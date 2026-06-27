@@ -1,6 +1,7 @@
-using Blackwall.Api.Configuration;
 using Blackwall.Api.Services;
+using Blackwall.Core.Configuration;
 using Blackwall.Core.DTOs;
+using Blackwall.Core.Services;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,20 +10,25 @@ using Microsoft.Extensions.Options;
 namespace Blackwall.Api.Controllers;
 
 [ApiController]
-[Route("api/auth")]
+[Route("[controller]")]
 public sealed class AuthController(
     DiscordOAuthService discordOAuthService,
-    JwtService jwtService,
+    AuthHandoffService authHandoffService,
+    GuildClaimService guildClaimService,
     BlackwallDbContext dbContext,
-    IOptions<WebOptions> webOptions
-) : ControllerBase {
-
+    IOptions<WebOptions> webOptions,
+    IOptions<AppConfiguration> appConfiguration
+) : ControllerBase
+{
     /// <summary>
     /// Builds and returns the Discord OAuth2 authorization URL to initiate login.
     /// </summary>
+    /// <returns>The Discord authorization URL.</returns>
+    /// <response code="200">Returns the Discord authorization URL.</response>
     [HttpGet("discord")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
-    public async Task<ActionResult<LoginResponse>> Login(CancellationToken ct) {
+    public async Task<ActionResult<LoginResponse>> Login()
+    {
         var state = await discordOAuthService.CreateAsync();
         var url = discordOAuthService.BuildLoginUrl(state);
 
@@ -30,20 +36,20 @@ public sealed class AuthController(
     }
 
     /// <summary>
-    /// Handles the Discord OAuth2 callback. Validates the code and state parameters, exchanges the
-    /// authorization code for an access token, retrieves the current user and guilds, and creates or
-    /// updates the local user record.
+    /// Handles the Discord OAuth2 callback. Validates the authorization code and state, exchanges the
+    /// code for an access token, and creates or updates the local user record. Syncs guild ownership
+    /// claims for the authenticated user, then redirects to the frontend with a short-lived handoff code.
     /// </summary>
     /// <param name="code">The authorization code returned by Discord.</param>
     /// <param name="state">The OAuth2 state parameter used for CSRF protection.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <returns>The authenticated user profile and their Discord guilds.</returns>
-    /// <response code="200">Returns the authenticated user and guild list.</response>
+    /// <returns>A redirect to the frontend auth callback URL containing the handoff code.</returns>
+    /// <response code="302">Redirects to the frontend with the handoff code.</response>
     /// <response code="400">The code or state is missing, invalid, or expired.</response>
     [HttpGet("discord/callback")]
-    [ProducesResponseType(typeof(DiscordCallbackResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status302Found)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<DiscordCallbackResponse>> Callback(
+    public async Task<IActionResult> Callback(
         [FromQuery] string? code,
         [FromQuery] string? state,
         CancellationToken cancellationToken
@@ -74,9 +80,9 @@ public sealed class AuthController(
             });
         }
 
-        var accessToken = await discordOAuthService.ExchangeCodeAsync(code, cancellationToken);
-        var discordUser = await discordOAuthService.GetCurrentUserAsync(accessToken, cancellationToken);
-        var guilds = await discordOAuthService.GetCurrentUserGuildsAsync(accessToken, cancellationToken);
+        var tokens = await discordOAuthService.ExchangeCodeAsync(code, cancellationToken);
+        var discordUser = await discordOAuthService.GetCurrentUserAsync(tokens.AccessToken, cancellationToken);
+        var guilds = await discordOAuthService.GetCurrentUserGuildsAsync(tokens.AccessToken, cancellationToken);
 
         if (!long.TryParse(discordUser.Id, out var discordUserId)) {
             return BadRequest(new ProblemDetails {
@@ -88,25 +94,91 @@ public sealed class AuthController(
 
         var user = await dbContext.AppUsers
             .FirstOrDefaultAsync(x => x.DiscordUserId == discordUserId, cancellationToken);
+        
+        var key = AesCrypto.GetBytes(appConfiguration.Value.EncryptionKey);
+        var iv = AesCrypto.GetBytes(appConfiguration.Value.EncryptionIv);
+        var encryptedAccessToken = AesCrypto.EncryptString(tokens.AccessToken, key, iv);
+        var encryptedRefreshToken = AesCrypto.EncryptString(tokens.RefreshToken, key, iv);
 
         if (user is null) {
             user = new Core.Entities.AppUser {
                 DiscordUserId = discordUserId,
                 Username = discordUser.Username,
-                DisplayName = discordUser.GlobalName
+                DisplayName = discordUser.GlobalName,
+                DiscordAccessToken = encryptedAccessToken,
+                DiscordRefreshToken = encryptedRefreshToken,
+                DiscordTokenExpiresAtUtc = tokens.ExpiresAt
             };
 
             dbContext.AppUsers.Add(user);
         } else {
             user.Username = discordUser.Username;
             user.DisplayName = discordUser.GlobalName;
+            user.DiscordAccessToken = encryptedAccessToken;
+            user.DiscordRefreshToken = encryptedRefreshToken;
+            user.DiscordTokenExpiresAtUtc = tokens.ExpiresAt;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        var token = jwtService.GenerateToken(user);
-        var redirectUrl = $"{webOptions.Value.BaseUrl.TrimEnd('/')}/auth/callback?token={Uri.EscapeDataString(token)}";
+        await guildClaimService.ClaimOwnershipAsync(user.Id, guilds, cancellationToken);
+
+        var handoffCode = await authHandoffService.CreateAsync(user);
+        var redirectUrl =
+            $"{webOptions.Value.BaseUrl.TrimEnd('/')}/auth/callback?code={Uri.EscapeDataString(handoffCode)}";
 
         return Redirect(redirectUrl);
+    }
+
+    /// <summary>
+    /// Exchanges a short-lived handoff code for a signed JWT.
+    /// Consumes the code atomically so it cannot be reused.
+    /// </summary>
+    /// <param name="request">The request body containing the handoff code.</param>
+    /// <param name="jwtService">The JWT service used to generate the token.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A signed JWT for the authenticated user.</returns>
+    /// <response code="200">Returns a signed JWT.</response>
+    /// <response code="400">The handoff code is missing, invalid, expired, or the associated user no longer exists.</response>
+    [HttpPost("exchange")]
+    [ProducesResponseType(typeof(AuthExchangeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<AuthExchangeResponse>> Exchange(
+        [FromBody] AuthExchangeRequest request,
+        [FromServices] JwtService jwtService,
+        CancellationToken cancellationToken
+    ) {
+        if (string.IsNullOrWhiteSpace(request.Code)) {
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid handoff code.",
+                Detail = "The handoff code is required.",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        var payload = await authHandoffService.ConsumeAsync(request.Code);
+
+        if (payload is null) {
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid or expired handoff code.",
+                Detail = "The handoff code was invalid, expired, or already used.",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        var user = await dbContext.AppUsers
+            .FirstOrDefaultAsync(x => x.Id == payload.UserId, cancellationToken);
+
+        if (user is null) {
+            return BadRequest(new ProblemDetails {
+                Title = "User not found.",
+                Detail = "The handoff code resolved to a user that no longer exists.",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        var token = jwtService.GenerateToken(user);
+
+        return Ok(new AuthExchangeResponse(token));
     }
 }

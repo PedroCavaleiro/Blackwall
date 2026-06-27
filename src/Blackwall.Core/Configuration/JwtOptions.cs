@@ -1,5 +1,8 @@
 // ReSharper disable NullableWarningSuppressionIsUsed
-namespace Blackwall.Api.Configuration;
+
+using Microsoft.Extensions.Configuration;
+
+namespace Blackwall.Core.Configuration;
 
 public class JwtOptions {
     public const string SectionName = "JWT";

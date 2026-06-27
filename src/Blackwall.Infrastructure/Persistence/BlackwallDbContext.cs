@@ -7,6 +7,9 @@ namespace Blackwall.Infrastructure.Persistence;
 public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> options) : DbContext(options) {
 
     public DbSet<AppUser> AppUsers => Set<AppUser>();
+    public DbSet<GuildInstance> GuildInstances => Set<GuildInstance>();
+    public DbSet<GuildManager> GuildManagers => Set<GuildManager>();
+    public DbSet<SpamConfiguration> SpamConfigurations => Set<SpamConfiguration>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes()) {
@@ -43,10 +46,6 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
 
         modelBuilder.Entity<GuildInstance>(entity => {
 
-            entity.Property(e => e.DiscordGuildId)
-                  .IsRequired()
-                  .HasMaxLength(32);
-
             entity.HasIndex(e => e.DiscordGuildId)
                   .IsUnique();
 
@@ -62,7 +61,8 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.HasOne(e => e.OwnerUser)
                   .WithMany(e => e.OwnedGuilds)
                   .HasForeignKey(e => e.OwnerUserId)
-                  .OnDelete(DeleteBehavior.Restrict);
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.SetNull);
 
             entity.HasOne(e => e.SpamConfiguration)
                   .WithOne(e => e.GuildInstance)
@@ -93,7 +93,6 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
         });
 
         modelBuilder.Entity<SpamConfiguration>(entity => {
-            entity.ToTable("spam_configurations");
 
             entity.Property(e => e.MaxMessagesPerWindow)
                   .IsRequired();

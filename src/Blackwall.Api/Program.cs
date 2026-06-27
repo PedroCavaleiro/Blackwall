@@ -1,11 +1,13 @@
 using System.Reflection;
 using System.Text;
-using Blackwall.Api.Configuration;
 using Blackwall.Api.Helpers;
 using Blackwall.Api.Services;
+using Blackwall.Bot.Background;
+using Blackwall.Bot.Services;
+using Blackwall.Core.Configuration;
 using Blackwall.Infrastructure;
+using Discord.WebSocket;
 using DotNetEnv;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
@@ -31,24 +33,40 @@ builder.Services.Configure<JwtOptions>(
 builder.Services.Configure<WebOptions>(
     builder.Configuration.GetSection(WebOptions.SectionName));
 
+builder.Services.Configure<AppConfiguration>(
+    builder.Configuration.GetSection(AppConfiguration.SectionName));
+
+builder.Services.Configure<GuildSyncOptions>(
+    builder.Configuration.GetSection(GuildSyncOptions.SectionName));
+
 var jwtOptions = builder.Configuration
                         .GetSection(JwtOptions.SectionName)
                         .Get<JwtOptions>() ?? throw new InvalidOperationException("JWT configuration is missing.");
 
+_ = builder.Configuration.GetSection(AppConfiguration.SectionName)
+    .Get<AppConfiguration>() ?? throw new InvalidOperationException("App configuration is missing.");
+
 builder.Services
-       .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-       .AddJwtBearer(options => {
-           options.TokenValidationParameters = new TokenValidationParameters {
-               ValidateIssuer = true,
-               ValidIssuer = jwtOptions.Issuer,
-               ValidateAudience = true,
-               ValidAudience = jwtOptions.Audience,
-               ValidateIssuerSigningKey = true,
-               IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret)),
-               ValidateLifetime = true,
-               ClockSkew = TimeSpan.FromMinutes(1)
-           };
-       });
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options => {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtOptions.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
+
+builder.Services.AddSingleton<DiscordSocketClient>();
+builder.Services.AddScoped<JwtService>();
+builder.Services.AddScoped<AuthHandoffService>();
+builder.Services.AddScoped<GuildPermissionSyncService>();
+builder.Services.AddHostedService<GuildPermissionSyncBackgroundService>();
 
 builder.Services.AddAuthorization();
 
@@ -82,7 +100,7 @@ app.MapGet("/health", () => Results.Redirect("/api/system/health"))
    .WithTags("System")
    .WithSummary("Convenience alias for the API health check")
    .WithDescription("This endpoint acts as an alias and returns a 302 Redirect to the primary health endpoint at `/api/system/health`.")
-   .Produces(StatusCodes.Status302Found);;
+   .Produces(StatusCodes.Status302Found);
 
 app.MapControllers();
 

@@ -1,4 +1,6 @@
-namespace Blackwall.Api.Configuration;
+using Microsoft.Extensions.Configuration;
+
+namespace Blackwall.Core.Configuration;
 
 public class WebOptions {
     public const string SectionName = "WEB";

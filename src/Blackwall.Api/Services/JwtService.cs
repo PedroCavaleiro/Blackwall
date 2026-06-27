@@ -1,7 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Blackwall.Api.Configuration;
+using Blackwall.Core.Configuration;
 using Blackwall.Core.Entities;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -11,7 +11,15 @@ namespace Blackwall.Api.Services;
 public sealed class JwtService(IOptions<JwtOptions> options) {
     private readonly JwtOptions _options = options.Value;
 
+    /// <summary>
+    /// Generates a signed JWT for the given user, valid for 7 days.
+    /// Includes the user's internal ID, Discord user ID, and username as claims.
+    /// The display name claim is included only when present.
+    /// </summary>
+    /// <param name="user">The user to generate a token for.</param>
+    /// <returns>A signed JWT string.</returns>
     public string GenerateToken(AppUser user) {
+        
         var claims = new List<Claim> {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new("discord_user_id", user.DiscordUserId.ToString()),
@@ -29,7 +37,8 @@ public sealed class JwtService(IOptions<JwtOptions> options) {
             audience: _options.Audience,
             claims: claims,
             expires: DateTime.UtcNow.AddDays(7),
-            signingCredentials: credentials);
+            signingCredentials: credentials
+        );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }

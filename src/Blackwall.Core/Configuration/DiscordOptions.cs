@@ -1,6 +1,9 @@
 // ReSharper disable NullableWarningSuppressionIsUsed
 // ReSharper disable UnusedAutoPropertyAccessor.Global
-namespace Blackwall.Api.Configuration;
+
+using Microsoft.Extensions.Configuration;
+
+namespace Blackwall.Core.Configuration;
 
 public sealed record DiscordOptions {
     public const string SectionName = "DISCORD";

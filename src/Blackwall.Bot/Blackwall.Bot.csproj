@@ -21,8 +21,6 @@
 
     <ItemGroup>
       <Folder Include="Algorithms\" />
-      <Folder Include="Handlers\" />
-      <Folder Include="Services\" />
     </ItemGroup>
 
 </Project>

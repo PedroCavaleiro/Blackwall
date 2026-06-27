@@ -9,11 +9,13 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\Blackwall.Bot\Blackwall.Bot.csproj" />
       <ProjectReference Include="..\Blackwall.Core\Blackwall.Core.csproj" />
       <ProjectReference Include="..\Blackwall.Infrastructure\Blackwall.Infrastructure.csproj" />
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="Discord.Net.WebSocket" Version="3.20.1" />
       <PackageReference Include="DotNetEnv" Version="3.2.0" />
       <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
       <PackageReference Include="Microsoft.AspNetCore.Authentication.OAuth" Version="2.3.11" />
@@ -28,6 +30,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Folder Include="Background\" />
       <Folder Include="Middleware\" />
     </ItemGroup>
 

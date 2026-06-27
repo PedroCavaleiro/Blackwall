@@ -3,6 +3,7 @@ using System;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Blackwall.Infrastructure.Migrations
 {
     [DbContext(typeof(BlackwallDbContext))]
-    partial class BlackwallDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260627164630_AddGuildInstanceIsActive")]
+    partial class AddGuildInstanceIsActive
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -63,10 +66,10 @@ namespace Blackwall.Infrastructure.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<long>("DiscordGuildId")
+                        .HasMaxLength(32)
                         .HasColumnType("bigint");
 
                     b.Property<string>("IconHash")
@@ -81,7 +84,7 @@ namespace Blackwall.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<long?>("OwnerUserId")
+                    b.Property<long>("OwnerUserId")
                         .HasColumnType("bigint");
 
                     b.Property<DateTime>("UpdatedAtUtc")
@@ -181,7 +184,8 @@ namespace Blackwall.Infrastructure.Migrations
                     b.HasOne("Blackwall.Core.Entities.AppUser", "OwnerUser")
                         .WithMany("OwnedGuilds")
                         .HasForeignKey("OwnerUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("OwnerUser");
                 });
