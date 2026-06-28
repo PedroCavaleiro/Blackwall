@@ -13,6 +13,8 @@ using Discord.WebSocket;
 using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Blackwall.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
 Env.TraversePath().Load();
@@ -110,6 +112,11 @@ builder.Services.AddOpenApi(options => {
 });
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope()) {
+    var db = scope.ServiceProvider.GetRequiredService<BlackwallDbContext>();
+    await db.Database.MigrateAsync();
+}
 
 app.MapGet("/health", () => Results.Redirect("/api/system/health"))
    .WithTags("System")
