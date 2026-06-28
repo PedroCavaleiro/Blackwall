@@ -1,0 +1,184 @@
+@page "/guild/{DiscordGuildId:long}"
+@attribute [Authorize]
+@inject BlackwallApiService Api
+@inject IHttpContextAccessor HttpContextAccessor
+
+<PageTitle>@(_settings?.Name ?? "Config") — Blackwall</PageTitle>
+
+<div style="max-width:760px;margin:0 auto;padding:2.5rem 1.5rem">
+    @if (_loading) {
+        <div class="font-mono" style="color:var(--bw-muted);font-size:0.85rem">&gt; Loading configuration...</div>
+    } else if (_settings is null) {
+        <div class="font-mono mb-4" style="color:var(--bw-danger);font-size:0.85rem">&gt; SIGNAL LOST: Guild not found or access denied.</div>
+        <a href="/dashboard" class="btn btn-primary cut-corner font-display" style="font-size:0.72rem">RETURN TO GRID</a>
+    } else {
+        <a href="/dashboard" class="d-inline-flex align-items-center gap-2 mb-4 font-mono text-decoration-none"
+           style="font-size:0.68rem;letter-spacing:0.12em;color:var(--bw-muted)">
+            &#8592; BACK TO GRID
+        </a>
+
+        <div class="d-flex align-items-center gap-3 mb-5">
+            <GuildAvatar Name="@_settings.Name" Icon="@_settings.IconHash" GuildId="@_settings.DiscordGuildId" />
+            <div>
+                <div class="font-mono mb-1" style="font-size:0.65rem;letter-spacing:0.15em;color:var(--bw-primary)">
+                    // GUILD CONFIG &middot; @_settings.DiscordGuildId
+                </div>
+                <h1 class="font-display mb-0" style="font-size:1.8rem;letter-spacing:0.04em">@_settings.Name.ToUpperInvariant()</h1>
+                <div class="font-mono mt-1" style="font-size:0.68rem;color:var(--bw-muted)">
+                    @(_settings.IsActive ? "BARRIER ACTIVE" : "BARRIER OFFLINE")
+                </div>
+            </div>
+        </div>
+
+        @if (_saved) {
+            <div class="alert alert-success font-mono mb-4" style="font-size:0.8rem">
+                // CONFIGURATION UPLOADED SUCCESSFULLY
+            </div>
+        }
+        @if (_error is not null) {
+            <div class="alert alert-danger font-mono mb-4" style="font-size:0.8rem">
+                // ERROR: @_error
+            </div>
+        }
+
+        <EditForm Model="Form" FormName="spam-settings" OnValidSubmit="SaveAsync" method="post">
+            <DataAnnotationsValidator />
+
+            <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                <div class="card-header">DETECTION MATRIX</div>
+                <div class="p-4">
+                    <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Tune the parameters that trip the barrier.</p>
+
+                    <div class="bw-field">
+                        <div class="bw-field-label">
+                            <div class="form-label mb-1">Rate limit window (seconds)</div>
+                            <div class="form-text">Time window for the spam counter.</div>
+                        </div>
+                        <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.RateLimitWindowSeconds" />
+                    </div>
+                    <div class="bw-field">
+                        <div class="bw-field-label">
+                            <div class="form-label mb-1">Max messages per window</div>
+                            <div class="form-text">Messages allowed per user before the barrier trips.</div>
+                        </div>
+                        <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.MaxMessagesPerWindow" />
+                    </div>
+                    <div class="bw-field">
+                        <div class="bw-field-label">
+                            <div class="form-label mb-1">Duplicate threshold</div>
+                            <div class="form-text">Delete after this many identical copies in the window.</div>
+                        </div>
+                        <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.DuplicateMessageThreshold" />
+                    </div>
+                    <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                        <div class="bw-field-label">
+                            <div class="form-label mb-1">Mention limit</div>
+                            <div class="form-text">Max user/role pings allowed per message.</div>
+                        </div>
+                        <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.MentionLimit" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="cut-corner border mb-5" style="background:var(--bs-card-bg)">
+                <div class="card-header">LINK BLOCKING</div>
+                <div class="p-4">
+                    <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Configure which external vectors are neutralized automatically.</p>
+
+                    <div class="bw-field">
+                        <div class="bw-field-label">
+                            <div class="form-label mb-1">Block Discord invite links</div>
+                            <div class="form-text">Deletes messages containing discord.gg invite URLs.</div>
+                        </div>
+                        <div class="form-check form-switch">
+                            <InputCheckbox class="form-check-input" id="blockInvites" @bind-Value="Form.BlockInviteLinks" style="width:2.5em;height:1.3em" />
+                        </div>
+                    </div>
+                    <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                        <div class="bw-field-label">
+                            <div class="form-label mb-1">Block external links</div>
+                            <div class="form-text">Deletes messages with URLs outside Discord's own domains.</div>
+                        </div>
+                        <div class="form-check form-switch">
+                            <InputCheckbox class="form-check-input" id="blockSuspicious" @bind-Value="Form.BlockSuspiciousLinks" style="width:2.5em;height:1.3em" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+                <button type="submit" class="btn btn-primary cut-corner font-display" style="font-size:0.75rem;letter-spacing:0.1em">
+                    COMMIT CHANGES
+                </button>
+                <a href="/dashboard" class="btn btn-outline-secondary font-display" style="font-size:0.75rem;letter-spacing:0.1em">
+                    CANCEL
+                </a>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [Parameter] public long DiscordGuildId { get; set; }
+
+#pragma warning disable BL0008
+    [SupplyParameterFromForm(FormName = "spam-settings")]
+    private SpamConfigForm Form { get; set; } = new();
+#pragma warning restore BL0008
+
+    private GuildSettingsResponse? _settings;
+    private bool _loading = true;
+    private bool _saved;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() {
+        try {
+            _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
+
+            var isPost = HttpContextAccessor.HttpContext?.Request.Method == "POST";
+
+            if (_settings is not null && !isPost) {
+                var s = _settings.SpamConfiguration;
+                Form.MaxMessagesPerWindow = s.MaxMessagesPerWindow;
+                Form.RateLimitWindowSeconds = s.RateLimitWindowSeconds;
+                Form.DuplicateMessageThreshold = s.DuplicateMessageThreshold;
+                Form.MentionLimit = s.MentionLimit;
+                Form.BlockInviteLinks = s.BlockInviteLinks;
+                Form.BlockSuspiciousLinks = s.BlockSuspiciousLinks;
+            }
+        } catch {
+            _settings = null;
+        } finally {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveAsync() {
+        _saved = false;
+        _error = null;
+
+        try {
+            await Api.UpdateGuildSettingsAsync(DiscordGuildId, new UpdateGuildSettingsRequest(
+                Form.MaxMessagesPerWindow,
+                Form.RateLimitWindowSeconds,
+                Form.DuplicateMessageThreshold,
+                Form.MentionLimit,
+                Form.BlockInviteLinks,
+                Form.BlockSuspiciousLinks
+            ));
+            _saved = true;
+            _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            _error = $"Failed to save settings: {ex.Message}";
+        }
+    }
+
+    private sealed class SpamConfigForm {
+        public int MaxMessagesPerWindow { get; set; } = 5;
+        public int RateLimitWindowSeconds { get; set; } = 5;
+        public int DuplicateMessageThreshold { get; set; } = 3;
+        public int MentionLimit { get; set; } = 5;
+        public bool BlockInviteLinks { get; set; } = true;
+        public bool BlockSuspiciousLinks { get; set; }
+    }
+}

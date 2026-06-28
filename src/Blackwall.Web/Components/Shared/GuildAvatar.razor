@@ -1,0 +1,25 @@
+@if (Icon is not null) {
+    <img src="https://cdn.discordapp.com/icons/@GuildId/@(Icon).png?size=64"
+         alt="@Name"
+         style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+    <div class="guild-avatar-fallback" style="display:none;width:48px;height:48px;border-radius:8px;background:linear-gradient(135deg,rgba(34,211,238,0.25),rgba(34,211,238,0.08));align-items:center;justify-content:center;font-weight:700;font-size:1rem;flex-shrink:0;color:var(--bw-primary)">
+        @Initials
+    </div>
+} else {
+    <div style="width:48px;height:48px;border-radius:8px;background:linear-gradient(135deg,rgba(34,211,238,0.25),rgba(34,211,238,0.08));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;flex-shrink:0;color:var(--bw-primary)">
+        @Initials
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public required string Name { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public long GuildId { get; set; }
+
+    private string Initials => string.Concat(
+        Name.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Take(2)
+            .Select(w => char.ToUpperInvariant(w[0]))
+    );
+}
