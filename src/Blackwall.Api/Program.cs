@@ -21,6 +21,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddEnvironmentVariables();
 
+var apiPort = builder.Configuration["API:PORT"];
+if (!string.IsNullOrWhiteSpace(apiPort))
+    builder.WebHost.UseUrls($"http://*:{apiPort}");
+
 builder.Services.AddControllers(options => {
     options.Conventions.Insert(0, new GlobalRoutePrefixConvention("api"));
 });

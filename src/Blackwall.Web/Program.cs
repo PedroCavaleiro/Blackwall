@@ -11,6 +11,10 @@ Env.TraversePath().Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
+var webPort = builder.Configuration["WEB:PORT"];
+if (!string.IsNullOrWhiteSpace(webPort))
+    builder.WebHost.UseUrls($"http://*:{webPort}");
+
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("JWT configuration is missing.");
 
