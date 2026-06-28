@@ -1,0 +1,18 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+COPY src/Blackwall.Core/Blackwall.Core.csproj                         src/Blackwall.Core/
+COPY src/Blackwall.Infrastructure/Blackwall.Infrastructure.csproj     src/Blackwall.Infrastructure/
+COPY src/Blackwall.Bot/Blackwall.Bot.csproj                           src/Blackwall.Bot/
+COPY src/Blackwall.Api/Blackwall.Api.csproj                           src/Blackwall.Api/
+RUN dotnet restore src/Blackwall.Api/Blackwall.Api.csproj
+
+COPY src/ src/
+RUN dotnet publish src/Blackwall.Api/Blackwall.Api.csproj \
+    -c Release -o /app/publish --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "Blackwall.Api.dll"]

@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: blackwall
+      POSTGRES_USER: blackwall
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blackwall"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    env_file: .env
+    environment:
+      API__PORT: "8080"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    env_file: .env
+    environment:
+      WEB__PORT: "8080"
+      API__BASE_URL: "http://api:8080"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+      - web
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
