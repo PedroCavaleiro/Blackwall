@@ -1,3 +1,4 @@
+using Blackwall.Infrastructure.Cache;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -20,6 +21,7 @@ public static class DependencyInjection {
 
         services.AddDbContext<BlackwallDbContext>(options => options.UseNpgsql(dbConnection));
         services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConnection));
+        services.AddScoped<SpamConfigurationCache>();
     }
 
 }

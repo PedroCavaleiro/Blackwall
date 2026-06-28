@@ -8,6 +8,8 @@ namespace Blackwall.Core.Configuration;
 public sealed record DiscordOptions {
     public const string SectionName = "DISCORD";
 
+    [ConfigurationKeyName("BOT_TOKEN")]
+    public required string BotToken { get; set; }
     [ConfigurationKeyName("CLIENT_ID")]
     public required string ClientId { get; set; }
     [ConfigurationKeyName("CLIENT_SECRET")]

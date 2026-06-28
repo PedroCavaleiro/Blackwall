@@ -34,6 +34,15 @@ namespace Blackwall.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("DiscordAccessToken")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DiscordRefreshToken")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DiscordTokenExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<long>("DiscordUserId")
                         .HasMaxLength(32)
                         .HasColumnType("bigint");

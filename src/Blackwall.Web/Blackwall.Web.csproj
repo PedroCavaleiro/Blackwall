@@ -11,4 +11,9 @@
       <ProjectReference Include="..\Blackwall.Core\Blackwall.Core.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="DotNetEnv" Version="3.2.0" />
+      <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
+    </ItemGroup>
+
 </Project>

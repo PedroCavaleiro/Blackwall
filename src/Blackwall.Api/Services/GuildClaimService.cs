@@ -53,61 +53,89 @@ public sealed class GuildClaimService(BlackwallDbContext dbContext)
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A read-only list of <see cref="ManageableGuildResponse"/> for all guilds the user can manage.</returns>
     public async Task<IReadOnlyList<ManageableGuildResponse>> GetManageableGuildsAsync(
+    long appUserId,
+    IReadOnlyList<DiscordGuildDto> guilds,
+    CancellationToken cancellationToken = default)
+{
+    var manageableGuilds = guilds
+        .Where(CanManage)
+        .ToList();
+
+    var guildIds = guilds.Select(x => x.Id).Select(long.Parse).AsEnumerable();
+
+    var existingGuilds = await dbContext.GuildInstances
+        .Where(x => guildIds.Contains(x.DiscordGuildId))
+        .Select(x => new {
+            x.Id,
+            x.DiscordGuildId,
+            x.IsActive,
+            x.OwnerUserId
+        })
+        .ToListAsync(cancellationToken);
+
+    var guildMap = existingGuilds.ToDictionary(x => x.DiscordGuildId);
+
+    var guildInstanceIds = existingGuilds
+        .Select(x => x.Id)
+        .AsEnumerable();
+
+    var managerGuildIds = await dbContext.GuildManagers
+        .Where(x => guildInstanceIds.Contains(x.GuildInstanceId) && x.UserId == appUserId)
+        .Select(x => x.GuildInstanceId)
+        .ToListAsync(cancellationToken);
+
+    var managerSet = managerGuildIds.ToHashSet();
+
+    return manageableGuilds
+        .Select(guild => {
+            guildMap.TryGetValue(long.Parse(guild.Id), out var existing);
+
+            var botInstalled = existing is not null && existing.IsActive;
+            var claimed = existing?.OwnerUserId is not null;
+            var isManager = existing is not null && managerSet.Contains(existing.Id);
+
+            var canOpen = existing is not null
+                          && existing.IsActive
+                          && (existing.OwnerUserId == appUserId || guild.Owner || isManager);
+
+            return new ManageableGuildResponse(
+                DiscordGuildId: long.Parse(guild.Id),
+                Name: guild.Name,
+                Icon: guild.Icon,
+                Owner: guild.Owner,
+                CanManage: true,
+                BotInstalled: botInstalled,
+                Claimed: claimed,
+                CanOpen: canOpen
+            );
+        })
+        .OrderByDescending(x => x.Owner)
+        .ThenBy(x => x.Name)
+        .ToList();
+}
+
+    /// <summary>
+    /// Determines whether the specified user has permission to open the dashboard for a guild.
+    /// Returns true if the user is the owner or an explicit manager of the active guild instance.
+    /// </summary>
+    public async Task<bool> CanOpenGuildAsync(
         long appUserId,
-        IReadOnlyList<DiscordGuildDto> guilds,
-        CancellationToken cancellationToken = default
-    ) {
-        var manageableGuilds = guilds
-            .Where(CanManage)
-            .ToList();
+        long discordGuildId,
+        CancellationToken cancellationToken = default)
+    {
+        var instance = await dbContext.GuildInstances
+            .Where(x => x.DiscordGuildId == discordGuildId && x.IsActive)
+            .Select(x => new { x.Id, x.OwnerUserId })
+            .FirstOrDefaultAsync(cancellationToken);
 
-        var guildIds = guilds.Select(x => x.Id).Select(long.Parse).AsEnumerable();
+        if (instance is null)
+            return false;
 
-        var existingGuilds = await dbContext.GuildInstances
-            .Where(x => guildIds.Contains(x.DiscordGuildId))
-            .ToListAsync(cancellationToken);
-        
-        var guildInstanceIds = existingGuilds.Select(x => x.Id).AsEnumerable();
-        var managers = await dbContext.GuildManagers
-            .Where(x => guildInstanceIds.Contains(x.GuildInstanceId) && x.UserId == appUserId)
-            .ToListAsync(cancellationToken);
-        
+        if (instance.OwnerUserId == appUserId)
+            return true;
 
-        var response = manageableGuilds
-            .Select(guild => {
-                var existing = existingGuilds.FirstOrDefault(x => x.DiscordGuildId == long.Parse(guild.Id));
-
-                var botInstalled = existing is not null && existing.IsActive;
-                var claimed = existing?.OwnerUserId is not null;
-
-                var isManager = existing is not null &&
-                                managers.Any(x => x.GuildInstanceId == existing.Id);
-
-                var canOpen =
-                    existing is not null &&
-                    existing.IsActive &&
-                    (
-                        existing.OwnerUserId == appUserId ||
-                        guild.Owner ||
-                        isManager
-                    );
-
-                return new ManageableGuildResponse(
-                    DiscordGuildId: long.Parse(guild.Id),
-                    Name: guild.Name,
-                    Icon: guild.Icon,
-                    Owner: guild.Owner,
-                    CanManage: true,
-                    BotInstalled: botInstalled,
-                    Claimed: claimed,
-                    CanOpen: canOpen
-                );
-            })
-            .OrderByDescending(x => x.Owner)
-            .ThenBy(x => x.Name)
-            .ToList();
-
-        return response;
+        return await dbContext.GuildManagers
+            .AnyAsync(x => x.GuildInstanceId == instance.Id && x.UserId == appUserId, cancellationToken);
     }
 
     /// <summary>

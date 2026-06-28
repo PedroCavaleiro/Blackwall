@@ -24,7 +24,8 @@ public sealed class GuildPermissionSyncBackgroundService(
 
         logger.LogInformation(
             "Guild permission sync background service started with interval {IntervalMinutes} minute(s).",
-            interval.TotalMinutes);
+            interval.TotalMinutes
+        );
 
         using var timer = new PeriodicTimer(interval);
 

@@ -2,10 +2,13 @@ using System.Reflection;
 using System.Text;
 using Blackwall.Api.Helpers;
 using Blackwall.Api.Services;
+using Blackwall.Bot;
 using Blackwall.Bot.Background;
+using Blackwall.Bot.Handlers;
 using Blackwall.Bot.Services;
 using Blackwall.Core.Configuration;
 using Blackwall.Infrastructure;
+using Discord;
 using Discord.WebSocket;
 using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -62,10 +65,18 @@ builder.Services
         };
     });
 
-builder.Services.AddSingleton<DiscordSocketClient>();
+builder.Services.AddSingleton<DiscordSocketClient>(_ => new DiscordSocketClient(new DiscordSocketConfig {
+    GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent
+}));
+builder.Services.AddSingleton<GuildHandler>();
+builder.Services.AddSingleton<MessageHandler>();
+builder.Services.AddSingleton<SpamDetectionService>();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<AuthHandoffService>();
+builder.Services.AddScoped<GuildClaimService>();
 builder.Services.AddScoped<GuildPermissionSyncService>();
+builder.Services.AddSingleton<DiscordGuildCacheService>();
+builder.Services.AddHostedService<BotWorker>();
 builder.Services.AddHostedService<GuildPermissionSyncBackgroundService>();
 
 builder.Services.AddAuthorization();

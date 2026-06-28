@@ -15,6 +15,7 @@ public sealed class AuthController(
     DiscordOAuthService discordOAuthService,
     AuthHandoffService authHandoffService,
     GuildClaimService guildClaimService,
+    DiscordGuildCacheService guildCache,
     BlackwallDbContext dbContext,
     IOptions<WebOptions> webOptions,
     IOptions<AppConfiguration> appConfiguration
@@ -122,6 +123,7 @@ public sealed class AuthController(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await guildClaimService.ClaimOwnershipAsync(user.Id, guilds, cancellationToken);
+        await guildCache.StoreAsync(user.Id, guilds, cancellationToken);
 
         var handoffCode = await authHandoffService.CreateAsync(user);
         var redirectUrl =

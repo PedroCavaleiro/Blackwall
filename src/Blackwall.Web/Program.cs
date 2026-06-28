@@ -1,24 +1,108 @@
+using System.Text;
+using Blackwall.Core.Configuration;
+using Blackwall.Core.DTOs;
 using Blackwall.Web.Components;
+using Blackwall.Web.Services;
+using DotNetEnv;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+
+Env.TraversePath().Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
+    ?? throw new InvalidOperationException("JWT configuration is missing.");
+
+var apiOptions = builder.Configuration.GetSection(ApiOptions.SectionName).Get<ApiOptions>()
+    ?? throw new InvalidOperationException("API configuration is missing.");
+
+builder.Services.Configure<ApiOptions>(builder.Configuration.GetSection(ApiOptions.SectionName));
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options => {
+        options.TokenValidationParameters = new TokenValidationParameters {
+            ValidateIssuer = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtOptions.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
+
+builder.Services.AddAuthorization();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddHttpClient<BlackwallApiService>(client => {
+    client.BaseAddress = new Uri(apiOptions.BaseUrl.TrimEnd('/') + '/');
+});
+
 builder.Services.AddRazorComponents()
-       .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment()) {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
+app.Use(async (context, next) => {
+    var token = context.Request.Cookies["blackwall_jwt"];
+    if (token is not null && !context.Request.Headers.ContainsKey("Authorization"))
+        context.Request.Headers.Authorization = $"Bearer {token}";
+    await next(context);
+});
+
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
+
+app.MapGet("/auth/login", async (HttpContext ctx) => {
+    using var client = new HttpClient();
+    var response = await client.GetFromJsonAsync<LoginResponse>(
+        $"{apiOptions.BaseUrl.TrimEnd('/')}/api/auth/discord");
+
+    return response?.Url is not null
+        ? Results.Redirect(response.Url)
+        : Results.Redirect("/?error=auth_failed");
+}).AllowAnonymous();
+
+app.MapGet("/auth/callback", async (string code, HttpContext ctx) => {
+    using var client = new HttpClient();
+    var response = await client.PostAsJsonAsync(
+        $"{apiOptions.BaseUrl.TrimEnd('/')}/api/auth/exchange",
+        new AuthExchangeRequest(code));
+
+    if (!response.IsSuccessStatusCode)
+        return Results.Redirect("/?error=auth_failed");
+
+    var result = await response.Content.ReadFromJsonAsync<AuthExchangeResponse>();
+
+    if (result?.Token is null)
+        return Results.Redirect("/?error=auth_failed");
+
+    ctx.Response.Cookies.Append("blackwall_jwt", result.Token, new CookieOptions {
+        HttpOnly = true,
+        Secure = !app.Environment.IsDevelopment(),
+        SameSite = SameSiteMode.Lax,
+        Expires = DateTimeOffset.UtcNow.AddDays(7)
+    });
+
+    return Results.Redirect("/dashboard");
+}).AllowAnonymous();
+
+app.MapGet("/auth/logout", (HttpContext ctx) => {
+    ctx.Response.Cookies.Delete("blackwall_jwt");
+    return Results.Redirect("/");
+}).AllowAnonymous();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
