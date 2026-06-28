@@ -1,4 +1,5 @@
 using Blackwall.Core.DTOs;
+using Blackwall.Core.Entities;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,6 +26,15 @@ public sealed class GuildClaimService(BlackwallDbContext dbContext)
             .Where(x => guildIds.Contains(x.DiscordGuildId))
             .ToListAsync(cancellationToken);
 
+        var existingInstanceIds = existingGuilds.Select(x => x.Id).ToList();
+
+        var existingManagerInstanceIds = await dbContext.GuildManagers
+            .Where(x => x.UserId == appUserId && existingInstanceIds.Contains(x.GuildInstanceId))
+            .Select(x => x.GuildInstanceId)
+            .ToListAsync(cancellationToken);
+
+        var managerInstanceSet = existingManagerInstanceIds.ToHashSet();
+
         foreach (var guild in manageableGuilds) {
             var existing = existingGuilds.FirstOrDefault(x => x.DiscordGuildId == long.Parse(guild.Id));
 
@@ -36,8 +46,16 @@ public sealed class GuildClaimService(BlackwallDbContext dbContext)
             existing.IsActive = true;
             existing.UpdatedAtUtc = DateTime.UtcNow;
 
-            if (existing.OwnerUserId is null && guild.Owner)
+            if (existing.OwnerUserId is null && guild.Owner) {
                 existing.OwnerUserId = appUserId;
+            } else if (existing.OwnerUserId != appUserId && !managerInstanceSet.Contains(existing.Id)) {
+                dbContext.GuildManagers.Add(new GuildManager {
+                    GuildInstanceId = existing.Id,
+                    UserId = appUserId,
+                    IsAdmin = true
+                });
+                managerInstanceSet.Add(existing.Id);
+            }
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

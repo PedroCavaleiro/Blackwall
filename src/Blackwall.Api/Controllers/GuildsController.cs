@@ -198,8 +198,10 @@ public sealed class GuildsController(
             throw new InvalidOperationException("No Discord access token is available for this user.");
 
         var cachedGuilds = await guildCache.GetAsync(appUserId, cancellationToken);
-        if (cachedGuilds is not null)
+        if (cachedGuilds is not null) {
+            await guildClaimService.ClaimOwnershipAsync(appUserId, cachedGuilds, cancellationToken);
             return await guildClaimService.GetManageableGuildsAsync(appUserId, cachedGuilds, cancellationToken);
+        }
 
         var accessToken = await discordOAuthService.EnsureFreshAccessTokenAsync(user, cancellationToken);
         var guilds = await discordOAuthService.GetCurrentUserGuildsAsync(accessToken, cancellationToken);
