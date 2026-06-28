@@ -6,16 +6,11 @@ using StackExchange.Redis;
 
 namespace Blackwall.Bot.Services;
 
-public sealed class SpamDetectionService(IConnectionMultiplexer redis) {
+public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     private readonly IDatabase _db = redis.GetDatabase();
 
-    private static readonly Regex InviteLinkPattern = new(
-        @"discord(?:\.gg|\.com/invite)/[a-zA-Z0-9-]+",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    private static readonly Regex SuspiciousLinkPattern = new(
-        @"https?://(?!(?:cdn\.discordapp\.com|media\.discordapp\.net|discord\.com|discord\.gg))[^\s]+",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex InviteLinkPattern = InviteLinkPatternRegex();
+    private static readonly Regex SuspiciousLinkPattern = SuspiciousLinkPatternRegex();
 
     /// <summary>
     /// Increments a per-user per-guild message counter in Redis. Returns true if the count
@@ -25,7 +20,8 @@ public sealed class SpamDetectionService(IConnectionMultiplexer redis) {
         long discordGuildId,
         long discordUserId,
         int maxMessages,
-        int windowSeconds) {
+        int windowSeconds
+    ) {
         var key = $"spam:ratelimit:{discordGuildId}:{discordUserId}";
         var count = await _db.StringIncrementAsync(key);
 
@@ -44,7 +40,8 @@ public sealed class SpamDetectionService(IConnectionMultiplexer redis) {
         long discordUserId,
         string content,
         int threshold,
-        int windowSeconds) {
+        int windowSeconds
+    ) {
         if (string.IsNullOrWhiteSpace(content))
             return false;
 
@@ -78,4 +75,9 @@ public sealed class SpamDetectionService(IConnectionMultiplexer redis) {
     /// <summary>Returns true if the content contains any non-Discord URL.</summary>
     public static bool ContainsSuspiciousLink(string content) =>
         SuspiciousLinkPattern.IsMatch(content);
+    
+    [GeneratedRegex(@"discord(?:\.gg|\.com/invite)/[a-zA-Z0-9-]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
+    private static partial Regex InviteLinkPatternRegex();
+    [GeneratedRegex(@"https?://(?!(?:cdn\.discordapp\.com|media\.discordapp\.net|discord\.com|discord\.gg))[^\s]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
+    private static partial Regex SuspiciousLinkPatternRegex();
 }

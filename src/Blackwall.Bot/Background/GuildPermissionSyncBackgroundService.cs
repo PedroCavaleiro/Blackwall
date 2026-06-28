@@ -14,6 +14,7 @@ public sealed class GuildPermissionSyncBackgroundService(
 ) : BackgroundService {
     private readonly GuildSyncOptions _options = options.Value;
 
+    /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
         if (!_options.Enabled) {
             logger.LogInformation("Guild permission sync background service is disabled.");
@@ -49,6 +50,10 @@ public sealed class GuildPermissionSyncBackgroundService(
         logger.LogInformation("Guild permission sync background service stopped.");
     }
 
+    /// <summary>
+    /// Runs a single sync operation.
+    /// </summary>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
     private async Task RunOnceAsync(CancellationToken cancellationToken) {
         using var scope = scopeFactory.CreateScope();
         var syncService = scope.ServiceProvider.GetRequiredService<GuildPermissionSyncService>();

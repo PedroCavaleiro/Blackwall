@@ -22,8 +22,8 @@ public sealed class SpamConfigurationCache(
     /// </summary>
     public async Task<SpamConfigurationDto?> GetByDiscordGuildIdAsync(
         long discordGuildId,
-        CancellationToken cancellationToken = default)
-    {
+        CancellationToken cancellationToken = default
+    ) {
         var key = $"{KeyPrefix}{discordGuildId}";
         var cached = await _db.StringGetAsync(key);
 

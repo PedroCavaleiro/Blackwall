@@ -15,8 +15,8 @@ public sealed class BotController(
     BlackwallDbContext dbContext,
     GuildClaimService guildClaimService,
     DiscordGuildCacheService guildCache
-) : ControllerBase
-{
+) : ControllerBase {
+    
     /// <summary>
     /// Returns the Discord OAuth2 URL to add Blackwall to a server.
     /// Optionally pre-selects a target guild if the current user can manage it.
@@ -71,6 +71,10 @@ public sealed class BotController(
         return Ok(new BotInviteResponse(url));
     }
 
+    /// <summary>
+    /// Extracts the current user's application ID from the JWT claims.
+    /// </summary>
+    /// <returns>The user's application ID, or <c>null</c> if the claim is missing or unparseable.</returns>
     private long? GetCurrentUserId() {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
                           ?? User.FindFirstValue("sub");
@@ -80,6 +84,15 @@ public sealed class BotController(
             : null;
     }
 
+    /// <summary>
+    /// Loads the list of Discord guilds that the specified user can manage.
+    /// Uses a cache when available; otherwise fetches from the Discord API and populates the cache.
+    /// </summary>
+    /// <param name="appUserId">The application user ID to load guilds for.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A read-only list of guilds the user can manage.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the user does not exist or has no Discord access token.</exception>
+    /// <exception cref="HttpRequestException">Thrown when the Discord API call fails.</exception>
     private async Task<IReadOnlyList<ManageableGuildResponse>> LoadManageableGuildsForUser(
         long appUserId,
         CancellationToken cancellationToken
@@ -93,7 +106,7 @@ public sealed class BotController(
         if (string.IsNullOrWhiteSpace(user.DiscordAccessToken))
             throw new InvalidOperationException("No Discord access token is available for this user.");
 
-        var cachedGuilds = await guildCache.GetAsync(appUserId, cancellationToken);
+        var cachedGuilds = await guildCache.GetAsync(appUserId);
         if (cachedGuilds is not null) {
             await guildClaimService.ClaimOwnershipAsync(appUserId, cachedGuilds, cancellationToken);
             return await guildClaimService.GetManageableGuildsAsync(appUserId, cachedGuilds, cancellationToken);
@@ -102,7 +115,7 @@ public sealed class BotController(
         var accessToken = await discordOAuthService.EnsureFreshAccessTokenAsync(user, cancellationToken);
         var guilds = await discordOAuthService.GetCurrentUserGuildsAsync(accessToken, cancellationToken);
         await guildClaimService.ClaimOwnershipAsync(user.Id, guilds, cancellationToken);
-        await guildCache.StoreAsync(appUserId, guilds, cancellationToken);
+        await guildCache.StoreAsync(appUserId, guilds);
 
         return await guildClaimService.GetManageableGuildsAsync(user.Id, guilds, cancellationToken);
     }

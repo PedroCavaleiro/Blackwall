@@ -58,7 +58,7 @@ public sealed class GuildHandler(
                 DuplicateMessageThreshold = 3,
                 MentionLimit = 5,
                 BlockInviteLinks = true,
-                BlockSuspiciousLinks = true
+                BlockSuspiciousLinks = false
             }
         };
 

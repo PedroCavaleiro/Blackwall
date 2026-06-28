@@ -54,8 +54,7 @@ public sealed class DiscordOAuthService(
     /// <param name="guildId">The Discord guild ID to pre-select in the bot invite flow. If not provided, Discord will prompt the user to choose a server.</param>
     /// <returns>The full Discord bot invite URL.</returns>
     public string BuildBotInviteUrl(long? guildId = null) {
-        var query = new Dictionary<string, string>
-        {
+        var query = new Dictionary<string, string> {
             ["client_id"] = _options.ClientId,
             ["permissions"] = _options.BotPermissions,
             ["scope"] = _options.BotScopes,

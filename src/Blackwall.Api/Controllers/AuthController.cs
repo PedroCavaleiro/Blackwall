@@ -19,8 +19,7 @@ public sealed class AuthController(
     BlackwallDbContext dbContext,
     IOptions<WebOptions> webOptions,
     IOptions<AppConfiguration> appConfiguration
-) : ControllerBase
-{
+) : ControllerBase {
     /// <summary>
     /// Builds and returns the Discord OAuth2 authorization URL to initiate login.
     /// </summary>
@@ -28,8 +27,7 @@ public sealed class AuthController(
     /// <response code="200">Returns the Discord authorization URL.</response>
     [HttpGet("discord")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
-    public async Task<ActionResult<LoginResponse>> Login()
-    {
+    public async Task<ActionResult<LoginResponse>> Login() {
         var state = await discordOAuthService.CreateAsync();
         var url = discordOAuthService.BuildLoginUrl(state);
 
@@ -123,7 +121,7 @@ public sealed class AuthController(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await guildClaimService.ClaimOwnershipAsync(user.Id, guilds, cancellationToken);
-        await guildCache.StoreAsync(user.Id, guilds, cancellationToken);
+        await guildCache.StoreAsync(user.Id, guilds);
 
         var handoffCode = await authHandoffService.CreateAsync(user);
         var redirectUrl =
