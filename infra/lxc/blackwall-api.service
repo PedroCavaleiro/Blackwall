@@ -1,0 +1,21 @@
+[Unit]
+Description=Blackwall API
+Documentation=https://github.com/pmcav/Blackwall
+After=network.target postgresql.service redis-server.service
+Requires=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=blackwall
+Group=blackwall
+WorkingDirectory=/opt/blackwall/api
+ExecStart=/usr/bin/dotnet /opt/blackwall/api/Blackwall.Api.dll
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+SyslogIdentifier=blackwall-api
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
+
+[Install]
+WantedBy=multi-user.target
