@@ -104,6 +104,13 @@ app.MapGet("/auth/logout", (HttpContext ctx) => {
     return Results.Redirect("/");
 }).AllowAnonymous();
 
+app.MapGet("/bot/invite", async (long guildId, BlackwallApiService api) => {
+    var url = await api.GetBotInviteUrlAsync(guildId);
+    return url is not null
+        ? Results.Redirect(url)
+        : Results.Redirect("/dashboard");
+}).RequireAuthorization();
+
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
    .AddInteractiveServerRenderMode();

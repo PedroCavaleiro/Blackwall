@@ -13,7 +13,8 @@ namespace Blackwall.Api.Controllers;
 public sealed class BotController(
     DiscordOAuthService discordOAuthService,
     BlackwallDbContext dbContext,
-    GuildClaimService guildClaimService
+    GuildClaimService guildClaimService,
+    DiscordGuildCacheService guildCache
 ) : ControllerBase
 {
     /// <summary>
@@ -57,6 +58,13 @@ public sealed class BotController(
                     Status = StatusCodes.Status401Unauthorized
                 });
             }
+            catch (HttpRequestException ex) {
+                return Unauthorized(new ProblemDetails {
+                    Title = "Discord API error.",
+                    Detail = ex.Message,
+                    Status = StatusCodes.Status401Unauthorized
+                });
+            }
         }
 
         var url = discordOAuthService.BuildBotInviteUrl(guildId);
@@ -85,9 +93,14 @@ public sealed class BotController(
         if (string.IsNullOrWhiteSpace(user.DiscordAccessToken))
             throw new InvalidOperationException("No Discord access token is available for this user.");
 
+        var cachedGuilds = await guildCache.GetAsync(appUserId, cancellationToken);
+        if (cachedGuilds is not null)
+            return await guildClaimService.GetManageableGuildsAsync(appUserId, cachedGuilds, cancellationToken);
+
         var accessToken = await discordOAuthService.EnsureFreshAccessTokenAsync(user, cancellationToken);
         var guilds = await discordOAuthService.GetCurrentUserGuildsAsync(accessToken, cancellationToken);
         await guildClaimService.ClaimOwnershipAsync(user.Id, guilds, cancellationToken);
+        await guildCache.StoreAsync(appUserId, guilds, cancellationToken);
 
         return await guildClaimService.GetManageableGuildsAsync(user.Id, guilds, cancellationToken);
     }
