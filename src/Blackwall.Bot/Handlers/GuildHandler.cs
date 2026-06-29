@@ -61,7 +61,7 @@ public sealed class GuildHandler(
                 BlockSuspiciousLinks = false,
                 IsEnabled = true,
                 IsDryRun = false,
-                Action = Blackwall.Core.Entities.InfractionAction.DeleteOnly,
+                Action = InfractionAction.DeleteOnly,
                 LogChannelId = null,
                 MessageDeleteDays = 0,
                 IsAntiRaidEnabled = false,
