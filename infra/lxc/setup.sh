@@ -18,7 +18,7 @@ warn()    { echo -e "\e[33m[WARN]\e[0m  $*"; }
 info "Updating system packages..."
 apt-get update -qq
 apt-get upgrade -y -qq
-apt-get install -y -qq curl wget gnupg2 lsb-release ca-certificates openssl
+apt-get install -y -qq curl wget gnupg2 lsb-release ca-certificates openssl rsync
 
 # ─── .NET 10 ASP.NET Core Runtime ─────────────────────────────────────────────
 if ! command -v dotnet &>/dev/null || [[ "$(dotnet --version 2>/dev/null | cut -d. -f1)" -lt 10 ]]; then
