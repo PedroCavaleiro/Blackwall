@@ -154,6 +154,10 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .IsRequired()
                   .HasDefaultValue(30);
 
+            entity.Property(e => e.IsLockedDown)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
             entity.Property(e => e.UpdatedAtUtc);
         });
 

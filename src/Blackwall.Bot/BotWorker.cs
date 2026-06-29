@@ -13,6 +13,7 @@ public sealed class BotWorker(
     GuildHandler guildHandler,
     MessageHandler messageHandler,
     GuildMemberHandler guildMemberHandler,
+    InteractionHandler interactionHandler,
     IOptions<DiscordOptions> options,
     ILogger<BotWorker> logger
 ) : IHostedService {
@@ -25,6 +26,7 @@ public sealed class BotWorker(
         client.LeftGuild += guildHandler.OnLeftGuildAsync;
         client.MessageReceived += messageHandler.OnMessageReceivedAsync;
         client.UserJoined += guildMemberHandler.OnUserJoinedAsync;
+        client.InteractionCreated += interactionHandler.OnInteractionCreatedAsync;
 
         await client.LoginAsync(TokenType.Bot, options.Value.BotToken);
         await client.StartAsync();
@@ -37,6 +39,7 @@ public sealed class BotWorker(
         client.LeftGuild -= guildHandler.OnLeftGuildAsync;
         client.MessageReceived -= messageHandler.OnMessageReceivedAsync;
         client.UserJoined -= guildMemberHandler.OnUserJoinedAsync;
+        client.InteractionCreated -= interactionHandler.OnInteractionCreatedAsync;
 
         await client.StopAsync();
         await client.LogoutAsync();
@@ -50,6 +53,8 @@ public sealed class BotWorker(
     private async Task OnReadyAsync() {
         foreach (var guild in client.Guilds)
             await guildHandler.OnJoinedGuildAsync(guild);
+
+        await interactionHandler.RegisterCommandsAsync(client);
     }
 
     /// <summary>

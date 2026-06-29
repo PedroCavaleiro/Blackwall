@@ -79,6 +79,8 @@ builder.Services.AddSingleton<MessageHandler>();
 builder.Services.AddSingleton<GuildMemberHandler>();
 builder.Services.AddSingleton<SpamDetectionService>();
 builder.Services.AddSingleton<RaidDetectionService>();
+builder.Services.AddSingleton<LockdownService>();
+builder.Services.AddSingleton<InteractionHandler>();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<AuthHandoffService>();
 builder.Services.AddScoped<GuildClaimService>();

@@ -102,6 +102,45 @@
                         }
                     </div>
                 </div>
+
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg);border-color:var(--bw-danger) !important">
+                    <div class="card-header" style="color:var(--bw-danger)">LOCKDOWN</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                            Instantly denies Send Messages, Send Messages in Threads, and Create Public Threads for @@everyone in every text channel and category via channel-specific permission overwrites. Higher-tier roles are unaffected. Use /lockdown or /unlock in Discord to toggle from chat.
+                        </p>
+
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Lockdown status</div>
+                                <div class="form-text">
+                                    @if (_isLockedDown) {
+                                        <text><span style="color:var(--bw-danger);font-weight:600">LOCKDOWN ACTIVE</span> &mdash; @("@everyone") is denied Send Messages in all text channels.</text>
+                                    } else {
+                                        <text><span style="color:var(--bw-muted)">Inactive</span> &mdash; all channels are operating normally.</text>
+                                    }
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                @if (_isLockedDown) {
+                                    <button type="button" class="btn btn-outline-success cut-corner font-display"
+                                            style="font-size:0.72rem;letter-spacing:0.1em"
+                                            disabled="@_lockdownBusy"
+                                            @onclick="UnlockAsync">
+                                        @(_lockdownBusy ? "LIFTING..." : "LIFT LOCKDOWN")
+                                    </button>
+                                } else {
+                                    <button type="button" class="btn btn-outline-danger cut-corner font-display"
+                                            style="font-size:0.72rem;letter-spacing:0.1em"
+                                            disabled="@_lockdownBusy"
+                                            @onclick="LockdownAsync">
+                                        @(_lockdownBusy ? "LOCKING..." : "INITIATE LOCKDOWN")
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
             }
 
             @if (_activeTab == "detection") {
@@ -314,6 +353,8 @@
     private bool _confirmRemove;
     private bool _removing;
     private string _activeTab = "general";
+    private bool _isLockedDown;
+    private bool _lockdownBusy;
 
     protected override async Task OnInitializedAsync() {
         try {
@@ -339,6 +380,7 @@
                 Form.AntiRaidJoinThreshold = s.AntiRaidJoinThreshold;
                 Form.AntiRaidWindowSeconds = s.AntiRaidWindowSeconds;
                 Form.AntiRaidCooldownMinutes = s.AntiRaidCooldownMinutes;
+                _isLockedDown = s.IsLockedDown;
             }
         } catch {
             _settings = null;
@@ -371,7 +413,8 @@
                 Form.IsAntiRaidEnabled,
                 Form.AntiRaidJoinThreshold,
                 Form.AntiRaidWindowSeconds,
-                Form.AntiRaidCooldownMinutes
+                Form.AntiRaidCooldownMinutes,
+                _isLockedDown
             ));
             _saved = true;
             _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
@@ -392,6 +435,38 @@
             _confirmRemove = false;
         } finally {
             _removing = false;
+        }
+    }
+
+    private async Task LockdownAsync() {
+        _lockdownBusy = true;
+        _error = null;
+
+        try {
+            await Api.LockdownAsync(DiscordGuildId);
+            _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
+            if (_settings is not null)
+                _isLockedDown = _settings.SpamConfiguration.IsLockedDown;
+        } catch (Exception ex) {
+            _error = $"Failed to initiate lockdown: {ex.Message}";
+        } finally {
+            _lockdownBusy = false;
+        }
+    }
+
+    private async Task UnlockAsync() {
+        _lockdownBusy = true;
+        _error = null;
+
+        try {
+            await Api.UnlockAsync(DiscordGuildId);
+            _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
+            if (_settings is not null)
+                _isLockedDown = _settings.SpamConfiguration.IsLockedDown;
+        } catch (Exception ex) {
+            _error = $"Failed to lift lockdown: {ex.Message}";
+        } finally {
+            _lockdownBusy = false;
         }
     }
 

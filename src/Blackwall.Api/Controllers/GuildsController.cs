@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Blackwall.Api.Services;
+using Blackwall.Bot.Services;
 using Blackwall.Core.DTOs;
 using Blackwall.Infrastructure.Cache;
 using Blackwall.Infrastructure.Persistence;
@@ -20,7 +21,8 @@ public sealed class GuildsController(
     GuildClaimService guildClaimService,
     SpamConfigurationCache spamConfigurationCache,
     DiscordGuildCacheService guildCache,
-    DiscordSocketClient discordClient
+    DiscordSocketClient discordClient,
+    LockdownService lockdownService
 ) : ControllerBase {
     
     /// <summary>
@@ -130,7 +132,8 @@ public sealed class GuildsController(
                 instance.SpamConfiguration.IsAntiRaidEnabled,
                 instance.SpamConfiguration.AntiRaidJoinThreshold,
                 instance.SpamConfiguration.AntiRaidWindowSeconds,
-                instance.SpamConfiguration.AntiRaidCooldownMinutes
+                instance.SpamConfiguration.AntiRaidCooldownMinutes,
+                instance.SpamConfiguration.IsLockedDown
             )
         ));
     }
@@ -205,6 +208,118 @@ public sealed class GuildsController(
         await spamConfigurationCache.InvalidateAsync(discordGuildId);
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Locks down the specified guild by denying Send Messages for @@everyone in all text channels
+    /// and categories via channel-specific permission overwrites.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Lockdown activated successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpPost("{discordGuildId:long}/lockdown")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Lockdown(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        if (instance.SpamConfiguration.IsLockedDown)
+            return BadRequest(new ProblemDetails {
+                Title = "Already locked down.",
+                Detail = "The guild is already in lockdown.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        await lockdownService.LockdownAsync((ulong)discordGuildId);
+
+        return Ok(new { Message = "Lockdown activated." });
+    }
+
+    /// <summary>
+    /// Lifts the lockdown by removing the @@everyone permission overwrites that were applied,
+    /// returning those permissions to their inherited state.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Lockdown lifted successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpPost("{discordGuildId:long}/unlock")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Unlock(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        if (!instance.SpamConfiguration.IsLockedDown)
+            return BadRequest(new ProblemDetails {
+                Title = "Not locked down.",
+                Detail = "The guild is not currently in lockdown.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        await lockdownService.UnlockAsync((ulong)discordGuildId);
+
+        return Ok(new { Message = "Lockdown lifted." });
     }
 
     /// <summary>
