@@ -45,7 +45,8 @@ success "Master connection established."
 info "Uploading API and Web to $REMOTE:$APP_DIR/ ..."
 # Using a single rsync command to sync the parent directory saves time.
 # The -e flag tells rsync to use our existing SSH socket.
-rsync -az -e "ssh -S $SSH_SOCKET" --delete "$OUT_DIR/" "$REMOTE:$APP_DIR/"
+# The --exclude flag prevents the remote .env file from being deleted or overwritten.
+rsync -az -e "ssh -S $SSH_SOCKET" --delete --exclude=".env" "$OUT_DIR/" "$REMOTE:$APP_DIR/"
 
 success "Upload complete."
 
