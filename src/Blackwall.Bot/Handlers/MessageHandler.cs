@@ -49,7 +49,9 @@ public sealed class MessageHandler(
 
         if (await spamDetectionService.IsDuplicateAsync(
                 discordGuildId, discordUserId,
-                message.Content, config.DuplicateMessageThreshold, config.RateLimitWindowSeconds))
+                (long)message.Channel.Id,
+                message.Content, config.DuplicateMessageThreshold,
+                config.DuplicateWindowSeconds, config.DuplicateCrossChannelEnabled))
             violations.Add("duplicate");
 
         if (SpamDetectionService.ExceedsMentionLimit(message, config.MentionLimit))

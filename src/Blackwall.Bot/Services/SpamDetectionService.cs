@@ -34,19 +34,25 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     /// <summary>
     /// Tracks message content hashes per user per guild. Returns true when the same hash
     /// is seen at least <paramref name="threshold"/> times within <paramref name="windowSeconds"/>.
+    /// When <paramref name="crossChannelEnabled"/> is true, duplicates are counted across all channels;
+    /// when false, only messages within the same <paramref name="channelId"/> are counted.
     /// </summary>
     public async Task<bool> IsDuplicateAsync(
         long discordGuildId,
         long discordUserId,
+        long channelId,
         string content,
         int threshold,
-        int windowSeconds
+        int windowSeconds,
+        bool crossChannelEnabled
     ) {
         if (string.IsNullOrWhiteSpace(content))
             return false;
 
         var hash = Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(content.Trim())));
-        var key = $"spam:dupes:{discordGuildId}:{discordUserId}:{hash}";
+        var key = crossChannelEnabled
+            ? $"spam:dupes:{discordGuildId}:{discordUserId}:{hash}"
+            : $"spam:dupes:{discordGuildId}:{discordUserId}:{channelId}:{hash}";
         var count = await _db.StringIncrementAsync(key);
 
         if (count == 1)

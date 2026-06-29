@@ -9,6 +9,8 @@ public class SpamConfiguration: EntityBase {
     public int MaxMessagesPerWindow { get; set; }
     public int RateLimitWindowSeconds { get; set; }
     public int DuplicateMessageThreshold { get; set; }
+    public int DuplicateWindowSeconds { get; set; } = 5;
+    public bool DuplicateCrossChannelEnabled { get; set; } = true;
     public int MentionLimit { get; set; }
     public bool BlockInviteLinks { get; set; }
     public bool BlockSuspiciousLinks { get; set; }

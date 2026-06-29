@@ -117,6 +117,8 @@ public sealed class GuildsController(
                 instance.SpamConfiguration.MaxMessagesPerWindow,
                 instance.SpamConfiguration.RateLimitWindowSeconds,
                 instance.SpamConfiguration.DuplicateMessageThreshold,
+                instance.SpamConfiguration.DuplicateWindowSeconds,
+                instance.SpamConfiguration.DuplicateCrossChannelEnabled,
                 instance.SpamConfiguration.MentionLimit,
                 instance.SpamConfiguration.BlockInviteLinks,
                 instance.SpamConfiguration.BlockSuspiciousLinks,
@@ -182,6 +184,8 @@ public sealed class GuildsController(
         spam.MaxMessagesPerWindow = request.MaxMessagesPerWindow;
         spam.RateLimitWindowSeconds = request.RateLimitWindowSeconds;
         spam.DuplicateMessageThreshold = request.DuplicateMessageThreshold;
+        spam.DuplicateWindowSeconds = Math.Clamp(request.DuplicateWindowSeconds, 1, 300);
+        spam.DuplicateCrossChannelEnabled = request.DuplicateCrossChannelEnabled;
         spam.MentionLimit = request.MentionLimit;
         spam.BlockInviteLinks = request.BlockInviteLinks;
         spam.BlockSuspiciousLinks = request.BlockSuspiciousLinks;

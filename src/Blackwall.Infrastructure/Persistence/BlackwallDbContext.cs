@@ -103,6 +103,14 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.Property(e => e.DuplicateMessageThreshold)
                   .IsRequired();
 
+            entity.Property(e => e.DuplicateWindowSeconds)
+                  .IsRequired()
+                  .HasDefaultValue(5);
+
+            entity.Property(e => e.DuplicateCrossChannelEnabled)
+                  .IsRequired()
+                  .HasDefaultValue(true);
+
             entity.Property(e => e.MentionLimit)
                   .IsRequired();
 

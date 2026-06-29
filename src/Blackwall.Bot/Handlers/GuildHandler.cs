@@ -54,8 +54,10 @@ public sealed class GuildHandler(
             UpdatedAtUtc = DateTime.UtcNow,
             SpamConfiguration = new SpamConfiguration {
                 MaxMessagesPerWindow = 5,
-                RateLimitWindowSeconds = 5,
+                RateLimitWindowSeconds = 8,
                 DuplicateMessageThreshold = 3,
+                DuplicateWindowSeconds = 5,
+                DuplicateCrossChannelEnabled = true,
                 MentionLimit = 5,
                 BlockInviteLinks = true,
                 BlockSuspiciousLinks = false,

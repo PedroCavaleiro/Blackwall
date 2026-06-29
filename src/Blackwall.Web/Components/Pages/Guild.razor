@@ -108,33 +108,49 @@
                 <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
                     <div class="card-header">DETECTION MATRIX</div>
                     <div class="p-4">
-                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Stops users from spamming messages in the server.</p>
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Controls how the barrier detects and neutralizes spam, duplicate floods, and mass-mention attacks. Each filter runs independently and stacks with the infraction action set in General.</p>
 
                         <div class="bw-field">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Rate limit window (seconds)</div>
-                                <div class="form-text">Time window for the spam counter.</div>
+                                <div class="form-text">Rolling time window in which messages from a single user are counted. The counter resets once the window expires with no new messages.</div>
                             </div>
                             <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.RateLimitWindowSeconds" />
                         </div>
                         <div class="bw-field">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Max messages per window</div>
-                                <div class="form-text">Messages allowed per user before the barrier trips.</div>
+                                <div class="form-text">Maximum messages a user may send within the rate limit window. The next message after this limit triggers an infraction.</div>
                             </div>
                             <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.MaxMessagesPerWindow" />
                         </div>
                         <div class="bw-field">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Duplicate threshold</div>
-                                <div class="form-text">Delete after this many identical copies in the window.</div>
+                                <div class="form-text">Number of identical messages a user must send within the duplicate window before the filter trips. Set to 0 to disable duplicate detection.</div>
                             </div>
                             <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.DuplicateMessageThreshold" />
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Duplicate window (seconds)</div>
+                                <div class="form-text">How long identical message hashes are remembered per user. Shorter windows catch burst spam; longer windows catch slow repeated floods. Range: 1–300 s.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" min="1" max="300" @bind-Value="Form.DuplicateWindowSeconds" />
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Cross-channel duplicate detection</div>
+                                <div class="form-text">When on, identical messages posted in different channels by the same user count toward the duplicate threshold. When off, duplicates are tracked per channel, so the same message repeated across channels will not trigger.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="dupCrossChannel" @bind-Value="Form.DuplicateCrossChannelEnabled" style="width:2.5em;height:1.3em" />
+                            </div>
                         </div>
                         <div class="bw-field" style="border-bottom:none;padding-bottom:0">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Mention limit</div>
-                                <div class="form-text">Max user/role pings allowed per message.</div>
+                                <div class="form-text">Maximum combined user, role, and @@everyone/@@here mentions allowed in a single message. Messages exceeding this are flagged as mass-ping spam.</div>
                             </div>
                             <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.MentionLimit" />
                         </div>
@@ -309,6 +325,8 @@
                 Form.MaxMessagesPerWindow = s.MaxMessagesPerWindow;
                 Form.RateLimitWindowSeconds = s.RateLimitWindowSeconds;
                 Form.DuplicateMessageThreshold = s.DuplicateMessageThreshold;
+                Form.DuplicateWindowSeconds = s.DuplicateWindowSeconds;
+                Form.DuplicateCrossChannelEnabled = s.DuplicateCrossChannelEnabled;
                 Form.MentionLimit = s.MentionLimit;
                 Form.BlockInviteLinks = s.BlockInviteLinks;
                 Form.BlockSuspiciousLinks = s.BlockSuspiciousLinks;
@@ -340,6 +358,8 @@
                 Form.MaxMessagesPerWindow,
                 Form.RateLimitWindowSeconds,
                 Form.DuplicateMessageThreshold,
+                Form.DuplicateWindowSeconds,
+                Form.DuplicateCrossChannelEnabled,
                 Form.MentionLimit,
                 Form.BlockInviteLinks,
                 Form.BlockSuspiciousLinks,
@@ -379,6 +399,8 @@
         public int MaxMessagesPerWindow { get; set; } = 5;
         public int RateLimitWindowSeconds { get; set; } = 5;
         public int DuplicateMessageThreshold { get; set; } = 3;
+        public int DuplicateWindowSeconds { get; set; } = 5;
+        public bool DuplicateCrossChannelEnabled { get; set; } = true;
         public int MentionLimit { get; set; } = 5;
         public bool BlockInviteLinks { get; set; } = true;
         public bool BlockSuspiciousLinks { get; set; }

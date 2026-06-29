@@ -36,6 +36,8 @@ public sealed class SpamConfigurationCache(
                 x.SpamConfiguration.MaxMessagesPerWindow,
                 x.SpamConfiguration.RateLimitWindowSeconds,
                 x.SpamConfiguration.DuplicateMessageThreshold,
+                x.SpamConfiguration.DuplicateWindowSeconds,
+                x.SpamConfiguration.DuplicateCrossChannelEnabled,
                 x.SpamConfiguration.MentionLimit,
                 x.SpamConfiguration.BlockInviteLinks,
                 x.SpamConfiguration.BlockSuspiciousLinks,
