@@ -38,7 +38,12 @@ public sealed class SpamConfigurationCache(
                 x.SpamConfiguration.DuplicateMessageThreshold,
                 x.SpamConfiguration.MentionLimit,
                 x.SpamConfiguration.BlockInviteLinks,
-                x.SpamConfiguration.BlockSuspiciousLinks
+                x.SpamConfiguration.BlockSuspiciousLinks,
+                x.SpamConfiguration.IsEnabled,
+                x.SpamConfiguration.IsDryRun,
+                x.SpamConfiguration.Action,
+                x.SpamConfiguration.LogChannelId,
+                x.SpamConfiguration.MessageDeleteDays
             ))
             .FirstOrDefaultAsync(cancellationToken);
 

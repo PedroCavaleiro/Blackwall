@@ -72,4 +72,30 @@ public sealed class BlackwallApiService(
         var result = await response.Content.ReadFromJsonAsync<BotInviteResponse>(ct);
         return result?.Url;
     }
+
+    /// <summary>
+    /// Retrieves all text channels visible to the bot in the specified guild.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="ct">A token to cancel the operation.</param>
+    /// <returns>A read-only list of text channels, or an empty list if the request fails.</returns>
+    public async Task<IReadOnlyList<DiscordChannelDto>> GetChannelsAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/channels");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) return [];
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<DiscordChannelDto>>(ct) ?? [];
+    }
+
+    /// <summary>
+    /// Removes the bot from the specified Discord guild and deactivates the guild instance.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="ct">A token to cancel the operation.</param>
+    public async Task RemoveBotAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

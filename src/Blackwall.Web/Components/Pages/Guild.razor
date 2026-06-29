@@ -1,7 +1,9 @@
 @page "/guild/{DiscordGuildId:long}"
 @attribute [Authorize]
+@rendermode InteractiveServer
+@using Blackwall.Core.Entities
 @inject BlackwallApiService Api
-@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager Nav
 
 <PageTitle>@(_settings?.Name ?? "Config") — Blackwall</PageTitle>
 
@@ -41,8 +43,63 @@
             </div>
         }
 
-        <EditForm Model="Form" FormName="spam-settings" OnValidSubmit="SaveAsync" method="post">
+        <EditForm Model="Form" OnValidSubmit="SaveAsync">
             <DataAnnotationsValidator />
+
+            <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                <div class="card-header">BARRIER CONTROL</div>
+                <div class="p-4">
+                    <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Master controls for barrier activation and enforcement mode.</p>
+
+                    <div class="bw-field">
+                        <div class="bw-field-label">
+                            <div class="form-label mb-1">Enable barrier</div>
+                            <div class="form-text">When off, the bot will not process any messages in this server.</div>
+                        </div>
+                        <div class="form-check form-switch">
+                            <InputCheckbox class="form-check-input" id="isEnabled" @bind-Value="Form.IsEnabled" style="width:2.5em;height:1.3em" />
+                        </div>
+                    </div>
+                    <div class="bw-field">
+                        <div class="bw-field-label">
+                            <div class="form-label mb-1">Dry run</div>
+                            <div class="form-text">Detections are logged but no action is taken against the user.</div>
+                        </div>
+                        <div class="form-check form-switch">
+                            <InputCheckbox class="form-check-input" id="isDryRun" @bind-Value="Form.IsDryRun" style="width:2.5em;height:1.3em" />
+                        </div>
+                    </div>
+                    <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                        <div class="bw-field-label">
+                            <div class="form-label mb-1">Infraction action</div>
+                            <div class="form-text">What the bot does to an offending user when a violation is detected.</div>
+                        </div>
+                        <InputSelect class="form-select" style="max-width:200px" @bind-Value="Form.Action">
+                            <option value="@InfractionAction.DeleteOnly">Delete message only</option>
+                            <option value="@InfractionAction.Timeout">Timeout user</option>
+                            <option value="@InfractionAction.Kick">Kick user</option>
+                            <option value="@InfractionAction.Ban">Ban user</option>
+                        </InputSelect>
+                    </div>
+                </div>
+            </div>
+
+            @if (Form.Action is InfractionAction.Kick or InfractionAction.Ban) {
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">MESSAGE PURGE</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Configure how far back Discord should delete the user's messages when they are kicked or banned.</p>
+
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Delete messages (days)</div>
+                                <div class="form-text">Number of days of message history to purge. Maximum is 7 days.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" min="0" max="7" @bind-Value="Form.MessageDeleteDays" />
+                        </div>
+                    </div>
+                </div>
+            }
 
             <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
                 <div class="card-header">DETECTION MATRIX</div>
@@ -80,7 +137,7 @@
                 </div>
             </div>
 
-            <div class="cut-corner border mb-5" style="background:var(--bs-card-bg)">
+            <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
                 <div class="card-header">LINK BLOCKING</div>
                 <div class="p-4">
                     <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Configure which external vectors are neutralized automatically.</p>
@@ -106,6 +163,28 @@
                 </div>
             </div>
 
+            <div class="cut-corner border mb-5" style="background:var(--bs-card-bg)">
+                <div class="card-header">AUDIT LOG</div>
+                <div class="p-4">
+                    <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                        Select a channel where Blackwall will post an embed for each infraction: who triggered it, which filter fired, the message content, and the action taken.
+                    </p>
+
+                    <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                        <div class="bw-field-label">
+                            <div class="form-label mb-1">Log channel</div>
+                            <div class="form-text">Leave blank to disable audit logging.</div>
+                        </div>
+                        <InputSelect class="form-select" style="max-width:260px" @bind-Value="Form.LogChannelId">
+                            <option value="">— None —</option>
+                            @foreach (var ch in _channels) {
+                                <option value="@ch.Id">#@ch.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+                </div>
+            </div>
+
             <div class="d-flex align-items-center gap-3">
                 <button type="submit" class="btn btn-primary cut-corner font-display" style="font-size:0.75rem;letter-spacing:0.1em">
                     COMMIT CHANGES
@@ -115,29 +194,64 @@
                 </a>
             </div>
         </EditForm>
+
+        <hr style="border-color:var(--bw-danger);opacity:0.25;margin:3rem 0 2rem" />
+
+        <div class="cut-corner border mb-4" style="background:var(--bs-card-bg);border-color:var(--bw-danger) !important">
+            <div class="card-header" style="color:var(--bw-danger)">DANGER ZONE</div>
+            <div class="p-4">
+                <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                    Removing the bot will immediately kick it from your Discord server and deactivate this Blackwall instance. Your configuration will be preserved if you re-add the bot later.
+                </p>
+
+                @if (!_confirmRemove) {
+                    <button type="button" class="btn btn-outline-danger cut-corner font-display"
+                            style="font-size:0.75rem;letter-spacing:0.1em"
+                            @onclick="() => _confirmRemove = true">
+                        REMOVE BOT FROM SERVER
+                    </button>
+                } else {
+                    <div class="font-mono mb-3" style="font-size:0.8rem;color:var(--bw-danger)">
+                        // WARNING: This will kick the bot from @_settings.Name. Are you sure?
+                    </div>
+                    <div class="d-flex gap-3">
+                        <button type="button" class="btn btn-danger cut-corner font-display"
+                                style="font-size:0.75rem;letter-spacing:0.1em"
+                                disabled="@_removing"
+                                @onclick="RemoveBotAsync">
+                            @(_removing ? "REMOVING..." : "CONFIRM REMOVAL")
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary font-display"
+                                style="font-size:0.75rem;letter-spacing:0.1em"
+                                @onclick="() => _confirmRemove = false">
+                            ABORT
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
     }
 </div>
 
 @code {
     [Parameter] public long DiscordGuildId { get; set; }
 
-#pragma warning disable BL0008
-    [SupplyParameterFromForm(FormName = "spam-settings")]
     private SpamConfigForm Form { get; set; } = new();
-#pragma warning restore BL0008
 
     private GuildSettingsResponse? _settings;
+    private IReadOnlyList<DiscordChannelDto> _channels = [];
     private bool _loading = true;
     private bool _saved;
     private string? _error;
+    private bool _confirmRemove;
+    private bool _removing;
 
     protected override async Task OnInitializedAsync() {
         try {
             _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
+            _channels = await Api.GetChannelsAsync(DiscordGuildId);
 
-            var isPost = HttpContextAccessor.HttpContext?.Request.Method == "POST";
-
-            if (_settings is not null && !isPost) {
+            if (_settings is not null) {
                 var s = _settings.SpamConfiguration;
                 Form.MaxMessagesPerWindow = s.MaxMessagesPerWindow;
                 Form.RateLimitWindowSeconds = s.RateLimitWindowSeconds;
@@ -145,6 +259,11 @@
                 Form.MentionLimit = s.MentionLimit;
                 Form.BlockInviteLinks = s.BlockInviteLinks;
                 Form.BlockSuspiciousLinks = s.BlockSuspiciousLinks;
+                Form.IsEnabled = s.IsEnabled;
+                Form.IsDryRun = s.IsDryRun;
+                Form.Action = s.Action;
+                Form.LogChannelId = s.LogChannelId.HasValue ? s.LogChannelId.Value.ToString() : "";
+                Form.MessageDeleteDays = s.MessageDeleteDays;
             }
         } catch {
             _settings = null;
@@ -158,18 +277,40 @@
         _error = null;
 
         try {
+            long? logChannelId = long.TryParse(Form.LogChannelId, out var parsed) ? parsed : null;
+
             await Api.UpdateGuildSettingsAsync(DiscordGuildId, new UpdateGuildSettingsRequest(
                 Form.MaxMessagesPerWindow,
                 Form.RateLimitWindowSeconds,
                 Form.DuplicateMessageThreshold,
                 Form.MentionLimit,
                 Form.BlockInviteLinks,
-                Form.BlockSuspiciousLinks
+                Form.BlockSuspiciousLinks,
+                Form.IsEnabled,
+                Form.IsDryRun,
+                Form.Action,
+                logChannelId,
+                Math.Clamp(Form.MessageDeleteDays, 0, 7)
             ));
             _saved = true;
             _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
         } catch (Exception ex) {
             _error = $"Failed to save settings: {ex.Message}";
+        }
+    }
+
+    private async Task RemoveBotAsync() {
+        _removing = true;
+        _error = null;
+
+        try {
+            await Api.RemoveBotAsync(DiscordGuildId);
+            Nav.NavigateTo("/dashboard", forceLoad: true);
+        } catch (Exception ex) {
+            _error = $"Failed to remove bot: {ex.Message}";
+            _confirmRemove = false;
+        } finally {
+            _removing = false;
         }
     }
 
@@ -180,5 +321,10 @@
         public int MentionLimit { get; set; } = 5;
         public bool BlockInviteLinks { get; set; } = true;
         public bool BlockSuspiciousLinks { get; set; }
+        public bool IsEnabled { get; set; } = true;
+        public bool IsDryRun { get; set; }
+        public InfractionAction Action { get; set; } = InfractionAction.DeleteOnly;
+        public string LogChannelId { get; set; } = "";
+        public int MessageDeleteDays { get; set; }
     }
 }

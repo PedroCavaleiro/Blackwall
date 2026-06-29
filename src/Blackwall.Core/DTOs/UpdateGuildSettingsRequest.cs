@@ -1,3 +1,5 @@
+using Blackwall.Core.Entities;
+
 namespace Blackwall.Core.DTOs;
 
 public sealed record UpdateGuildSettingsRequest(
@@ -6,5 +8,10 @@ public sealed record UpdateGuildSettingsRequest(
     int DuplicateMessageThreshold,
     int MentionLimit,
     bool BlockInviteLinks,
-    bool BlockSuspiciousLinks
+    bool BlockSuspiciousLinks,
+    bool IsEnabled,
+    bool IsDryRun,
+    InfractionAction Action,
+    long? LogChannelId,
+    int MessageDeleteDays
 );

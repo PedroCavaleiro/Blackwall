@@ -68,7 +68,7 @@
                 <div class="row g-3">
                     @foreach (var guild in _available) {
                         <div class="col-sm-6 col-lg-4">
-                            <a href="/bot/invite?guildId=@guild.DiscordGuildId" class="bw-guild-card cut-corner d-block text-decoration-none">
+                            <a href="/bot/invite?guildId=@guild.DiscordGuildId" target="_blank" class="bw-guild-card cut-corner d-block text-decoration-none">
                                 <div class="d-flex align-items-start gap-3">
                                     <GuildAvatar Name="@guild.Name" Icon="@guild.Icon" GuildId="@guild.DiscordGuildId" />
                                     <div class="min-w-0 flex-grow-1">

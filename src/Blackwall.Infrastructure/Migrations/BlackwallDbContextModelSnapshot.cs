@@ -149,6 +149,11 @@ namespace Blackwall.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<int>("Action")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<bool>("BlockInviteLinks")
                         .HasColumnType("boolean");
 
@@ -165,11 +170,29 @@ namespace Blackwall.Infrastructure.Migrations
                     b.Property<long>("GuildInstanceId")
                         .HasColumnType("bigint");
 
+                    b.Property<bool>("IsDryRun")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<long?>("LogChannelId")
+                        .HasColumnType("bigint");
+
                     b.Property<int>("MaxMessagesPerWindow")
                         .HasColumnType("integer");
 
                     b.Property<int>("MentionLimit")
                         .HasColumnType("integer");
+
+                    b.Property<int>("MessageDeleteDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<int>("RateLimitWindowSeconds")
                         .HasColumnType("integer");

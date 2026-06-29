@@ -112,6 +112,24 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.Property(e => e.BlockSuspiciousLinks)
                   .IsRequired();
 
+            entity.Property(e => e.IsEnabled)
+                  .IsRequired()
+                  .HasDefaultValue(true);
+
+            entity.Property(e => e.IsDryRun)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.Action)
+                  .IsRequired()
+                  .HasDefaultValue(InfractionAction.DeleteOnly);
+
+            entity.Property(e => e.LogChannelId);
+
+            entity.Property(e => e.MessageDeleteDays)
+                  .IsRequired()
+                  .HasDefaultValue(0);
+
             entity.Property(e => e.UpdatedAtUtc);
         });
 

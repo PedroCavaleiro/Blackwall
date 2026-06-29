@@ -3,6 +3,8 @@ using Blackwall.Api.Services;
 using Blackwall.Core.DTOs;
 using Blackwall.Infrastructure.Cache;
 using Blackwall.Infrastructure.Persistence;
+using Discord;
+using Discord.WebSocket;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +19,8 @@ public sealed class GuildsController(
     DiscordOAuthService discordOAuthService,
     GuildClaimService guildClaimService,
     SpamConfigurationCache spamConfigurationCache,
-    DiscordGuildCacheService guildCache
+    DiscordGuildCacheService guildCache,
+    DiscordSocketClient discordClient
 ) : ControllerBase {
     
     /// <summary>
@@ -116,7 +119,12 @@ public sealed class GuildsController(
                 instance.SpamConfiguration.DuplicateMessageThreshold,
                 instance.SpamConfiguration.MentionLimit,
                 instance.SpamConfiguration.BlockInviteLinks,
-                instance.SpamConfiguration.BlockSuspiciousLinks
+                instance.SpamConfiguration.BlockSuspiciousLinks,
+                instance.SpamConfiguration.IsEnabled,
+                instance.SpamConfiguration.IsDryRun,
+                instance.SpamConfiguration.Action,
+                instance.SpamConfiguration.LogChannelId,
+                instance.SpamConfiguration.MessageDeleteDays
             )
         ));
     }
@@ -173,9 +181,118 @@ public sealed class GuildsController(
         spam.MentionLimit = request.MentionLimit;
         spam.BlockInviteLinks = request.BlockInviteLinks;
         spam.BlockSuspiciousLinks = request.BlockSuspiciousLinks;
+        spam.IsEnabled = request.IsEnabled;
+        spam.IsDryRun = request.IsDryRun;
+        spam.Action = request.Action;
+        spam.LogChannelId = request.LogChannelId;
+        spam.MessageDeleteDays = Math.Clamp(request.MessageDeleteDays, 0, 7);
         spam.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await spamConfigurationCache.InvalidateAsync(discordGuildId);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Returns all text channels visible to the bot in the specified guild.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of text channels.</returns>
+    /// <response code="200">Returns the list of channels.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild is not found or the bot is not connected to it.</response>
+    [HttpGet("{discordGuildId:long}/channels")]
+    [ProducesResponseType(typeof(IReadOnlyList<DiscordChannelDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<DiscordChannelDto>>> GetChannels(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+
+        if (!canOpen)
+            return Forbid();
+
+        var guild = discordClient.GetGuild((ulong)discordGuildId);
+
+        if (guild is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "The bot is not connected to this guild.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var channels = guild.TextChannels
+            .OrderBy(c => c.Position)
+            .Select(c => new DiscordChannelDto((long)c.Id, c.Name))
+            .ToList();
+
+        return Ok(channels);
+    }
+
+    /// <summary>
+    /// Removes the bot from the specified Discord guild and deactivates the guild instance.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">Bot removed and guild deactivated successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpDelete("{discordGuildId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveBot(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var discordGuild = discordClient.GetGuild((ulong)discordGuildId);
+        if (discordGuild is not null)
+            await discordGuild.LeaveAsync();
+
+        instance.IsActive = false;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         await spamConfigurationCache.InvalidateAsync(discordGuildId);
 

@@ -42,7 +42,6 @@ public sealed class GuildClaimService(BlackwallDbContext dbContext) {
 
             existing.Name = guild.Name;
             existing.IconHash = guild.Icon;
-            existing.IsActive = true;
             existing.UpdatedAtUtc = DateTime.UtcNow;
 
             if (existing.OwnerUserId is null && guild.Owner) {

@@ -67,6 +67,8 @@ Edit `.env` and fill in the required values:
 | `DISCORD__BOT_SCOPES` | Bot invite scopes (default `bot applications.commands`)                              |
 | `DISCORD__LOGIN_SCOPES` | OAuth2 login scopes (default `identify guilds`)                                      |
 
+> **Tip:** The default `76806` covers only the permissions Blackwall needs. If you want the bot to automatically see all channels without manual overrides, set this to `8` (Administrator). Use with caution — this grants full server access.
+
 **JWT**
 
 | Variable | Description |

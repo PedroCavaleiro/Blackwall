@@ -58,7 +58,12 @@ public sealed class GuildHandler(
                 DuplicateMessageThreshold = 3,
                 MentionLimit = 5,
                 BlockInviteLinks = true,
-                BlockSuspiciousLinks = false
+                BlockSuspiciousLinks = false,
+                IsEnabled = true,
+                IsDryRun = false,
+                Action = Blackwall.Core.Entities.InfractionAction.DeleteOnly,
+                LogChannelId = null,
+                MessageDeleteDays = 0
             }
         };
 
