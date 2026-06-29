@@ -46,189 +46,200 @@
         <EditForm Model="Form" OnValidSubmit="SaveAsync">
             <DataAnnotationsValidator />
 
-            <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
-                <div class="card-header">BARRIER CONTROL</div>
-                <div class="p-4">
-                    <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Master controls for barrier activation and enforcement mode.</p>
-
-                    <div class="bw-field">
-                        <div class="bw-field-label">
-                            <div class="form-label mb-1">Enable barrier</div>
-                            <div class="form-text">When off, the bot will not process any messages in this server.</div>
-                        </div>
-                        <div class="form-check form-switch">
-                            <InputCheckbox class="form-check-input" id="isEnabled" @bind-Value="Form.IsEnabled" style="width:2.5em;height:1.3em" />
-                        </div>
-                    </div>
-                    <div class="bw-field">
-                        <div class="bw-field-label">
-                            <div class="form-label mb-1">Dry run</div>
-                            <div class="form-text">Detections are logged but no action is taken against the user.</div>
-                        </div>
-                        <div class="form-check form-switch">
-                            <InputCheckbox class="form-check-input" id="isDryRun" @bind-Value="Form.IsDryRun" style="width:2.5em;height:1.3em" />
-                        </div>
-                    </div>
-                    <div class="bw-field" style="border-bottom:none;padding-bottom:0">
-                        <div class="bw-field-label">
-                            <div class="form-label mb-1">Infraction action</div>
-                            <div class="form-text">What the bot does to an offending user when a violation is detected.</div>
-                        </div>
-                        <InputSelect class="form-select" style="max-width:200px" @bind-Value="Form.Action">
-                            <option value="@InfractionAction.DeleteOnly">Delete message only</option>
-                            <option value="@InfractionAction.Timeout">Timeout user</option>
-                            <option value="@InfractionAction.Kick">Kick user</option>
-                            <option value="@InfractionAction.Ban">Ban user</option>
-                        </InputSelect>
-                    </div>
-                </div>
+            <div class="bw-tabs">
+                <button type="button" class="bw-tab-btn @(_activeTab == "general"   ? "active" : "")" @onclick='() => _activeTab = "general"'>GENERAL</button>
+                <button type="button" class="bw-tab-btn @(_activeTab == "detection" ? "active" : "")" @onclick='() => _activeTab = "detection"'>DETECTION</button>
+                <button type="button" class="bw-tab-btn @(_activeTab == "links"     ? "active" : "")" @onclick='() => _activeTab = "links"'>LINKS</button>
+                <button type="button" class="bw-tab-btn @(_activeTab == "antiraid"  ? "active" : "")" @onclick='() => _activeTab = "antiraid"'>ANTI-RAID</button>
+                <button type="button" class="bw-tab-btn @(_activeTab == "audit"     ? "active" : "")" @onclick='() => _activeTab = "audit"'>AUDIT</button>
             </div>
 
-            @if (Form.Action is InfractionAction.Kick or InfractionAction.Ban) {
+            @if (_activeTab == "general") {
                 <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
-                    <div class="card-header">MESSAGE PURGE</div>
+                    <div class="card-header">BARRIER CONTROL</div>
                     <div class="p-4">
-                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Configure how far back Discord should delete the user's messages when they are kicked or banned.</p>
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Master controls for barrier activation and enforcement mode.</p>
 
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Enable barrier</div>
+                                <div class="form-text">When off, the bot will not process any messages in this server.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="isEnabled" @bind-Value="Form.IsEnabled" style="width:2.5em;height:1.3em" />
+                            </div>
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Dry run</div>
+                                <div class="form-text">Detections are logged but no action is taken against the user.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="isDryRun" @bind-Value="Form.IsDryRun" style="width:2.5em;height:1.3em" />
+                            </div>
+                        </div>
+                        <div class="bw-field" style="@(Form.Action is InfractionAction.Kick or InfractionAction.Ban ? "" : "border-bottom:none;padding-bottom:0")">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Infraction action</div>
+                                <div class="form-text">What the bot does to an offending user when a violation is detected.</div>
+                            </div>
+                            <InputSelect class="form-select" style="max-width:200px" @bind-Value="Form.Action">
+                                <option value="@InfractionAction.DeleteOnly">Delete message only</option>
+                                <option value="@InfractionAction.Timeout">Timeout user</option>
+                                <option value="@InfractionAction.Kick">Kick user</option>
+                                <option value="@InfractionAction.Ban">Ban user</option>
+                            </InputSelect>
+                        </div>
+
+                        @if (Form.Action is InfractionAction.Kick or InfractionAction.Ban) {
+                            <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">Delete messages (days)</div>
+                                    <div class="form-text">Number of days of message history to purge when kicking or banning. Maximum is 7 days.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="0" max="7" @bind-Value="Form.MessageDeleteDays" />
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (_activeTab == "detection") {
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">DETECTION MATRIX</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Tune the parameters that trip the barrier.</p>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Rate limit window (seconds)</div>
+                                <div class="form-text">Time window for the spam counter.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.RateLimitWindowSeconds" />
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Max messages per window</div>
+                                <div class="form-text">Messages allowed per user before the barrier trips.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.MaxMessagesPerWindow" />
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Duplicate threshold</div>
+                                <div class="form-text">Delete after this many identical copies in the window.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.DuplicateMessageThreshold" />
+                        </div>
                         <div class="bw-field" style="border-bottom:none;padding-bottom:0">
                             <div class="bw-field-label">
-                                <div class="form-label mb-1">Delete messages (days)</div>
-                                <div class="form-text">Number of days of message history to purge. Maximum is 7 days.</div>
+                                <div class="form-label mb-1">Mention limit</div>
+                                <div class="form-text">Max user/role pings allowed per message.</div>
                             </div>
-                            <InputNumber class="form-control" style="max-width:140px" min="0" max="7" @bind-Value="Form.MessageDeleteDays" />
+                            <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.MentionLimit" />
                         </div>
                     </div>
                 </div>
             }
 
-            <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
-                <div class="card-header">DETECTION MATRIX</div>
-                <div class="p-4">
-                    <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Tune the parameters that trip the barrier.</p>
+            @if (_activeTab == "links") {
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">LINK BLOCKING</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Configure which external vectors are neutralized automatically.</p>
 
-                    <div class="bw-field">
-                        <div class="bw-field-label">
-                            <div class="form-label mb-1">Rate limit window (seconds)</div>
-                            <div class="form-text">Time window for the spam counter.</div>
-                        </div>
-                        <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.RateLimitWindowSeconds" />
-                    </div>
-                    <div class="bw-field">
-                        <div class="bw-field-label">
-                            <div class="form-label mb-1">Max messages per window</div>
-                            <div class="form-text">Messages allowed per user before the barrier trips.</div>
-                        </div>
-                        <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.MaxMessagesPerWindow" />
-                    </div>
-                    <div class="bw-field">
-                        <div class="bw-field-label">
-                            <div class="form-label mb-1">Duplicate threshold</div>
-                            <div class="form-text">Delete after this many identical copies in the window.</div>
-                        </div>
-                        <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.DuplicateMessageThreshold" />
-                    </div>
-                    <div class="bw-field" style="border-bottom:none;padding-bottom:0">
-                        <div class="bw-field-label">
-                            <div class="form-label mb-1">Mention limit</div>
-                            <div class="form-text">Max user/role pings allowed per message.</div>
-                        </div>
-                        <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.MentionLimit" />
-                    </div>
-                </div>
-            </div>
-
-            <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
-                <div class="card-header">LINK BLOCKING</div>
-                <div class="p-4">
-                    <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Configure which external vectors are neutralized automatically.</p>
-
-                    <div class="bw-field">
-                        <div class="bw-field-label">
-                            <div class="form-label mb-1">Block Discord invite links</div>
-                            <div class="form-text">Deletes messages containing discord.gg invite URLs.</div>
-                        </div>
-                        <div class="form-check form-switch">
-                            <InputCheckbox class="form-check-input" id="blockInvites" @bind-Value="Form.BlockInviteLinks" style="width:2.5em;height:1.3em" />
-                        </div>
-                    </div>
-                    <div class="bw-field" style="border-bottom:none;padding-bottom:0">
-                        <div class="bw-field-label">
-                            <div class="form-label mb-1">Block external links</div>
-                            <div class="form-text">Deletes messages with URLs outside Discord's own domains.</div>
-                        </div>
-                        <div class="form-check form-switch">
-                            <InputCheckbox class="form-check-input" id="blockSuspicious" @bind-Value="Form.BlockSuspiciousLinks" style="width:2.5em;height:1.3em" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
-                <div class="card-header">ANTI-RAID</div>
-                <div class="p-4">
-                    <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
-                        Automatically deletes all active invite links when an abnormal surge of joins is detected. During the cooldown period the action cannot re-trigger.
-                    </p>
-
-                    <div class="bw-field">
-                        <div class="bw-field-label">
-                            <div class="form-label mb-1">Enable anti-raid</div>
-                            <div class="form-text">Monitor join rate and automatically pause invites when a raid is detected.</div>
-                        </div>
-                        <div class="form-check form-switch">
-                            <InputCheckbox class="form-check-input" id="isAntiRaidEnabled" @bind-Value="Form.IsAntiRaidEnabled" style="width:2.5em;height:1.3em" />
-                        </div>
-                    </div>
-
-                    @if (Form.IsAntiRaidEnabled) {
                         <div class="bw-field">
                             <div class="bw-field-label">
-                                <div class="form-label mb-1">Join threshold</div>
-                                <div class="form-text">Number of joins within the window that triggers the lockdown.</div>
+                                <div class="form-label mb-1">Block Discord invite links</div>
+                                <div class="form-text">Deletes messages containing discord.gg invite URLs.</div>
                             </div>
-                            <InputNumber class="form-control" style="max-width:140px" min="2" @bind-Value="Form.AntiRaidJoinThreshold" />
-                        </div>
-                        <div class="bw-field">
-                            <div class="bw-field-label">
-                                <div class="form-label mb-1">Detection window (seconds)</div>
-                                <div class="form-text">Rolling time window used to count joins. Range: 5–300 s.</div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="blockInvites" @bind-Value="Form.BlockInviteLinks" style="width:2.5em;height:1.3em" />
                             </div>
-                            <InputNumber class="form-control" style="max-width:140px" min="5" max="300" @bind-Value="Form.AntiRaidWindowSeconds" />
                         </div>
                         <div class="bw-field" style="border-bottom:none;padding-bottom:0">
                             <div class="bw-field-label">
-                                <div class="form-label mb-1">Cooldown (minutes)</div>
-                                <div class="form-text">How long invites remain paused before the lockdown lifts automatically.</div>
+                                <div class="form-label mb-1">Block external links</div>
+                                <div class="form-text">Deletes messages with URLs outside Discord's own domains.</div>
                             </div>
-                            <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.AntiRaidCooldownMinutes" />
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="blockSuspicious" @bind-Value="Form.BlockSuspiciousLinks" style="width:2.5em;height:1.3em" />
+                            </div>
                         </div>
-                    }
-                </div>
-            </div>
-
-            <div class="cut-corner border mb-5" style="background:var(--bs-card-bg)">
-                <div class="card-header">AUDIT LOG</div>
-                <div class="p-4">
-                    <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
-                        Select a channel where Blackwall will post an embed for each infraction: who triggered it, which filter fired, the message content, and the action taken.
-                    </p>
-
-                    <div class="bw-field" style="border-bottom:none;padding-bottom:0">
-                        <div class="bw-field-label">
-                            <div class="form-label mb-1">Log channel</div>
-                            <div class="form-text">Leave blank to disable audit logging.</div>
-                        </div>
-                        <InputSelect class="form-select" style="max-width:260px" @bind-Value="Form.LogChannelId">
-                            <option value="">— None —</option>
-                            @foreach (var ch in _channels) {
-                                <option value="@ch.Id">#@ch.Name</option>
-                            }
-                        </InputSelect>
                     </div>
                 </div>
-            </div>
+            }
 
-            <div class="d-flex align-items-center gap-3">
+            @if (_activeTab == "antiraid") {
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">ANTI-RAID</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                            Automatically deletes all active invite links when an abnormal surge of joins is detected. During the cooldown period the action cannot re-trigger.
+                        </p>
+
+                        <div class="bw-field" style="@(Form.IsAntiRaidEnabled ? "" : "border-bottom:none;padding-bottom:0")">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Enable anti-raid</div>
+                                <div class="form-text">Monitor join rate and automatically pause invites when a raid is detected.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="isAntiRaidEnabled" @bind-Value="Form.IsAntiRaidEnabled" style="width:2.5em;height:1.3em" />
+                            </div>
+                        </div>
+
+                        @if (Form.IsAntiRaidEnabled) {
+                            <div class="bw-field">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">Join threshold</div>
+                                    <div class="form-text">Number of joins within the window that triggers the lockdown.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="2" @bind-Value="Form.AntiRaidJoinThreshold" />
+                            </div>
+                            <div class="bw-field">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">Detection window (seconds)</div>
+                                    <div class="form-text">Rolling time window used to count joins. Range: 5–300 s.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="5" max="300" @bind-Value="Form.AntiRaidWindowSeconds" />
+                            </div>
+                            <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">Cooldown (minutes)</div>
+                                    <div class="form-text">How long invites remain paused before the lockdown lifts automatically.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.AntiRaidCooldownMinutes" />
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (_activeTab == "audit") {
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">AUDIT LOG</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                            Select a channel where Blackwall will post an embed for each infraction: who triggered it, which filter fired, the message content, and the action taken.
+                        </p>
+
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Log channel</div>
+                                <div class="form-text">Leave blank to disable audit logging.</div>
+                            </div>
+                            <InputSelect class="form-select" style="max-width:260px" @bind-Value="Form.LogChannelId">
+                                <option value="">— None —</option>
+                                @foreach (var ch in _channels) {
+                                    <option value="@ch.Id">#@ch.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="d-flex align-items-center gap-3 mt-2">
                 <button type="submit" class="btn btn-primary cut-corner font-display" style="font-size:0.75rem;letter-spacing:0.1em">
                     COMMIT CHANGES
                 </button>
@@ -288,6 +299,7 @@
     private string? _error;
     private bool _confirmRemove;
     private bool _removing;
+    private string _activeTab = "general";
 
     protected override async Task OnInitializedAsync() {
         try {

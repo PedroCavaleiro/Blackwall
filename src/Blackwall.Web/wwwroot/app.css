@@ -300,5 +300,39 @@ h1:focus { outline: none; }
     min-width: 0;
 }
 
+/* --- Settings tabs --- */
+.bw-tabs {
+    display: flex;
+    border-bottom: 1px solid rgba(34, 211, 238, 0.2);
+    margin-bottom: 1.5rem;
+    gap: 0;
+    overflow-x: auto;
+}
+
+.bw-tab-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--bw-muted);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 0.6rem 1.1rem;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    margin-bottom: -1px;
+}
+
+.bw-tab-btn:hover {
+    color: var(--bw-primary);
+}
+
+.bw-tab-btn.active {
+    color: var(--bw-primary);
+    border-bottom-color: var(--bw-primary);
+}
+
 /* --- Reconnect modal --- */
 #components-reconnect-modal { display: none; }

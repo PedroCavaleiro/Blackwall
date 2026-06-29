@@ -1,81 +1,60 @@
-#Requires -Version 5.1
+#!/usr/bin/env bash
 # Blackwall — deploy published artifacts to a remote LXC
-# Usage: .\deploy.ps1 -LxcHost <ip> [-SshUser <user>]
-# Example: .\deploy.ps1 -LxcHost 192.168.1.50
-# Example: .\deploy.ps1 -LxcHost 192.168.1.50 -SshUser root
-param(
-    [Parameter(Mandatory)][string]$LxcHost,
-    [string]$SshUser = "root"
-)
+# Usage: ./deploy.sh <lxc-ip> [ssh-user]
+set -euo pipefail
 
-$ErrorActionPreference = "Stop"
+LXC_HOST="${1:?Usage: $0 <lxc-ip> [ssh-user]}"
+SSH_USER="${2:-root}"
+REMOTE="$SSH_USER@$LXC_HOST"
+APP_DIR="/opt/blackwall"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+OUT_DIR="$REPO_ROOT/.publish"
 
-$Remote   = "${SshUser}@${LxcHost}"
-$AppDir   = "/opt/blackwall"
-$RepoRoot = (Resolve-Path "$PSScriptRoot/../..").Path
-$OutDir   = Join-Path $RepoRoot ".publish"
+# Define a temporary socket file for the SSH master connection
+SSH_SOCKET="/tmp/blackwall_deploy_socket_$$"
 
-function Info($msg)    { Write-Host "[INFO]  $msg" -ForegroundColor Cyan }
-function Success($msg) { Write-Host "[OK]    $msg" -ForegroundColor Green }
-function Fail($msg)    { Write-Host "[ERROR] $msg" -ForegroundColor Red; exit 1 }
+info()    { echo -e "\e[34m[INFO]\e[0m  $*"; }
+success() { echo -e "\e[32m[OK]\e[0m    $*"; }
+
+# Clean up the SSH master connection and output dir when the script exits (success or fail)
+cleanup() {
+info "Closing SSH master connection and cleaning up..."
+ssh -S "$SSH_SOCKET" -O exit "$REMOTE" 2>/dev/null || true
+rm -rf "$OUT_DIR"
+}
+trap cleanup EXIT
 
 # ─── Publish ──────────────────────────────────────────────────────────────────
-Info "Publishing Blackwall.Api..."
-dotnet publish "$RepoRoot\src\Blackwall.Api\Blackwall.Api.csproj" `
-    -c Release -o "$OutDir\api" --nologo -v q
-if ($LASTEXITCODE -ne 0) { Fail "dotnet publish failed for Blackwall.Api" }
+info "Publishing Blackwall.Api..."
+dotnet publish "$REPO_ROOT/src/Blackwall.Api/Blackwall.Api.csproj" \
+-c Release -o "$OUT_DIR/api" --nologo -v q
 
-Info "Publishing Blackwall.Web..."
-dotnet publish "$RepoRoot\src\Blackwall.Web\Blackwall.Web.csproj" `
-    -c Release -o "$OutDir\web" --nologo -v q
-if ($LASTEXITCODE -ne 0) { Fail "dotnet publish failed for Blackwall.Web" }
+info "Publishing Blackwall.Web..."
+dotnet publish "$REPO_ROOT/src/Blackwall.Web/Blackwall.Web.csproj" \
+-c Release -o "$OUT_DIR/web" --nologo -v q
 
-Success "Publish complete."
+success "Publish complete."
 
-# ─── Archive (Windows tar, available since Windows 10 1803) ──────────────────
-Info "Archiving artifacts..."
-tar -czf "$OutDir\api.tar.gz" -C "$OutDir\api" .
-tar -czf "$OutDir\web.tar.gz" -C "$OutDir\web" .
+# ─── Open Master SSH Connection ───────────────────────────────────────────────
+info "Opening master SSH connection to $REMOTE..."
+# This is the ONLY time you will be prompted for a password.
+ssh -M -S "$SSH_SOCKET" -fnNT "$REMOTE"
+success "Master connection established."
 
 # ─── Upload ───────────────────────────────────────────────────────────────────
-Info "Uploading API archive to ${Remote}:${AppDir}/ ..."
-scp "$OutDir\api.tar.gz" "${Remote}:${AppDir}/api.tar.gz"
-if ($LASTEXITCODE -ne 0) { Fail "scp failed for API" }
+info "Uploading API and Web to $REMOTE:$APP_DIR/ ..."
+# Using a single rsync command to sync the parent directory saves time.
+# The -e flag tells rsync to use our existing SSH socket.
+rsync -az -e "ssh -S $SSH_SOCKET" --delete "$OUT_DIR/" "$REMOTE:$APP_DIR/"
 
-Info "Uploading Web archive to ${Remote}:${AppDir}/ ..."
-scp "$OutDir\web.tar.gz" "${Remote}:${AppDir}/web.tar.gz"
-if ($LASTEXITCODE -ne 0) { Fail "scp failed for Web" }
+success "Upload complete."
 
-Success "Upload complete."
+# ─── Fix ownership and restart ────────────────────────────────────────────────
+info "Fixing ownership and restarting services..."
+# We pass the -S flag so ssh uses the master socket and doesn't ask for a password.
+ssh -S "$SSH_SOCKET" "$REMOTE" "chown -R blackwall:blackwall $APP_DIR/api $APP_DIR/web && \
+               systemctl restart blackwall-api blackwall-web && \
+               systemctl is-active blackwall-api && \
+               systemctl is-active blackwall-web"
 
-# ─── Extract, fix ownership, restart ─────────────────────────────────────────
-Info "Extracting, fixing ownership and restarting services..."
-$remoteCmd = @"
-set -e
-rm -rf $AppDir/api $AppDir/web
-mkdir -p $AppDir/api $AppDir/web
-tar -xzf $AppDir/api.tar.gz -C $AppDir/api
-tar -xzf $AppDir/web.tar.gz -C $AppDir/web
-rm -f $AppDir/api.tar.gz $AppDir/web.tar.gz
-chown -R blackwall:blackwall $AppDir/api $AppDir/web
-systemctl restart blackwall-api blackwall-web
-systemctl is-active blackwall-api
-systemctl is-active blackwall-web
-"@
-
-$tempFile = [System.IO.Path]::GetTempFileName() + ".sh"
-$utf8NoBom = New-Object System.Text.UTF8Encoding $false
-[System.IO.File]::WriteAllText($tempFile, ($remoteCmd -replace "`r`n", "`n"), $utf8NoBom)
-
-$remoteScript = "/tmp/blackwall_deploy.sh"
-scp -q $tempFile "${Remote}:${remoteScript}"
-Remove-Item $tempFile
-if ($LASTEXITCODE -ne 0) { Fail "scp of deploy script failed" }
-
-ssh $Remote "bash $remoteScript; rm -f $remoteScript"
-if ($LASTEXITCODE -ne 0) { Fail "Remote setup or service restart failed" }
-
-Success "Deployment done. Both services are running."
-
-# ─── Cleanup local artifacts ─────────────────────────────────────────────────
-Remove-Item -Recurse -Force $OutDir
+success "Deployment done. Both services are running."
