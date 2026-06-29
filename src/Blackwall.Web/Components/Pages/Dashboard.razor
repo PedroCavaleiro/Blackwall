@@ -92,6 +92,20 @@
     }
 </div>
 
+<script>
+    (function () {
+        var hidden = false;
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'hidden') {
+                hidden = true;
+            } else if (hidden) {
+                hidden = false;
+                location.reload();
+            }
+        });
+    })();
+</script>
+
 @code {
     private IReadOnlyList<ManageableGuildResponse>? _guilds;
     private List<ManageableGuildResponse> _deployed  = [];
