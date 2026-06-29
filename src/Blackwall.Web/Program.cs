@@ -79,7 +79,13 @@ app.MapGet("/auth/login", async (HttpContext ctx) => {
         : Results.Redirect("/?error=auth_failed");
 }).AllowAnonymous();
 
-app.MapGet("/auth/callback", async (string code, HttpContext ctx) => {
+app.MapGet("/auth/callback", async (string? code, string? error, HttpContext ctx) => {
+    if (!string.IsNullOrEmpty(error))
+        return Results.Redirect($"/?error={Uri.EscapeDataString(error)}");
+
+    if (string.IsNullOrEmpty(code))
+        return Results.Redirect("/?error=auth_failed");
+
     using var client = new HttpClient();
     var response = await client.PostAsJsonAsync(
         $"{apiOptions.BaseUrl.TrimEnd('/')}/api/auth/exchange",

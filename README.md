@@ -81,6 +81,7 @@ Edit `.env` and fill in the required values:
 |----------|-------------|
 | `APP__ENC_KEY` | AES encryption key for stored Discord tokens |
 | `APP__ENC_IV` | AES initialisation vector |
+| `APP__DISABLE_NEW_USERS` | When `true`, prevents new users from creating an account (existing users can still log in). Defaults to `false`. |
 
 **API**
 

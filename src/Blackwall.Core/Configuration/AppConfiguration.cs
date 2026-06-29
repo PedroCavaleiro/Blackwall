@@ -10,4 +10,7 @@ public sealed record AppConfiguration {
 
     [ConfigurationKeyName("ENC_IV")]
     public string EncryptionIv { get; set; } = string.Empty;
+
+    [ConfigurationKeyName("DISABLE_NEW_USERS")]
+    public bool DisableNewUsers { get; set; } = false;
 }

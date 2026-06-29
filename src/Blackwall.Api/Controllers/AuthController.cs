@@ -100,6 +100,11 @@ public sealed class AuthController(
         var encryptedRefreshToken = AesCrypto.EncryptString(tokens.RefreshToken, key, iv);
 
         if (user is null) {
+            if (appConfiguration.Value.DisableNewUsers) {
+                var disabledRedirectUrl = $"{webOptions.Value.BaseUrl.TrimEnd('/')}/auth/callback?error=new_users_disabled";
+                return Redirect(disabledRedirectUrl);
+            }
+
             user = new Core.Entities.AppUser {
                 DiscordUserId = discordUserId,
                 Username = discordUser.Username,

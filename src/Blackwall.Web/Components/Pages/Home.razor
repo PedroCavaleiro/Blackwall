@@ -27,7 +27,11 @@
                 raid detection, and automated enforcement when something nasty tries to breach your server.
             </p>
 
-            @if (!string.IsNullOrEmpty(_error)) {
+            @if (_error == "new_users_disabled") {
+                <div class="alert alert-warning d-inline-block mb-4 font-mono" style="font-size:0.8rem">
+                    // ACCESS DENIED: New user registration is currently disabled.
+                </div>
+            } else if (!string.IsNullOrEmpty(_error)) {
                 <div class="alert alert-danger d-inline-block mb-4 font-mono" style="font-size:0.8rem">
                     // AUTH ERROR: Authentication failed. Please try again.
                 </div>
@@ -43,7 +47,7 @@
         <!-- Feature cards -->
         <section style="padding:0 1.5rem 5rem;max-width:1000px;margin:0 auto">
             <div class="row g-3">
-                @foreach (var f in _features) {
+                @foreach (var f in Features) {
                     <div class="col-md-4">
                         <div class="cut-corner border h-100 p-4" style="background:var(--bs-card-bg);position:relative">
                             <div style="position:absolute;top:0;left:0;width:3rem;height:1px;background:var(--bw-primary)"></div>
@@ -70,15 +74,18 @@
 @code {
     private string? _error;
 
-    private static readonly (string Icon, string Title, string Desc)[] _features = [
+    private static readonly (string Icon, string Title, string Desc)[] Features = [
         ("⚡", "Quickhack Defense", "Automatic message scoring on every guild event. Spam vectors neutralized before they spread."),
         ("👁", "Total Netrunner Visibility", "Per-server dashboards and tunable thresholds. You control what trips the barrier."),
         ("🛡", "Hard-Coded Safeguards", "Smart defaults with zero tolerance for false positives on legitimate users."),
     ];
 
     protected override async Task OnInitializedAsync() {
-        if (Nav.ToAbsoluteUri(Nav.Uri).Query.Contains("error="))
-            _error = "auth_failed";
+        var query = Nav.ToAbsoluteUri(Nav.Uri).Query;
+        if (query.Contains("error=")) {
+            var match = System.Text.RegularExpressions.Regex.Match(query, @"[?&]error=([^&]*)");
+            _error = match.Success ? Uri.UnescapeDataString(match.Groups[1].Value) : "auth_failed";
+        }
 
         var state = await AuthStateProvider.GetAuthenticationStateAsync();
         if (state.User.Identity?.IsAuthenticated == true)
