@@ -130,6 +130,22 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .IsRequired()
                   .HasDefaultValue(0);
 
+            entity.Property(e => e.IsAntiRaidEnabled)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.AntiRaidJoinThreshold)
+                  .IsRequired()
+                  .HasDefaultValue(10);
+
+            entity.Property(e => e.AntiRaidWindowSeconds)
+                  .IsRequired()
+                  .HasDefaultValue(30);
+
+            entity.Property(e => e.AntiRaidCooldownMinutes)
+                  .IsRequired()
+                  .HasDefaultValue(30);
+
             entity.Property(e => e.UpdatedAtUtc);
         });
 

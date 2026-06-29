@@ -13,5 +13,9 @@ public sealed record UpdateGuildSettingsRequest(
     bool IsDryRun,
     InfractionAction Action,
     long? LogChannelId,
-    int MessageDeleteDays
+    int MessageDeleteDays,
+    bool IsAntiRaidEnabled,
+    int AntiRaidJoinThreshold,
+    int AntiRaidWindowSeconds,
+    int AntiRaidCooldownMinutes
 );

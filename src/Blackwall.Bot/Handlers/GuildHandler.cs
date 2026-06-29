@@ -63,7 +63,11 @@ public sealed class GuildHandler(
                 IsDryRun = false,
                 Action = Blackwall.Core.Entities.InfractionAction.DeleteOnly,
                 LogChannelId = null,
-                MessageDeleteDays = 0
+                MessageDeleteDays = 0,
+                IsAntiRaidEnabled = false,
+                AntiRaidJoinThreshold = 10,
+                AntiRaidWindowSeconds = 30,
+                AntiRaidCooldownMinutes = 30
             }
         };
 

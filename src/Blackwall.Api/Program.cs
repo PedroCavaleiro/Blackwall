@@ -76,7 +76,9 @@ builder.Services.AddSingleton<DiscordSocketClient>(_ => new DiscordSocketClient(
 }));
 builder.Services.AddSingleton<GuildHandler>();
 builder.Services.AddSingleton<MessageHandler>();
+builder.Services.AddSingleton<GuildMemberHandler>();
 builder.Services.AddSingleton<SpamDetectionService>();
+builder.Services.AddSingleton<RaidDetectionService>();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<AuthHandoffService>();
 builder.Services.AddScoped<GuildClaimService>();

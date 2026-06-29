@@ -12,6 +12,7 @@ public sealed class BotWorker(
     DiscordSocketClient client,
     GuildHandler guildHandler,
     MessageHandler messageHandler,
+    GuildMemberHandler guildMemberHandler,
     IOptions<DiscordOptions> options,
     ILogger<BotWorker> logger
 ) : IHostedService {
@@ -19,9 +20,11 @@ public sealed class BotWorker(
     /// <inheritdoc/>
     public async Task StartAsync(CancellationToken cancellationToken) {
         client.Log += LogAsync;
+        client.Ready += OnReadyAsync;
         client.JoinedGuild += guildHandler.OnJoinedGuildAsync;
         client.LeftGuild += guildHandler.OnLeftGuildAsync;
         client.MessageReceived += messageHandler.OnMessageReceivedAsync;
+        client.UserJoined += guildMemberHandler.OnUserJoinedAsync;
 
         await client.LoginAsync(TokenType.Bot, options.Value.BotToken);
         await client.StartAsync();
@@ -29,12 +32,24 @@ public sealed class BotWorker(
 
     /// <inheritdoc/>
     public async Task StopAsync(CancellationToken cancellationToken) {
+        client.Ready -= OnReadyAsync;
         client.JoinedGuild -= guildHandler.OnJoinedGuildAsync;
         client.LeftGuild -= guildHandler.OnLeftGuildAsync;
         client.MessageReceived -= messageHandler.OnMessageReceivedAsync;
+        client.UserJoined -= guildMemberHandler.OnUserJoinedAsync;
 
         await client.StopAsync();
         await client.LogoutAsync();
+    }
+
+    /// <summary>
+    /// Called when the Discord client is fully ready. Re-syncs all guilds the bot is currently
+    /// a member of to ensure <see cref="Blackwall.Core.Entities.GuildInstance.IsActive"/> is
+    /// correct after a restart or reconnect.
+    /// </summary>
+    private async Task OnReadyAsync() {
+        foreach (var guild in client.Guilds)
+            await guildHandler.OnJoinedGuildAsync(guild);
     }
 
     /// <summary>

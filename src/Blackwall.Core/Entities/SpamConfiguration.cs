@@ -19,5 +19,10 @@ public class SpamConfiguration: EntityBase {
     public long? LogChannelId { get; set; }
     public int MessageDeleteDays { get; set; }
 
+    public bool IsAntiRaidEnabled { get; set; }
+    public int AntiRaidJoinThreshold { get; set; } = 10;
+    public int AntiRaidWindowSeconds { get; set; } = 30;
+    public int AntiRaidCooldownMinutes { get; set; } = 30;
+
     public DateTime? UpdatedAtUtc { get; set; }
 }

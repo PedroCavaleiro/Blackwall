@@ -124,7 +124,11 @@ public sealed class GuildsController(
                 instance.SpamConfiguration.IsDryRun,
                 instance.SpamConfiguration.Action,
                 instance.SpamConfiguration.LogChannelId,
-                instance.SpamConfiguration.MessageDeleteDays
+                instance.SpamConfiguration.MessageDeleteDays,
+                instance.SpamConfiguration.IsAntiRaidEnabled,
+                instance.SpamConfiguration.AntiRaidJoinThreshold,
+                instance.SpamConfiguration.AntiRaidWindowSeconds,
+                instance.SpamConfiguration.AntiRaidCooldownMinutes
             )
         ));
     }
@@ -186,6 +190,10 @@ public sealed class GuildsController(
         spam.Action = request.Action;
         spam.LogChannelId = request.LogChannelId;
         spam.MessageDeleteDays = Math.Clamp(request.MessageDeleteDays, 0, 7);
+        spam.IsAntiRaidEnabled = request.IsAntiRaidEnabled;
+        spam.AntiRaidJoinThreshold = Math.Max(2, request.AntiRaidJoinThreshold);
+        spam.AntiRaidWindowSeconds = Math.Clamp(request.AntiRaidWindowSeconds, 5, 300);
+        spam.AntiRaidCooldownMinutes = Math.Max(1, request.AntiRaidCooldownMinutes);
         spam.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 

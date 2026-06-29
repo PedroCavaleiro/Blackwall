@@ -43,7 +43,11 @@ public sealed class SpamConfigurationCache(
                 x.SpamConfiguration.IsDryRun,
                 x.SpamConfiguration.Action,
                 x.SpamConfiguration.LogChannelId,
-                x.SpamConfiguration.MessageDeleteDays
+                x.SpamConfiguration.MessageDeleteDays,
+                x.SpamConfiguration.IsAntiRaidEnabled,
+                x.SpamConfiguration.AntiRaidJoinThreshold,
+                x.SpamConfiguration.AntiRaidWindowSeconds,
+                x.SpamConfiguration.AntiRaidCooldownMinutes
             ))
             .FirstOrDefaultAsync(cancellationToken);
 
