@@ -178,7 +178,7 @@
                             Automatically deletes all active invite links when an abnormal surge of joins is detected. During the cooldown period the action cannot re-trigger.
                         </p>
 
-                        <div class="bw-field" style="@(Form.IsAntiRaidEnabled ? "" : "border-bottom:none;padding-bottom:0")">
+                        <div class="bw-field">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Enable anti-raid</div>
                                 <div class="form-text">Monitor join rate and automatically pause invites when a raid is detected.</div>
@@ -188,29 +188,27 @@
                             </div>
                         </div>
 
-                        @if (Form.IsAntiRaidEnabled) {
-                            <div class="bw-field">
-                                <div class="bw-field-label">
-                                    <div class="form-label mb-1">Join threshold</div>
-                                    <div class="form-text">Number of joins within the window that triggers the lockdown.</div>
-                                </div>
-                                <InputNumber class="form-control" style="max-width:140px" min="2" @bind-Value="Form.AntiRaidJoinThreshold" />
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Join threshold</div>
+                                <div class="form-text">Number of joins within the window that triggers the lockdown.</div>
                             </div>
-                            <div class="bw-field">
-                                <div class="bw-field-label">
-                                    <div class="form-label mb-1">Detection window (seconds)</div>
-                                    <div class="form-text">Rolling time window used to count joins. Range: 5–300 s.</div>
-                                </div>
-                                <InputNumber class="form-control" style="max-width:140px" min="5" max="300" @bind-Value="Form.AntiRaidWindowSeconds" />
+                            <InputNumber class="form-control" style="max-width:140px" min="2" @bind-Value="Form.AntiRaidJoinThreshold" disabled="@(!Form.IsAntiRaidEnabled)" />
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Detection window (seconds)</div>
+                                <div class="form-text">Rolling time window used to count joins. Range: 5–300 s.</div>
                             </div>
-                            <div class="bw-field" style="border-bottom:none;padding-bottom:0">
-                                <div class="bw-field-label">
-                                    <div class="form-label mb-1">Cooldown (minutes)</div>
-                                    <div class="form-text">How long invites remain paused before the lockdown lifts automatically.</div>
-                                </div>
-                                <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.AntiRaidCooldownMinutes" />
+                            <InputNumber class="form-control" style="max-width:140px" min="5" max="300" @bind-Value="Form.AntiRaidWindowSeconds" disabled="@(!Form.IsAntiRaidEnabled)" />
+                        </div>
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Cooldown (minutes)</div>
+                                <div class="form-text">How long invites remain paused before the lockdown lifts automatically.</div>
                             </div>
-                        }
+                            <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.AntiRaidCooldownMinutes" disabled="@(!Form.IsAntiRaidEnabled)" />
+                        </div>
                     </div>
                 </div>
             }
