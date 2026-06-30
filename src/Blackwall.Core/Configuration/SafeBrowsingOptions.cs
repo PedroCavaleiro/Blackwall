@@ -5,6 +5,9 @@ namespace Blackwall.Core.Configuration;
 public sealed class SafeBrowsingOptions {
     public const string SectionName = "SAFE_BROWSING";
 
+    [ConfigurationKeyName("ENABLED")]
+    public bool Enabled { get; set; } = true;
+
     [ConfigurationKeyName("API_KEY")]
     public string? ApiKey { get; set; }
 

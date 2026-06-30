@@ -2,8 +2,11 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @using Blackwall.Core.Entities
+@using Blackwall.Core.Configuration
+@using Microsoft.Extensions.Options
 @inject BlackwallApiService Api
 @inject NavigationManager Nav
+@inject IOptions<SafeBrowsingOptions> SafeBrowsingOptions
 
 <PageTitle>@(_settings?.Name ?? "Config") — Blackwall</PageTitle>
 
@@ -323,6 +326,7 @@
                     </div>
                 </div>
 
+                @if (SafeBrowsingOptions.Value.Enabled) {
                 <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
                     <div class="card-header">GOOGLE SAFE BROWSING</div>
                     <div class="p-4">
@@ -349,6 +353,7 @@
                         </div>
                     </div>
                 </div>
+                }
 
                 @if (!Form.LinkWhitelistMode) {
                     <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">

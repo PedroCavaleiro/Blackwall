@@ -23,6 +23,7 @@ var apiOptions = builder.Configuration.GetSection(ApiOptions.SectionName).Get<Ap
     ?? throw new InvalidOperationException("API configuration is missing.");
 
 builder.Services.Configure<ApiOptions>(builder.Configuration.GetSection(ApiOptions.SectionName));
+builder.Services.Configure<SafeBrowsingOptions>(builder.Configuration.GetSection(SafeBrowsingOptions.SectionName));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options => {

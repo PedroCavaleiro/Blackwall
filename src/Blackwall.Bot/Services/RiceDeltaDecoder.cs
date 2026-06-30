@@ -1,6 +1,5 @@
 using System.Numerics;
-using System.Text.Json.Serialization;
-// ReSharper disable UnusedAutoPropertyAccessor.Global
+using Blackwall.Bot.Services.SafeBrowsingProto;
 
 namespace Blackwall.Bot.Services;
 
@@ -18,7 +17,7 @@ public static class RiceDeltaDecoder {
         var firstValue = encoded.FirstValue;
         var k = encoded.RiceParameter;
         var count = encoded.EntriesCount;
-        var data = Convert.FromBase64String(encoded.EncodedData ?? "");
+        var data = encoded.EncodedData.ToByteArray();
 
         var result = new List<uint>(count + 1) { firstValue };
 
@@ -53,7 +52,7 @@ public static class RiceDeltaDecoder {
 
         var k = encoded.RiceParameter;
         var count = encoded.EntriesCount;
-        var data = Convert.FromBase64String(encoded.EncodedData ?? "");
+        var data = encoded.EncodedData.ToByteArray();
 
         var result = new List<byte[]>(count + 1) { ToBigEndianBytes(firstValue, 32) };
 
@@ -79,23 +78,12 @@ public static class RiceDeltaDecoder {
     /// Combines four 64-bit string parts into a single 256-bit BigInteger,
     /// with the first part occupying the most significant position.
     /// </summary>
-    private static BigInteger BuildBigInteger256(string? first, string? second, string? third, string? fourth) {
-        var a = ParseUInt64(first);
-        var b = ParseUInt64(second);
-        var c = ParseUInt64(third);
-        var d = ParseUInt64(fourth);
-
-        return (new BigInteger(a) << 192)
-             | (new BigInteger(b) << 128)
-             | (new BigInteger(c) << 64)
-             | new BigInteger(d);
+    private static BigInteger BuildBigInteger256(ulong first, ulong second, ulong third, ulong fourth) {
+        return (new BigInteger(first) << 192)
+             | (new BigInteger(second) << 128)
+             | (new BigInteger(third) << 64)
+             | new BigInteger(fourth);
     }
-
-    /// <summary>
-    /// Parses a string as a 64-bit unsigned integer, returning zero for null or empty input.
-    /// </summary>
-    private static ulong ParseUInt64(string? s) =>
-        string.IsNullOrEmpty(s) ? 0UL : ulong.Parse(s);
 
     /// <summary>
     /// Converts a BigInteger to a fixed-length big-endian byte array,
@@ -177,41 +165,4 @@ public static class RiceDeltaDecoder {
             return bit;
         }
     }
-}
-
-public sealed class RiceDeltaEncoded32Bit {
-    [JsonPropertyName("firstValue")]
-    public uint FirstValue { get; set; }
-
-    [JsonPropertyName("riceParameter")]
-    public int RiceParameter { get; set; }
-
-    [JsonPropertyName("entriesCount")]
-    public int EntriesCount { get; set; }
-
-    [JsonPropertyName("encodedData")]
-    public string? EncodedData { get; set; }
-}
-
-public sealed class RiceDeltaEncoded256Bit {
-    [JsonPropertyName("firstValueFirstPart")]
-    public string? FirstValueFirstPart { get; set; }
-
-    [JsonPropertyName("firstValueSecondPart")]
-    public string? FirstValueSecondPart { get; set; }
-
-    [JsonPropertyName("firstValueThirdPart")]
-    public string? FirstValueThirdPart { get; set; }
-
-    [JsonPropertyName("firstValueFourthPart")]
-    public string? FirstValueFourthPart { get; set; }
-
-    [JsonPropertyName("riceParameter")]
-    public int RiceParameter { get; set; }
-
-    [JsonPropertyName("entriesCount")]
-    public int EntriesCount { get; set; }
-
-    [JsonPropertyName("encodedData")]
-    public string? EncodedData { get; set; }
 }

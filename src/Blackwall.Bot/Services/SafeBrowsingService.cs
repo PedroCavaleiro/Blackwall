@@ -1,16 +1,10 @@
-using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json.Serialization;
+using Blackwall.Bot.Services.SafeBrowsingProto;
 using Blackwall.Core.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
-// ReSharper disable ClassNeverInstantiated.Local
-// ReSharper disable AutoPropertyCanBeMadeGetOnly.Local
-// ReSharper disable UnusedMember.Local
-// ReSharper disable PropertyCanBeMadeInitOnly.Local
-// ReSharper disable NullableWarningSuppressionIsUsed
 
 namespace Blackwall.Bot.Services;
 
@@ -32,7 +26,9 @@ public sealed class SafeBrowsingService(
     private const string CacheKeyPrefix = "sb:hash:";
     private static readonly TimeSpan DefaultCacheTtl = TimeSpan.FromMinutes(5);
 
-    private static readonly HttpClient HttpClient = new() {
+    private static readonly HttpClient HttpClient = new(new HttpClientHandler {
+        AutomaticDecompression = System.Net.DecompressionMethods.All
+    }) {
         Timeout = TimeSpan.FromSeconds(3)
     };
 
@@ -46,6 +42,11 @@ public sealed class SafeBrowsingService(
     /// Returns SAFE, UNSAFE, or UNSURE.
     /// </summary>
     public async Task<SafeBrowsingResult> CheckUrlAsync(string url) {
+        if (!options.Value.Enabled) {
+            logger.LogDebug("Safe Browsing is disabled, skipping URL check");
+            return SafeBrowsingResult.Safe;
+        }
+
         var apiKey = options.Value.ApiKey;
         if (string.IsNullOrWhiteSpace(apiKey)) {
             logger.LogWarning("Safe Browsing API key is not configured");
@@ -107,7 +108,7 @@ public sealed class SafeBrowsingService(
             }
 
             var fullHashHexList = serverResult.Value.fullHashes
-                .Select(fh => Convert.ToHexString(fh.FullHash))
+                .Select(Convert.ToHexString)
                 .ToList();
 
             var cacheValue = fullHashHexList.Count > 0
@@ -146,7 +147,7 @@ public sealed class SafeBrowsingService(
     /// Queries the Safe Browsing hashes:search endpoint for a given 4-byte prefix,
     /// returning matching full hashes and the cache duration, or null on error.
     /// </summary>
-    private async Task<(List<FullHashResponse> fullHashes, TimeSpan cacheDuration)?> QueryHashPrefixAsync(
+    private async Task<(List<byte[]> fullHashes, TimeSpan cacheDuration)?> QueryHashPrefixAsync(
         byte[] prefix,
         string apiKey
     ) {
@@ -161,12 +162,14 @@ public sealed class SafeBrowsingService(
                 return null;
             }
 
-            var body = await response.Content.ReadFromJsonAsync<SafeBrowsingSearchResponse>();
-            if (body is null)
-                return (new List<FullHashResponse>(), DefaultCacheTtl);
+            var rawBytes = await response.Content.ReadAsByteArrayAsync();
+            var body = SearchHashesResponse.Parser.ParseFrom(rawBytes);
 
             var cacheDuration = ParseDuration(body.CacheDuration);
-            return (body.FullHashes ?? new List<FullHashResponse>(), cacheDuration);
+            var fullHashes = body.FullHashes
+                .Select(fh => fh.FullHash_.ToByteArray())
+                .ToList();
+            return (fullHashes, cacheDuration);
         } catch (Exception ex) {
             logger.LogWarning(ex, "Error querying Safe Browsing API");
             return null;
@@ -229,38 +232,14 @@ public sealed class SafeBrowsingService(
     }
 
     /// <summary>
-    /// Parses a duration string ending in 's' (e.g. "300s") into a TimeSpan,
-    /// falling back to the default TTL when parsing fails.
+    /// Parses a protobuf Duration into a TimeSpan,
+    /// falling back to the default TTL when the duration is null.
     /// </summary>
-    private static TimeSpan ParseDuration(string? duration) {
-        if (string.IsNullOrWhiteSpace(duration) || !duration.EndsWith('s'))
+    private static TimeSpan ParseDuration(Duration? duration) {
+        if (duration is null)
             return DefaultCacheTtl;
 
-        var value = duration[..^1];
-        if (double.TryParse(value, out var seconds))
-            return TimeSpan.FromSeconds(Math.Max(seconds, 1));
-
-        return DefaultCacheTtl;
-    }
-
-    private sealed class SafeBrowsingSearchResponse {
-        [JsonPropertyName("fullHashes")]
-        public List<FullHashResponse>? FullHashes { get; set; }
-
-        [JsonPropertyName("cacheDuration")]
-        public string? CacheDuration { get; set; }
-    }
-
-    private sealed class FullHashResponse {
-        [JsonPropertyName("fullHash")]
-        public byte[] FullHash { get; set; } = [];
-
-        [JsonPropertyName("fullHashDetails")]
-        public List<FullHashDetailResponse>? FullHashDetails { get; set; }
-    }
-
-    private sealed class FullHashDetailResponse {
-        [JsonPropertyName("threatType")]
-        public string? ThreatType { get; set; }
+        return TimeSpan.FromSeconds(Math.Max(duration.Seconds, 1))
+             + TimeSpan.FromTicks(duration.Nanos / 100);
     }
 }

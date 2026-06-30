@@ -1,81 +1,16 @@
-using System.Net.Http.Json;
-using System.Text.Json.Serialization;
+using Blackwall.Bot.Services.SafeBrowsingProto;
 using Blackwall.Core.Configuration;
+using Google.Protobuf;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
-// ReSharper disable UnusedAutoPropertyAccessor.Global
-// ReSharper disable PropertyCanBeMadeInitOnly.Global
-// ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
-// ReSharper disable UnusedMember.Global
-// ReSharper disable CollectionNeverUpdated.Global
-// ReSharper disable NullableWarningSuppressionIsUsed
 
 namespace Blackwall.Bot.Services;
 
 /// <summary>
-/// Response from hashLists:list containing metadata about available hash lists.
+/// Metadata about a discovered hash list, used to route list contents during sync.
 /// </summary>
-public sealed class HashListsListResponse {
-    [JsonPropertyName("hashLists")]
-    public List<HashListMetadata>? HashLists { get; set; }
-
-    [JsonPropertyName("nextPageToken")]
-    public string? NextPageToken { get; set; }
-}
-
-public sealed class HashListMetadata {
-    [JsonPropertyName("name")]
-    public string Name { get; set; } = "";
-
-    [JsonPropertyName("metadata")]
-    public HashListMetadataInfo? Metadata { get; set; }
-}
-
-public sealed class HashListMetadataInfo {
-    [JsonPropertyName("threatTypes")]
-    public List<string>? ThreatTypes { get; set; }
-
-    [JsonPropertyName("likelySafeTypes")]
-    public List<string>? LikelySafeTypes { get; set; }
-
-    [JsonPropertyName("hashLength")]
-    public string? HashLength { get; set; }
-}
-
-/// <summary>
-/// Response from hashLists:batchGet containing the actual hash list data.
-/// </summary>
-public sealed class HashListsBatchGetResponse {
-    [JsonPropertyName("hashLists")]
-    public List<HashListData>? HashLists { get; set; }
-}
-
-public sealed class HashListData {
-    [JsonPropertyName("name")]
-    public string Name { get; set; } = "";
-
-    [JsonPropertyName("version")]
-    public string? Version { get; set; }
-
-    [JsonPropertyName("partialUpdate")]
-    public bool PartialUpdate { get; set; }
-
-    [JsonPropertyName("compressedRemovals")]
-    public RiceDeltaEncoded32Bit? CompressedRemovals { get; set; }
-
-    [JsonPropertyName("minimumWaitDuration")]
-    public string? MinimumWaitDuration { get; set; }
-
-    [JsonPropertyName("metadata")]
-    public HashListMetadataInfo? Metadata { get; set; }
-
-    [JsonPropertyName("additionsFourBytes")]
-    public RiceDeltaEncoded32Bit? AdditionsFourBytes { get; set; }
-
-    [JsonPropertyName("additionsThirtyTwoBytes")]
-    public RiceDeltaEncoded256Bit? AdditionsThirtyTwoBytes { get; set; }
-}
+public sealed record HashListInfo(string Name, bool IsGlobalCache, bool IsThreatList);
 
 /// <summary>
 /// Downloads and synchronizes the Google Safe Browsing V5 Global Cache and threat lists
@@ -91,7 +26,9 @@ public sealed class SafeBrowsingSyncService(
     private const string VersionKeyPrefix = "sb:version:";
     private const string SyncedKey = "sb:synced";
 
-    private static readonly HttpClient HttpClient = new() {
+    private static readonly HttpClient HttpClient = new(new HttpClientHandler {
+        AutomaticDecompression = System.Net.DecompressionMethods.All
+    }) {
         Timeout = TimeSpan.FromSeconds(60)
     };
 
@@ -124,6 +61,11 @@ public sealed class SafeBrowsingSyncService(
     /// Returns the minimum wait duration before the next sync should occur.
     /// </summary>
     public async Task<TimeSpan> SyncAsync(CancellationToken cancellationToken = default) {
+        if (!options.Value.Enabled) {
+            logger.LogDebug("Safe Browsing is disabled, skipping sync");
+            return TimeSpan.FromHours(1);
+        }
+
         var apiKey = options.Value.ApiKey;
         if (string.IsNullOrWhiteSpace(apiKey)) {
             logger.LogWarning("Safe Browsing API key is not configured, skipping sync");
@@ -131,16 +73,16 @@ public sealed class SafeBrowsingSyncService(
         }
 
         try {
-            var listNames = await DiscoverHashListNamesAsync(apiKey, cancellationToken);
-            if (listNames.Count == 0) {
+            var listInfos = await DiscoverHashListNamesAsync(apiKey, cancellationToken);
+            if (listInfos.Count == 0) {
                 logger.LogWarning("No hash lists discovered from Safe Browsing API");
                 return TimeSpan.FromMinutes(15);
             }
 
             logger.LogInformation("Discovered {Count} hash lists: {Names}",
-                listNames.Count, string.Join(", ", listNames));
+                listInfos.Count, string.Join(", ", listInfos.Select(l => l.Name)));
 
-            var minWaitDuration = await FetchAndUpdateListsAsync(listNames, apiKey, cancellationToken);
+            var minWaitDuration = await FetchAndUpdateListsAsync(listInfos, apiKey, cancellationToken);
 
             await _db.StringSetAsync(SyncedKey, "1");
 
@@ -156,11 +98,11 @@ public sealed class SafeBrowsingSyncService(
     /// Enumerates all available hash list names from the Safe Browsing API,
     /// following pagination until all pages are consumed.
     /// </summary>
-    private async Task<List<string>> DiscoverHashListNamesAsync(string apiKey, CancellationToken ct) {
+    private async Task<List<HashListInfo>> DiscoverHashListNamesAsync(string apiKey, CancellationToken ct) {
         var baseUrl = options.Value.BaseUrl.TrimEnd('/');
         var url = $"{baseUrl}/hashLists?key={Uri.EscapeDataString(apiKey)}";
 
-        var names = new List<string>();
+        var infos = new List<HashListInfo>();
         string? pageToken = null;
 
         do {
@@ -169,16 +111,25 @@ public sealed class SafeBrowsingSyncService(
                 requestUrl += $"&pageToken={Uri.EscapeDataString(pageToken)}";
 
             using var response = await HttpClient.GetAsync(requestUrl, ct);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode) {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                logger.LogError("Safe Browsing hashLists returned {Status}: {Body}", response.StatusCode, errorBody);
+                break;
+            }
 
-            var body = await response.Content.ReadFromJsonAsync<HashListsListResponse>(ct);
-            if (body?.HashLists is null) break;
+            var rawBytes = await response.Content.ReadAsByteArrayAsync(ct);
+            var body = ListHashListsResponse.Parser.ParseFrom(rawBytes);
 
-            names.AddRange(body.HashLists.Select(h => h.Name));
+            foreach (var list in body.HashLists) {
+                var isGlobalCache = list.Metadata.LikelySafeTypes.Count > 0;
+                var isThreatList = list.Metadata.ThreatTypes.Count > 0;
+                infos.Add(new HashListInfo(list.Name, isGlobalCache, isThreatList));
+            }
+
             pageToken = body.NextPageToken;
         } while (!string.IsNullOrEmpty(pageToken));
 
-        return names;
+        return infos;
     }
 
     /// <summary>
@@ -186,11 +137,12 @@ public sealed class SafeBrowsingSyncService(
     /// incremental updates, processes each list, and returns the minimum wait duration.
     /// </summary>
     private async Task<TimeSpan> FetchAndUpdateListsAsync(
-        List<string> listNames,
+        List<HashListInfo> listInfos,
         string apiKey,
         CancellationToken ct
     ) {
         var baseUrl = options.Value.BaseUrl.TrimEnd('/');
+        var listNames = listInfos.Select(l => l.Name).ToList();
         var versions = await GetStoredVersionsAsync(listNames);
 
         var url = $"{baseUrl}/hashLists:batchGet?key={Uri.EscapeDataString(apiKey)}";
@@ -201,16 +153,22 @@ public sealed class SafeBrowsingSyncService(
         }
 
         using var response = await HttpClient.GetAsync(url, ct);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode) {
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            logger.LogError("Safe Browsing batchGet returned {Status}: {Body}", response.StatusCode, errorBody);
+            return TimeSpan.FromMinutes(30);
+        }
 
-        var body = await response.Content.ReadFromJsonAsync<HashListsBatchGetResponse>(ct);
-        if (body?.HashLists is null) return TimeSpan.FromMinutes(30);
+        var rawBytes = await response.Content.ReadAsByteArrayAsync(ct);
+        var body = BatchGetHashListsResponse.Parser.ParseFrom(rawBytes);
 
         var minWait = TimeSpan.FromMinutes(30);
+        var infoMap = listInfos.ToDictionary(l => l.Name);
 
         foreach (var list in body.HashLists) {
             try {
-                var waitDuration = await ProcessHashListAsync(list);
+                var info = infoMap.GetValueOrDefault(list.Name);
+                var waitDuration = await ProcessHashListAsync(list, info?.IsGlobalCache ?? false, info?.IsThreatList ?? false);
                 if (waitDuration < minWait)
                     minWait = waitDuration;
             } catch (Exception ex) {
@@ -226,9 +184,7 @@ public sealed class SafeBrowsingSyncService(
     /// Redis set (Global Cache or threat prefixes), stores the new version token, and
     /// returns the list's minimum wait duration.
     /// </summary>
-    private async Task<TimeSpan> ProcessHashListAsync(HashListData list) {
-        var isGlobalCache = list.Metadata?.LikelySafeTypes is { Count: > 0 };
-        var isThreatList = list.Metadata?.ThreatTypes is { Count: > 0 };
+    private async Task<TimeSpan> ProcessHashListAsync(HashList list, bool isGlobalCache, bool isThreatList) {
         var redisKey = isGlobalCache ? GlobalCacheKey : ThreatPrefixesKey;
 
         if (!list.PartialUpdate) {
@@ -265,8 +221,8 @@ public sealed class SafeBrowsingSyncService(
             }
         }
 
-        if (list.Version is not null)
-            await _db.StringSetAsync($"{VersionKeyPrefix}{list.Name}", list.Version);
+        if (list.Version.Length > 0)
+            await _db.StringSetAsync($"{VersionKeyPrefix}{list.Name}", Convert.ToBase64String(list.Version.ToByteArray()));
 
         return ParseDuration(list.MinimumWaitDuration);
     }
@@ -288,13 +244,11 @@ public sealed class SafeBrowsingSyncService(
     /// Parses a duration string ending in 's' (e.g. "300s") into a TimeSpan,
     /// falling back to a 30-minute default when parsing fails.
     /// </summary>
-    private static TimeSpan ParseDuration(string? duration) {
-        if (string.IsNullOrWhiteSpace(duration) || !duration.EndsWith('s'))
+    private static TimeSpan ParseDuration(Duration? duration) {
+        if (duration is null)
             return TimeSpan.FromMinutes(30);
 
-        var value = duration[..^1];
-        return double.TryParse(value, out var seconds)
-            ? TimeSpan.FromSeconds(Math.Max(seconds, 1))
-            : TimeSpan.FromMinutes(30);
+        return TimeSpan.FromSeconds(Math.Max(duration.Seconds, 1))
+             + TimeSpan.FromTicks(duration.Nanos / 100);
     }
 }
