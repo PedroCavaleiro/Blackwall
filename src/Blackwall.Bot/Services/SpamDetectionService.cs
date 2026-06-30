@@ -158,7 +158,8 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
             if (await blacklistService.IsLinkBlockedAsync(discordGuildId, url))
                 return true;
 
-            var resolved = await ResolveRedirectAsync(url);
+            var redirectUrl = url.Contains("://") ? url : "https://" + url;
+            var resolved = await ResolveRedirectAsync(redirectUrl);
             if (resolved is not null && await blacklistService.IsLinkBlockedAsync(discordGuildId, resolved))
                 return true;
         }
@@ -170,6 +171,6 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     private static partial Regex InviteLinkPatternRegex();
     [GeneratedRegex(@"https?://(?!(?:cdn\.discordapp\.com|media\.discordapp\.net|discord\.com|discord\.gg))[^\s]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
     private static partial Regex SuspiciousLinkPatternRegex();
-    [GeneratedRegex(@"https?://[^\s]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
+    [GeneratedRegex(@"(?:https?://)?[a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?)+(?:/[^\s]*)?", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
     private static partial Regex UrlPatternRegex();
 }

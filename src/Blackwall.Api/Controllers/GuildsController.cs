@@ -598,7 +598,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, cancellationToken), cancellationToken);
+        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None));
 
         return Ok(new BlacklistResponse(blacklist.Id, blacklist.Url));
     }
@@ -661,7 +661,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId));
+        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None));
 
         return NoContent();
     }
@@ -836,7 +836,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, cancellationToken), cancellationToken);
+        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None));
 
         return Ok(new BlacklistDomainResponse(entry.Id, entry.Domain));
     }
@@ -899,7 +899,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, cancellationToken), cancellationToken);
+        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None));
 
         return NoContent();
     }

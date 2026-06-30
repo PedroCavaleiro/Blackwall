@@ -162,6 +162,9 @@ public sealed partial class BlacklistService(
     public IReadOnlyList<string> GetDefaultBlacklists() => options.Value.Defaults;
 
     private static string? ExtractHost(string url) {
+        if (!url.Contains("://"))
+            url = "https://" + url;
+
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
             return null;
 
