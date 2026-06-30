@@ -127,6 +127,14 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .IsRequired()
                   .HasDefaultValue(false);
 
+            entity.Property(e => e.SafeBrowsingEnabled)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.SafeBrowsingBlockUnsure)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
             entity.Property(e => e.IsEnabled)
                   .IsRequired()
                   .HasDefaultValue(true);

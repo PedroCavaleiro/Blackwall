@@ -12,6 +12,7 @@ public sealed class MessageHandler(
     IServiceScopeFactory scopeFactory,
     SpamDetectionService spamDetectionService,
     LockdownService lockdownService,
+    SafeBrowsingService safeBrowsingService,
     ILogger<MessageHandler> logger
 ) {
     /// <summary>
@@ -83,11 +84,23 @@ public sealed class MessageHandler(
             using var blacklistScope = scopeFactory.CreateScope();
             var blacklistService = blacklistScope.ServiceProvider.GetRequiredService<BlacklistService>();
 
-            if (await SpamDetectionService.ContainsBlacklistedLinkAsync(message.Content, blacklistService, discordGuildId)) {
+            var blockedByBlacklist = await SpamDetectionService.ContainsBlacklistedLinkAsync(message.Content, blacklistService, discordGuildId);
+
+            if (blockedByBlacklist) {
                 violations.Add("suspicious_link");
                 triggeredActions.Add(config.SuspiciousLinkAction ?? config.Action);
                 if ((config.SuspiciousLinkAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
                     shouldLockdown = true;
+            } else if (config.SafeBrowsingEnabled) {
+                var sbResult = await SpamDetectionService.CheckSafeBrowsingAsync(message.Content, safeBrowsingService);
+
+                if (sbResult == SafeBrowsingResult.Unsafe
+                    || (sbResult == SafeBrowsingResult.Unsure && config.SafeBrowsingBlockUnsure)) {
+                    violations.Add("safe_browsing");
+                    triggeredActions.Add(config.SuspiciousLinkAction ?? config.Action);
+                    if ((config.SuspiciousLinkAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
+                        shouldLockdown = true;
+                }
             }
         }
 

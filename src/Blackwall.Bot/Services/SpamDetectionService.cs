@@ -166,6 +166,61 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
 
         return false;
     }
+
+    /// <summary>
+    /// Checks all non-Discord URLs in the content against Google Safe Browsing.
+    /// Returns the worst result found (Unsafe > Unsure > Safe).
+    /// Only URLs that are not Discord domains are checked.
+    /// </summary>
+    public static async Task<SafeBrowsingResult> CheckSafeBrowsingAsync(
+        string content,
+        SafeBrowsingService safeBrowsingService
+    ) {
+        var urls = UrlPattern.Matches(content);
+        if (urls.Count == 0)
+            return SafeBrowsingResult.Safe;
+
+        var worst = SafeBrowsingResult.Safe;
+
+        foreach (Match match in urls) {
+            var url = match.Value;
+
+            if (IsDiscordUrl(url))
+                continue;
+
+            var result = await safeBrowsingService.CheckUrlAsync(url);
+            if (result == SafeBrowsingResult.Unsafe)
+                return SafeBrowsingResult.Unsafe;
+            if (result == SafeBrowsingResult.Unsure && worst == SafeBrowsingResult.Safe)
+                worst = SafeBrowsingResult.Unsure;
+
+            var redirectUrl = url.Contains("://") ? url : "https://" + url;
+            var resolved = await ResolveRedirectAsync(redirectUrl);
+            if (resolved is not null && !IsDiscordUrl(resolved)) {
+                var resolvedResult = await safeBrowsingService.CheckUrlAsync(resolved);
+                if (resolvedResult == SafeBrowsingResult.Unsafe)
+                    return SafeBrowsingResult.Unsafe;
+                if (resolvedResult == SafeBrowsingResult.Unsure && worst == SafeBrowsingResult.Safe)
+                    worst = SafeBrowsingResult.Unsure;
+            }
+        }
+
+        return worst;
+    }
+
+    /// <summary>
+    /// Returns true if the URL points to a Discord-owned domain.
+    /// </summary>
+    private static bool IsDiscordUrl(string url) {
+        if (!url.Contains("://"))
+            url = "https://" + url;
+
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            && (uri.Host.EndsWith("discord.gg", StringComparison.OrdinalIgnoreCase)
+                || uri.Host.EndsWith("discord.com", StringComparison.OrdinalIgnoreCase)
+                || uri.Host.EndsWith("discordapp.com", StringComparison.OrdinalIgnoreCase)
+                || uri.Host.EndsWith("discordapp.net", StringComparison.OrdinalIgnoreCase));
+    }
     
     [GeneratedRegex(@"discord(?:\.gg|\.com/invite)/[a-zA-Z0-9-]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
     private static partial Regex InviteLinkPatternRegex();

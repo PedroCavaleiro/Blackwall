@@ -12,6 +12,8 @@ public sealed record SpamConfigurationDto(
     bool BlockInviteLinks,
     bool BlockSuspiciousLinks,
     bool LinkWhitelistMode,
+    bool SafeBrowsingEnabled,
+    bool SafeBrowsingBlockUnsure,
     bool IsEnabled,
     bool IsDryRun,
     InfractionAction Action,

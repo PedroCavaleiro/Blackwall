@@ -323,6 +323,33 @@
                     </div>
                 </div>
 
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">GOOGLE SAFE BROWSING</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Real-Time threat check powered by a locally synchronized Global Cache from Google Safe Browsing. All URL checks are resolved locally against the synced cache &mdash; no URL data or hash prefixes are ever sent to Google.</p>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Enable Google Safe Browsing</div>
+                                <div class="form-text">Checks URLs that pass the blacklist/whitelist filter against Google's threat lists in real-time.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="safeBrowsing" @bind-Value="Form.SafeBrowsingEnabled" style="width:2.5em;height:1.3em" disabled="@(!Form.BlockSuspiciousLinks)" />
+                            </div>
+                        </div>
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Block level</div>
+                                <div class="form-text">Choose which Safe Browsing results to block. <strong>Unsafe only</strong> blocks confirmed threats. <strong>Unsafe and Unsure</strong> also blocks URLs where the result is uncertain.</div>
+                            </div>
+                            <select class="form-select" style="max-width:250px" @bind="Form.SafeBrowsingBlockUnsure" disabled="@(!Form.SafeBrowsingEnabled)">
+                                <option value="false">Unsafe only</option>
+                                <option value="true">Unsafe and Unsure</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
                 @if (!Form.LinkWhitelistMode) {
                     <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
                         <div class="card-header">BLACKLIST SOURCES</div>
@@ -638,6 +665,8 @@
                 Form.BlockInviteLinks = s.BlockInviteLinks;
                 Form.BlockSuspiciousLinks = s.BlockSuspiciousLinks;
                 Form.LinkWhitelistMode = s.LinkWhitelistMode;
+                Form.SafeBrowsingEnabled = s.SafeBrowsingEnabled;
+                Form.SafeBrowsingBlockUnsure = s.SafeBrowsingBlockUnsure;
                 Form.IsEnabled = s.IsEnabled;
                 Form.IsDryRun = s.IsDryRun;
                 Form.Action = s.Action;
@@ -688,6 +717,8 @@
                 Form.BlockInviteLinks,
                 Form.BlockSuspiciousLinks,
                 Form.LinkWhitelistMode,
+                Form.SafeBrowsingEnabled,
+                Form.SafeBrowsingBlockUnsure,
                 Form.IsEnabled,
                 Form.IsDryRun,
                 Form.Action,
@@ -774,6 +805,8 @@
         public bool BlockInviteLinks { get; set; } = true;
         public bool BlockSuspiciousLinks { get; set; }
         public bool LinkWhitelistMode { get; set; }
+        public bool SafeBrowsingEnabled { get; set; }
+        public bool SafeBrowsingBlockUnsure { get; set; }
         public bool IsEnabled { get; set; } = true;
         public bool IsDryRun { get; set; }
         public InfractionAction Action { get; set; } = InfractionAction.DeleteOnly;

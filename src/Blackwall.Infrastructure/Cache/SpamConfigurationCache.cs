@@ -42,6 +42,8 @@ public sealed class SpamConfigurationCache(
                 x.SpamConfiguration.BlockInviteLinks,
                 x.SpamConfiguration.BlockSuspiciousLinks,
                 x.SpamConfiguration.LinkWhitelistMode,
+                x.SpamConfiguration.SafeBrowsingEnabled,
+                x.SpamConfiguration.SafeBrowsingBlockUnsure,
                 x.SpamConfiguration.IsEnabled,
                 x.SpamConfiguration.IsDryRun,
                 x.SpamConfiguration.Action,

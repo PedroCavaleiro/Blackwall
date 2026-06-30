@@ -126,6 +126,8 @@ public sealed class GuildsController(
                 instance.SpamConfiguration.BlockInviteLinks,
                 instance.SpamConfiguration.BlockSuspiciousLinks,
                 instance.SpamConfiguration.LinkWhitelistMode,
+                instance.SpamConfiguration.SafeBrowsingEnabled,
+                instance.SpamConfiguration.SafeBrowsingBlockUnsure,
                 instance.SpamConfiguration.IsEnabled,
                 instance.SpamConfiguration.IsDryRun,
                 instance.SpamConfiguration.Action,
@@ -206,6 +208,8 @@ public sealed class GuildsController(
         spam.BlockInviteLinks = request.BlockInviteLinks;
         spam.BlockSuspiciousLinks = request.BlockSuspiciousLinks;
         spam.LinkWhitelistMode = request.LinkWhitelistMode;
+        spam.SafeBrowsingEnabled = request.SafeBrowsingEnabled;
+        spam.SafeBrowsingBlockUnsure = request.SafeBrowsingBlockUnsure;
         spam.IsEnabled = request.IsEnabled;
         spam.IsDryRun = request.IsDryRun;
         spam.Action = request.Action;
@@ -810,7 +814,7 @@ public sealed class GuildsController(
                 Status = StatusCodes.Status404NotFound
             });
 
-        var domain = request.Domain?.Trim().ToLowerInvariant();
+        var domain = request.Domain.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(domain) || domain.Contains(' ') || domain.Contains('/'))
             return BadRequest(new ProblemDetails {
                 Title = "Invalid domain.",
