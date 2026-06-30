@@ -42,36 +42,59 @@ public sealed class MessageHandler(
             return;
 
         var violations = new List<string>(5);
+        var triggeredActions = new List<InfractionAction>(5);
+        var shouldLockdown = false;
 
         if (await spamDetectionService.IsRateLimitedAsync(
                 discordGuildId, discordUserId,
-                config.MaxMessagesPerWindow, config.RateLimitWindowSeconds))
+                config.MaxMessagesPerWindow, config.RateLimitWindowSeconds)) {
             violations.Add("rate_limit");
+            triggeredActions.Add(config.RateLimitAction ?? config.Action);
+            if ((config.RateLimitAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
+                shouldLockdown = true;
+        }
 
         if (await spamDetectionService.IsDuplicateAsync(
                 discordGuildId, discordUserId,
                 (long)message.Channel.Id,
                 message.Content, config.DuplicateMessageThreshold,
-                config.DuplicateWindowSeconds, config.DuplicateCrossChannelEnabled))
+                config.DuplicateWindowSeconds, config.DuplicateCrossChannelEnabled)) {
             violations.Add("duplicate");
+            triggeredActions.Add(config.DuplicateAction ?? config.Action);
+            if ((config.DuplicateAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
+                shouldLockdown = true;
+        }
 
-        if (SpamDetectionService.ExceedsMentionLimit(message, config.MentionLimit))
+        if (SpamDetectionService.ExceedsMentionLimit(message, config.MentionLimit)) {
             violations.Add("mention_limit");
+            triggeredActions.Add(config.MentionLimitAction ?? config.Action);
+            if ((config.MentionLimitAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
+                shouldLockdown = true;
+        }
 
-        if (config.BlockInviteLinks && SpamDetectionService.ContainsInviteLink(message.Content))
+        if (config.BlockInviteLinks && SpamDetectionService.ContainsInviteLink(message.Content)) {
             violations.Add("invite_link");
+            triggeredActions.Add(config.InviteLinkAction ?? config.Action);
+            if ((config.InviteLinkAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
+                shouldLockdown = true;
+        }
 
-        if (config.BlockSuspiciousLinks && SpamDetectionService.ContainsSuspiciousLink(message.Content))
+        if (config.BlockSuspiciousLinks && SpamDetectionService.ContainsSuspiciousLink(message.Content)) {
             violations.Add("suspicious_link");
+            triggeredActions.Add(config.SuspiciousLinkAction ?? config.Action);
+            if ((config.SuspiciousLinkAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
+                shouldLockdown = true;
+        }
 
         if (violations.Count == 0)
             return;
 
         var violationSummary = string.Join(", ", violations);
+        var effectiveAction = GetMostSevereAction(triggeredActions);
 
         logger.LogInformation(
-            "Spam detected in guild {GuildId} from user {UserId}: {Violations} (DryRun={DryRun})",
-            discordGuildId, discordUserId, violationSummary, config.IsDryRun);
+            "Spam detected in guild {GuildId} from user {UserId}: {Violations} (DryRun={DryRun}, Action={Action})",
+            discordGuildId, discordUserId, violationSummary, config.IsDryRun, effectiveAction);
 
         if (!config.IsDryRun) {
             try {
@@ -82,9 +105,9 @@ public sealed class MessageHandler(
                     message.Id, discordGuildId);
             }
 
-            await ApplyActionAsync(message, guildChannel.Guild, config.Action, config.MessageDeleteDays);
+            await ApplyActionAsync(message, guildChannel.Guild, effectiveAction, config.MessageDeleteDays);
 
-            if (config.AutoLockdownEnabled && !config.IsLockedDown) {
+            if (shouldLockdown) {
                 logger.LogWarning(
                     "Auto-lockdown triggered for guild {GuildId} due to infraction from user {UserId}: {Violations}",
                     discordGuildId, discordUserId, violationSummary);
@@ -94,7 +117,20 @@ public sealed class MessageHandler(
         }
 
         if (config.LogChannelId.HasValue)
-            await SendLogMessageAsync(message, guildChannel.Guild, violations, config.Action, config.IsDryRun);
+            await SendLogMessageAsync(message, guildChannel.Guild, violations, effectiveAction, config.IsDryRun);
+    }
+
+    /// <summary>
+    /// Returns the most severe action from the list of triggered module actions.
+    /// Severity order: DeleteOnly &lt; Timeout &lt; Kick &lt; Ban.
+    /// </summary>
+    private static InfractionAction GetMostSevereAction(IReadOnlyList<InfractionAction> actions) {
+        var max = InfractionAction.DeleteOnly;
+        foreach (var action in actions) {
+            if (action > max)
+                max = action;
+        }
+        return max;
     }
 
     /// <summary>

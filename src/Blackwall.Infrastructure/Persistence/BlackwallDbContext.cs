@@ -162,6 +162,17 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .IsRequired()
                   .HasDefaultValue(false);
 
+            entity.Property(e => e.RateLimitAction);
+            entity.Property(e => e.RateLimitAutoLockdown);
+            entity.Property(e => e.DuplicateAction);
+            entity.Property(e => e.DuplicateAutoLockdown);
+            entity.Property(e => e.MentionLimitAction);
+            entity.Property(e => e.MentionLimitAutoLockdown);
+            entity.Property(e => e.InviteLinkAction);
+            entity.Property(e => e.InviteLinkAutoLockdown);
+            entity.Property(e => e.SuspiciousLinkAction);
+            entity.Property(e => e.SuspiciousLinkAutoLockdown);
+
             entity.Property(e => e.UpdatedAtUtc);
         });
 

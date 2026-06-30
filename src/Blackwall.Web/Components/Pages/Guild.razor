@@ -205,6 +205,86 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">MODULE OVERRIDES</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Override the global infraction action and auto-lockdown behavior for individual detection modules. Set to "Default" to inherit from the General tab.</p>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Rate limit &mdash; action</div>
+                                <div class="form-text">Action taken when a user exceeds the message rate limit.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.RateLimitActionStr">
+                                <option value="">Default</option>
+                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
+                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
+                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
+                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
+                            </select>
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Rate limit &mdash; auto-lockdown</div>
+                                <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.RateLimitAutoLockdownStr">
+                                <option value="">Default</option>
+                                <option value="true">Lockdown</option>
+                                <option value="false">No lockdown</option>
+                            </select>
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Duplicate &mdash; action</div>
+                                <div class="form-text">Action taken when a user sends duplicate messages.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.DuplicateActionStr">
+                                <option value="">Default</option>
+                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
+                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
+                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
+                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
+                            </select>
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Duplicate &mdash; auto-lockdown</div>
+                                <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.DuplicateAutoLockdownStr">
+                                <option value="">Default</option>
+                                <option value="true">Lockdown</option>
+                                <option value="false">No lockdown</option>
+                            </select>
+                        </div>
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Mention limit &mdash; action</div>
+                                <div class="form-text">Action taken when a user exceeds the mention limit.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.MentionLimitActionStr">
+                                <option value="">Default</option>
+                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
+                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
+                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
+                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
+                            </select>
+                        </div>
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Mention limit &mdash; auto-lockdown</div>
+                                <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.MentionLimitAutoLockdownStr">
+                                <option value="">Default</option>
+                                <option value="true">Lockdown</option>
+                                <option value="false">No lockdown</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
             }
 
             @if (_activeTab == "links") {
@@ -230,6 +310,62 @@
                             <div class="form-check form-switch">
                                 <InputCheckbox class="form-check-input" id="blockSuspicious" @bind-Value="Form.BlockSuspiciousLinks" style="width:2.5em;height:1.3em" />
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">MODULE OVERRIDES</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Override the global infraction action and auto-lockdown behavior for individual link protection modules. Set to "Default" to inherit from the General tab.</p>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Invite link &mdash; action</div>
+                                <div class="form-text">Action taken when a user posts a Discord invite link.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.InviteLinkActionStr">
+                                <option value="">Default</option>
+                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
+                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
+                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
+                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
+                            </select>
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Invite link &mdash; auto-lockdown</div>
+                                <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.InviteLinkAutoLockdownStr">
+                                <option value="">Default</option>
+                                <option value="true">Lockdown</option>
+                                <option value="false">No lockdown</option>
+                            </select>
+                        </div>
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">External link &mdash; action</div>
+                                <div class="form-text">Action taken when a user posts an external link.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.SuspiciousLinkActionStr">
+                                <option value="">Default</option>
+                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
+                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
+                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
+                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
+                            </select>
+                        </div>
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">External link &mdash; auto-lockdown</div>
+                                <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.SuspiciousLinkAutoLockdownStr">
+                                <option value="">Default</option>
+                                <option value="true">Lockdown</option>
+                                <option value="false">No lockdown</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -391,6 +527,16 @@
                 Form.AntiRaidWindowSeconds = s.AntiRaidWindowSeconds;
                 Form.AntiRaidCooldownMinutes = s.AntiRaidCooldownMinutes;
                 Form.AutoLockdownEnabled = s.AutoLockdownEnabled;
+                Form.RateLimitActionStr = s.RateLimitAction?.ToString() ?? "";
+                Form.RateLimitAutoLockdownStr = s.RateLimitAutoLockdown?.ToString().ToLowerInvariant() ?? "";
+                Form.DuplicateActionStr = s.DuplicateAction?.ToString() ?? "";
+                Form.DuplicateAutoLockdownStr = s.DuplicateAutoLockdown?.ToString().ToLowerInvariant() ?? "";
+                Form.MentionLimitActionStr = s.MentionLimitAction?.ToString() ?? "";
+                Form.MentionLimitAutoLockdownStr = s.MentionLimitAutoLockdown?.ToString().ToLowerInvariant() ?? "";
+                Form.InviteLinkActionStr = s.InviteLinkAction?.ToString() ?? "";
+                Form.InviteLinkAutoLockdownStr = s.InviteLinkAutoLockdown?.ToString().ToLowerInvariant() ?? "";
+                Form.SuspiciousLinkActionStr = s.SuspiciousLinkAction?.ToString() ?? "";
+                Form.SuspiciousLinkAutoLockdownStr = s.SuspiciousLinkAutoLockdown?.ToString().ToLowerInvariant() ?? "";
                 _isLockedDown = s.IsLockedDown;
             }
         } catch {
@@ -426,7 +572,17 @@
                 Form.AntiRaidWindowSeconds,
                 Form.AntiRaidCooldownMinutes,
                 _isLockedDown,
-                Form.AutoLockdownEnabled
+                Form.AutoLockdownEnabled,
+                ParseAction(Form.RateLimitActionStr),
+                ParseBool(Form.RateLimitAutoLockdownStr),
+                ParseAction(Form.DuplicateActionStr),
+                ParseBool(Form.DuplicateAutoLockdownStr),
+                ParseAction(Form.MentionLimitActionStr),
+                ParseBool(Form.MentionLimitAutoLockdownStr),
+                ParseAction(Form.InviteLinkActionStr),
+                ParseBool(Form.InviteLinkAutoLockdownStr),
+                ParseAction(Form.SuspiciousLinkActionStr),
+                ParseBool(Form.SuspiciousLinkAutoLockdownStr)
             ));
             _saved = true;
             _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
@@ -501,5 +657,23 @@
         public int AntiRaidWindowSeconds { get; set; } = 30;
         public int AntiRaidCooldownMinutes { get; set; } = 30;
         public bool AutoLockdownEnabled { get; set; }
+        public string RateLimitActionStr { get; set; } = "";
+        public string RateLimitAutoLockdownStr { get; set; } = "";
+        public string DuplicateActionStr { get; set; } = "";
+        public string DuplicateAutoLockdownStr { get; set; } = "";
+        public string MentionLimitActionStr { get; set; } = "";
+        public string MentionLimitAutoLockdownStr { get; set; } = "";
+        public string InviteLinkActionStr { get; set; } = "";
+        public string InviteLinkAutoLockdownStr { get; set; } = "";
+        public string SuspiciousLinkActionStr { get; set; } = "";
+        public string SuspiciousLinkAutoLockdownStr { get; set; } = "";
+    }
+
+    private static InfractionAction? ParseAction(string value) {
+        return Enum.TryParse<InfractionAction>(value, out var action) ? action : null;
+    }
+
+    private static bool? ParseBool(string value) {
+        return bool.TryParse(value, out var result) ? result : null;
     }
 }

@@ -17,7 +17,7 @@ public sealed class BotWorker(
     IOptions<DiscordOptions> options,
     ILogger<BotWorker> logger
 ) : IHostedService {
-    
+
     /// <inheritdoc/>
     public async Task StartAsync(CancellationToken cancellationToken) {
         client.Log += LogAsync;
@@ -53,6 +53,9 @@ public sealed class BotWorker(
     private async Task OnReadyAsync() {
         foreach (var guild in client.Guilds)
             await guildHandler.OnJoinedGuildAsync(guild);
+
+        await client.SetActivityAsync(new Game("blackwall.observer"));
+        await client.SetStatusAsync(UserStatus.Online);
 
         await interactionHandler.RegisterCommandsAsync(client);
     }

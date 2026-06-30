@@ -21,5 +21,15 @@ public sealed record SpamConfigurationDto(
     int AntiRaidWindowSeconds,
     int AntiRaidCooldownMinutes,
     bool IsLockedDown,
-    bool AutoLockdownEnabled
+    bool AutoLockdownEnabled,
+    InfractionAction? RateLimitAction,
+    bool? RateLimitAutoLockdown,
+    InfractionAction? DuplicateAction,
+    bool? DuplicateAutoLockdown,
+    InfractionAction? MentionLimitAction,
+    bool? MentionLimitAutoLockdown,
+    InfractionAction? InviteLinkAction,
+    bool? InviteLinkAutoLockdown,
+    InfractionAction? SuspiciousLinkAction,
+    bool? SuspiciousLinkAutoLockdown
 );

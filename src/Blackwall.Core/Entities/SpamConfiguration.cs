@@ -29,5 +29,20 @@ public class SpamConfiguration: EntityBase {
     public bool IsLockedDown { get; set; }
     public bool AutoLockdownEnabled { get; set; }
 
+    public InfractionAction? RateLimitAction { get; set; }
+    public bool? RateLimitAutoLockdown { get; set; }
+
+    public InfractionAction? DuplicateAction { get; set; }
+    public bool? DuplicateAutoLockdown { get; set; }
+
+    public InfractionAction? MentionLimitAction { get; set; }
+    public bool? MentionLimitAutoLockdown { get; set; }
+
+    public InfractionAction? InviteLinkAction { get; set; }
+    public bool? InviteLinkAutoLockdown { get; set; }
+
+    public InfractionAction? SuspiciousLinkAction { get; set; }
+    public bool? SuspiciousLinkAutoLockdown { get; set; }
+
     public DateTime? UpdatedAtUtc { get; set; }
 }

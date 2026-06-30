@@ -51,7 +51,17 @@ public sealed class SpamConfigurationCache(
                 x.SpamConfiguration.AntiRaidWindowSeconds,
                 x.SpamConfiguration.AntiRaidCooldownMinutes,
                 x.SpamConfiguration.IsLockedDown,
-                x.SpamConfiguration.AutoLockdownEnabled
+                x.SpamConfiguration.AutoLockdownEnabled,
+                x.SpamConfiguration.RateLimitAction,
+                x.SpamConfiguration.RateLimitAutoLockdown,
+                x.SpamConfiguration.DuplicateAction,
+                x.SpamConfiguration.DuplicateAutoLockdown,
+                x.SpamConfiguration.MentionLimitAction,
+                x.SpamConfiguration.MentionLimitAutoLockdown,
+                x.SpamConfiguration.InviteLinkAction,
+                x.SpamConfiguration.InviteLinkAutoLockdown,
+                x.SpamConfiguration.SuspiciousLinkAction,
+                x.SpamConfiguration.SuspiciousLinkAutoLockdown
             ))
             .FirstOrDefaultAsync(cancellationToken);
 

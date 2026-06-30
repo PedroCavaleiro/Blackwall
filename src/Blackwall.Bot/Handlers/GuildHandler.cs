@@ -71,7 +71,17 @@ public sealed class GuildHandler(
                 AntiRaidWindowSeconds = 30,
                 AntiRaidCooldownMinutes = 30,
                 IsLockedDown = false,
-                AutoLockdownEnabled = false
+                AutoLockdownEnabled = false,
+                RateLimitAction = null,
+                RateLimitAutoLockdown = null,
+                DuplicateAction = null,
+                DuplicateAutoLockdown = null,
+                MentionLimitAction = null,
+                MentionLimitAutoLockdown = null,
+                InviteLinkAction = null,
+                InviteLinkAutoLockdown = null,
+                SuspiciousLinkAction = null,
+                SuspiciousLinkAutoLockdown = null
             }
         };
 

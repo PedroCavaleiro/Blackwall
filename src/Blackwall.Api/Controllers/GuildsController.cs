@@ -134,7 +134,17 @@ public sealed class GuildsController(
                 instance.SpamConfiguration.AntiRaidWindowSeconds,
                 instance.SpamConfiguration.AntiRaidCooldownMinutes,
                 instance.SpamConfiguration.IsLockedDown,
-                instance.SpamConfiguration.AutoLockdownEnabled
+                instance.SpamConfiguration.AutoLockdownEnabled,
+                instance.SpamConfiguration.RateLimitAction,
+                instance.SpamConfiguration.RateLimitAutoLockdown,
+                instance.SpamConfiguration.DuplicateAction,
+                instance.SpamConfiguration.DuplicateAutoLockdown,
+                instance.SpamConfiguration.MentionLimitAction,
+                instance.SpamConfiguration.MentionLimitAutoLockdown,
+                instance.SpamConfiguration.InviteLinkAction,
+                instance.SpamConfiguration.InviteLinkAutoLockdown,
+                instance.SpamConfiguration.SuspiciousLinkAction,
+                instance.SpamConfiguration.SuspiciousLinkAutoLockdown
             )
         ));
     }
@@ -203,6 +213,16 @@ public sealed class GuildsController(
         spam.AntiRaidWindowSeconds = Math.Clamp(request.AntiRaidWindowSeconds, 5, 300);
         spam.AntiRaidCooldownMinutes = Math.Max(1, request.AntiRaidCooldownMinutes);
         spam.AutoLockdownEnabled = request.AutoLockdownEnabled;
+        spam.RateLimitAction = request.RateLimitAction;
+        spam.RateLimitAutoLockdown = request.RateLimitAutoLockdown;
+        spam.DuplicateAction = request.DuplicateAction;
+        spam.DuplicateAutoLockdown = request.DuplicateAutoLockdown;
+        spam.MentionLimitAction = request.MentionLimitAction;
+        spam.MentionLimitAutoLockdown = request.MentionLimitAutoLockdown;
+        spam.InviteLinkAction = request.InviteLinkAction;
+        spam.InviteLinkAutoLockdown = request.InviteLinkAutoLockdown;
+        spam.SuspiciousLinkAction = request.SuspiciousLinkAction;
+        spam.SuspiciousLinkAutoLockdown = request.SuspiciousLinkAutoLockdown;
         spam.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
