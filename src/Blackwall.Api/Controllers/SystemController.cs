@@ -1,3 +1,4 @@
+using Blackwall.Bot.Services;
 using Blackwall.Core.DTOs;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +10,9 @@ namespace Blackwall.Api.Controllers;
 [Route("[controller]")]
 public sealed class SystemController(
     BlackwallDbContext dbContext,
-    IConnectionMultiplexer redis
+    IConnectionMultiplexer redis,
+    SafeBrowsingService safeBrowsingService,
+    SafeBrowsingSyncService safeBrowsingSyncService
 ): ControllerBase {
 
     /// <summary>
@@ -35,6 +38,84 @@ public sealed class SystemController(
             dbCanConnect,
             redisConnected,
             DateTime.UtcNow
+        ));
+    }
+
+    /// <summary>
+    /// Tests a URL against Google Safe Browsing and returns the result.
+    /// </summary>
+    /// <remarks>
+    /// Pass any URL to check it. If no URL is provided, Google's official test malware URL
+    /// (<c>https://testsafebrowsing.appspot.com/s/malware.html</c>) is used.
+    /// The response includes the check result, whether the Global Cache is synced, and the
+    /// number of entries in the Global Cache and threat lists.
+    /// </remarks>
+    /// <param name="url">The URL to check. Defaults to Google's Safe Browsing test malware URL.</param>
+    /// <response code="200">Returns the Safe Browsing check result and sync status.</response>
+    [HttpGet("safe-browsing/test")]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(List<SafeBrowsingTestResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> TestSafeBrowsing([FromQuery] string? url) {
+        var unsafeTest = string.IsNullOrWhiteSpace(url)
+            ? "https://testsafebrowsing.appspot.com/s/malware.html"
+            : url;
+        
+        var safeTest = string.IsNullOrWhiteSpace(url)
+            ? "github.com/PedroCavaleiro/Blackwall"
+            : url;
+
+        var synced = await safeBrowsingSyncService.IsSyncedAsync();
+        var unsafeResult = await safeBrowsingService.CheckUrlAsync(unsafeTest);
+        var safeResult = await safeBrowsingService.CheckUrlAsync(safeTest);
+
+        return Ok(new List<SafeBrowsingTestResponse> {
+            new(
+                unsafeTest,
+                unsafeResult.ToString(),
+                synced
+            ),
+            new(
+                safeTest,
+                safeResult.ToString(),
+                synced
+            )
+        });
+    }
+
+    /// <summary>
+    /// Manually triggers a Safe Browsing hash list sync and returns the result.
+    /// </summary>
+    /// <remarks>
+    /// Use this to diagnose sync failures. The response includes whether the sync succeeded,
+    /// any error message, and the current number of entries in the Global Cache and threat lists.
+    /// </remarks>
+    /// <response code="200">Returns the sync result and current Redis state.</response>
+    [HttpPost("safe-browsing/sync")]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(SafeBrowsingSyncResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> TriggerSafeBrowsingSync() {
+        var db = redis.GetDatabase();
+
+        string? error = null;
+        var success = false;
+
+        try {
+            await safeBrowsingSyncService.SyncCoreAsync();
+            success = true;
+        } catch (Exception ex) {
+            error = ex.ToString();
+        }
+
+        var synced = await safeBrowsingSyncService.IsSyncedAsync();
+        var globalCacheEntries = await db.SetLengthAsync("sb:globalcache");
+        var threatEntries = await db.SetLengthAsync("sb:threats");
+
+        return Ok(new SafeBrowsingSyncResponse(
+            success,
+            error,
+            globalCacheEntries,
+            threatEntries,
+            synced
         ));
     }
 

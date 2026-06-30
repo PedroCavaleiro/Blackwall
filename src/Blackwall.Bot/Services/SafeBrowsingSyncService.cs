@@ -1,6 +1,5 @@
 using Blackwall.Bot.Services.SafeBrowsingProto;
 using Blackwall.Core.Configuration;
-using Google.Protobuf;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
@@ -61,6 +60,18 @@ public sealed class SafeBrowsingSyncService(
     /// Returns the minimum wait duration before the next sync should occur.
     /// </summary>
     public async Task<TimeSpan> SyncAsync(CancellationToken cancellationToken = default) {
+        try {
+            return await SyncCoreAsync(cancellationToken);
+        } catch (Exception ex) {
+            logger.LogError(ex, "Error during Safe Browsing hash list sync");
+            return TimeSpan.FromMinutes(5);
+        }
+    }
+
+    /// <summary>
+    /// Performs the sync without swallowing exceptions, so callers can surface errors.
+    /// </summary>
+    public async Task<TimeSpan> SyncCoreAsync(CancellationToken cancellationToken = default) {
         if (!options.Value.Enabled) {
             logger.LogDebug("Safe Browsing is disabled, skipping sync");
             return TimeSpan.FromHours(1);
@@ -72,26 +83,21 @@ public sealed class SafeBrowsingSyncService(
             return TimeSpan.FromMinutes(15);
         }
 
-        try {
-            var listInfos = await DiscoverHashListNamesAsync(apiKey, cancellationToken);
-            if (listInfos.Count == 0) {
-                logger.LogWarning("No hash lists discovered from Safe Browsing API");
-                return TimeSpan.FromMinutes(15);
-            }
-
-            logger.LogInformation("Discovered {Count} hash lists: {Names}",
-                listInfos.Count, string.Join(", ", listInfos.Select(l => l.Name)));
-
-            var minWaitDuration = await FetchAndUpdateListsAsync(listInfos, apiKey, cancellationToken);
-
-            await _db.StringSetAsync(SyncedKey, "1");
-
-            logger.LogInformation("Safe Browsing hash lists synced successfully. Next sync in {Duration}", minWaitDuration);
-            return minWaitDuration;
-        } catch (Exception ex) {
-            logger.LogError(ex, "Error during Safe Browsing hash list sync");
-            return TimeSpan.FromMinutes(5);
+        var listInfos = await DiscoverHashListNamesAsync(apiKey, cancellationToken);
+        if (listInfos.Count == 0) {
+            logger.LogWarning("No hash lists discovered from Safe Browsing API");
+            return TimeSpan.FromMinutes(15);
         }
+
+        logger.LogInformation("Discovered {Count} hash lists: {Names}",
+            listInfos.Count, string.Join(", ", listInfos.Select(l => l.Name)));
+
+        var minWaitDuration = await FetchAndUpdateListsAsync(listInfos, apiKey, cancellationToken);
+
+        await _db.StringSetAsync(SyncedKey, "1");
+
+        logger.LogInformation("Safe Browsing hash lists synced successfully. Next sync in {Duration}", minWaitDuration);
+        return minWaitDuration;
     }
 
     /// <summary>
