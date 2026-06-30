@@ -50,7 +50,8 @@ public sealed class SpamConfigurationCache(
                 x.SpamConfiguration.AntiRaidJoinThreshold,
                 x.SpamConfiguration.AntiRaidWindowSeconds,
                 x.SpamConfiguration.AntiRaidCooldownMinutes,
-                x.SpamConfiguration.IsLockedDown
+                x.SpamConfiguration.IsLockedDown,
+                x.SpamConfiguration.AutoLockdownEnabled
             ))
             .FirstOrDefaultAsync(cancellationToken);
 

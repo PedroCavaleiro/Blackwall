@@ -11,6 +11,7 @@ namespace Blackwall.Bot.Handlers;
 public sealed class MessageHandler(
     IServiceScopeFactory scopeFactory,
     SpamDetectionService spamDetectionService,
+    LockdownService lockdownService,
     ILogger<MessageHandler> logger
 ) {
     /// <summary>
@@ -82,6 +83,14 @@ public sealed class MessageHandler(
             }
 
             await ApplyActionAsync(message, guildChannel.Guild, config.Action, config.MessageDeleteDays);
+
+            if (config.AutoLockdownEnabled && !config.IsLockedDown) {
+                logger.LogWarning(
+                    "Auto-lockdown triggered for guild {GuildId} due to infraction from user {UserId}: {Violations}",
+                    discordGuildId, discordUserId, violationSummary);
+
+                _ = Task.Run(() => lockdownService.LockdownAsync(guildChannel.Guild.Id));
+            }
         }
 
         if (config.LogChannelId.HasValue)

@@ -334,5 +334,55 @@ h1:focus { outline: none; }
     border-bottom-color: var(--bw-primary);
 }
 
+/* --- Legal pages --- */
+.bw-legal h2 {
+    font-family: "Rajdhani", "Inter", sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--bw-primary);
+    margin-top: 2rem;
+    margin-bottom: 0.6rem;
+}
+
+.bw-legal h2:first-child { margin-top: 0; }
+
+.bw-legal h3 {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--bs-body-color);
+    margin-top: 1.25rem;
+    margin-bottom: 0.4rem;
+}
+
+.bw-legal p {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.8rem;
+    line-height: 1.7;
+    color: var(--bw-muted);
+    margin-bottom: 0.8rem;
+}
+
+.bw-legal ul {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.8rem;
+    line-height: 1.7;
+    color: var(--bw-muted);
+    padding-left: 1.2rem;
+    margin-bottom: 0.8rem;
+}
+
+.bw-legal ul li { margin-bottom: 0.3rem; }
+
+.bw-legal a {
+    color: var(--bw-primary);
+    text-decoration: none;
+}
+
+.bw-legal a:hover { text-decoration: underline; }
+
 /* --- Reconnect modal --- */
 #components-reconnect-modal { display: none; }

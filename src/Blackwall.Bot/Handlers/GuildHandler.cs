@@ -70,7 +70,8 @@ public sealed class GuildHandler(
                 AntiRaidJoinThreshold = 10,
                 AntiRaidWindowSeconds = 30,
                 AntiRaidCooldownMinutes = 30,
-                IsLockedDown = false
+                IsLockedDown = false,
+                AutoLockdownEnabled = false
             }
         };
 

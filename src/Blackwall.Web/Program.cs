@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Blackwall.Core.Configuration;
 using Blackwall.Core.DTOs;
 using Blackwall.Web.Components;
@@ -45,10 +46,14 @@ builder.Services.AddHttpClient<BlackwallApiService>(client => {
     client.BaseAddress = new Uri(apiOptions.BaseUrl.TrimEnd('/') + '/');
 });
 
+builder.Services.AddSingleton<DiscordAppInfoService>();
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
+
+await LoadDiscordAppInfoAsync(app.Services, builder.Configuration);
 
 if (!app.Environment.IsDevelopment()) {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
@@ -126,3 +131,24 @@ app.MapRazorComponents<App>()
    .AddInteractiveServerRenderMode();
 
 app.Run();
+
+return;
+
+async Task LoadDiscordAppInfoAsync(IServiceProvider services, IConfiguration config) {
+    var clientId = config["DISCORD:CLIENT_ID"];
+    var appInfo = services.GetRequiredService<DiscordAppInfoService>();
+    appInfo.ClientId = clientId ?? "N/A";
+
+    if (string.IsNullOrWhiteSpace(clientId))
+        return;
+
+    try {
+        using var http = new HttpClient();
+        var json = await http.GetFromJsonAsync<JsonElement>(
+            $"https://discord.com/api/v10/applications/{clientId}/rpc");
+        if (json.TryGetProperty("name", out var nameProp) && nameProp.GetString() is { } name)
+            appInfo.AppName = name;
+    } catch {
+        // Leave defaults if the API call fails
+    }
+}

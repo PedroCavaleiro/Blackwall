@@ -1,0 +1,190 @@
+@page "/terms-of-service"
+@inject IConfiguration Config
+@inject DiscordAppInfoService AppInfo
+
+<PageTitle>Terms of Service — @AppInfo.AppName</PageTitle>
+
+<div class="bw-container" style="max-width:760px;padding-top:3rem;padding-bottom:4rem">
+    <div class="d-inline-flex align-items-center gap-2 px-3 py-1 mb-4 font-mono"
+         style="border:1px solid rgba(34,211,238,0.4);color:var(--bw-primary);font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase">
+        <span class="rounded-circle bw-pulse" style="width:6px;height:6px;background:var(--bw-primary);flex-shrink:0;display:inline-block"></span>
+        Legal // Terms of Service
+    </div>
+
+    <h1 class="font-display mb-2" style="font-size:clamp(1.8rem,4vw,2.6rem);line-height:1.1">
+        Terms of <span class="neon-text">Service</span>
+    </h1>
+    <p class="font-mono mb-5" style="font-size:0.78rem;color:var(--bw-muted)">
+        Last updated: June 30, 2026
+    </p>
+
+    <div class="cut-corner border p-4 p-md-5" style="background:var(--bs-card-bg);position:relative">
+        <div style="position:absolute;top:0;left:0;width:3rem;height:1px;background:var(--bw-primary)"></div>
+
+        <div class="bw-legal">
+            <p style="border-left:2px solid var(--bw-primary);padding-left:0.8rem;color:var(--bs-body-color)">
+                These Terms of Service apply only to the <strong>@WebHost</strong> website and the
+                <strong>@AppInfo.AppName</strong> Discord application (App ID: <code>@AppInfo.ClientId</code>),
+                as both are operated on self-hosted infrastructure.
+            </p>
+
+            <h2>1. Acceptance of Terms</h2>
+            <p>
+                By inviting the @AppInfo.AppName bot ("the Service") to your Discord server or by using the @AppInfo.AppName web dashboard,
+                you ("you", "your") agree to be bound by these Terms of Service. If you do not agree, do not use the Service.
+                The Service is self-hosted software operated by the person or organization that deployed this instance
+                (the "host"). The original @AppInfo.AppName developers ("we", "us", "our") provide the software but do not
+                operate or control individual instances.
+            </p>
+
+            <h2>2. Description of Service</h2>
+            <p>
+                @AppInfo.AppName is an automated anti-spam and moderation bot for Discord. The Service provides real-time message
+                scoring, raid detection, automated enforcement actions, and a web-based dashboard for configuration.
+                Because the Service is self-hosted, the host may modify, suspend, or discontinue any feature of the Service
+                at any time without notice. The original developers reserve the right to modify, suspend, or discontinue
+                the software project itself, including updates and source code availability.<br />
+                The underlying source code is provided subject to its open-source license <a href="https://github.com/PedroCavaleiro/Blackwall/blob/dev/LICENSE" target="_blank">LICENSE.md</a>, while these Terms govern the use of this specific deployed instance.
+            </p>
+
+            <h2>3. Eligibility</h2>
+            <p>
+                You must be at least 13 years old (or the minimum age required to use Discord in your jurisdiction) and
+                have the authority to add bots to the Discord server in question. By using the Service you represent that
+                you meet these requirements.
+            </p>
+
+            <h2>4. Acceptable Use</h2>
+            <p>Instance owners and users agree not to:</p>
+            <ul>
+                <li>Use the Service to violate <strong>Discord's Terms of Service or Community Guidelines</strong>, including
+                    but not limited to harassment, hate speech, illegal content, or coordinated platform abuse.</li>
+                <li>Use the Service to unlawfully target, surveil, or collect personal data from Discord users.</li>
+                <li>Attempt to exploit or attack the Service or its underlying systems.</li>
+                <li>Abuse, overload, or attack the host's infrastructure, APIs, or network resources.</li>
+                <li>Sell or redistribute the Service without the written permission of the original developers.</li>
+            </ul>
+            <p>
+                Instance owners are solely responsible for configuring the Service in a manner that complies with Discord's
+                Terms of Service, Community Guidelines, and applicable law. The original developers are not responsible
+                for how an instance owner configures or deploys the bot.
+            </p>
+
+            <h2>5. User Content</h2>
+            <p>
+                The Service processes message metadata and content from your Discord server solely for the purpose of
+                spam detection and moderation. We do not claim ownership of your content. You are responsible for ensuring
+                that your use of the Service complies with applicable data protection laws, including obtaining any
+                necessary consent from your server members.
+            </p>
+
+            <h2>6. Disclaimers &amp; "As-Is" Provision</h2>
+            <p>
+                The Service is provided <strong>"as is"</strong> and <strong>"as available"</strong>, without warranties of
+                any kind, whether express or implied, including but not limited to implied warranties of merchantability,
+                fitness for a particular purpose, non-infringement, or that the Service will be uninterrupted, error-free,
+                or that it will detect all spam or malicious activity.
+            </p>
+            <p>
+                <strong>The original developers do not guarantee that the software will function correctly on any given
+                self-hosted instance.</strong> Updates to the software may introduce bugs or breaking changes that affect
+                existing instances. The host is responsible for testing updates before deployment and for maintaining the
+                stability of their own infrastructure.
+            </p>
+            <p>
+                Web dashboard downtime, database corruption, Redis failures, network outages, or any other disruption
+                caused by the host's infrastructure is the sole responsibility of the host. The original developers are
+                not liable for any downtime or data loss resulting from the host's deployment choices.
+            </p>
+            <p>
+                You use the Service entirely at your own risk.
+            </p>
+
+            <h2>7. Limitation of Liability</h2>
+            <p>
+                To the maximum extent permitted by law, neither the original developers nor the host shall be liable for
+                any indirect, incidental, special, consequential, or punitive damages arising out of or related to your
+                use of the Service.
+            </p>
+            <p>
+                <strong>The Service is an automated moderation tool that takes enforcement actions (message deletion,
+                timeouts, kicks, and bans) based on configurable rules.</strong> The original developers are
+                <strong>not responsible for the actions of the bot on any given server</strong>. This includes, but is
+                not limited to:
+            </p>
+            <ul>
+                <li><strong>Misconfiguration:</strong> if the bot is configured with overly aggressive thresholds or
+                    incorrect enforcement actions (e.g., banning instead of deleting), and as a result kicks, times out,
+                    or bans legitimate users — including an entire server's user base — the original developers are not
+                    liable for any resulting damage, data loss, or community disruption.</li>
+                <li><strong>False positives:</strong> the bot may incorrectly flag legitimate messages as spam. The
+                    original developers are not liable for any wrongful deletion, timeout, kick, or ban.</li>
+                <li><strong>Software defects:</strong> bugs in the software may cause unexpected behavior, including
+                    unintended enforcement actions. The original developers are not liable for any damage caused by
+                    such defects on a self-hosted instance.</li>
+                <li><strong>Host infrastructure failures:</strong> downtime, data loss, or service disruption caused by
+                    the host's infrastructure (e.g., VPS provider, database, Redis) is the sole responsibility of the
+                    host.</li>
+            </ul>
+            <p>
+                The host of this instance is an independent operator, not an agent, employee, or partner of the original
+                developers. The host bears full responsibility for the deployment, configuration, and consequences of
+                running the Service on their infrastructure.
+            </p>
+
+            <h2>8. Indemnification</h2>
+            <p>
+                Instance owners agree to indemnify and hold harmless both the original developers and the host of this
+                instance from any claims, damages, or expenses arising from their use or configuration of the Service,
+                including but not limited to claims arising from enforcement actions taken by the bot, false positives,
+                data loss, or violation of these Terms or Discord's Terms of Service.
+            </p>
+
+            <h2>9. Termination</h2>
+            <p>
+                You may stop using the Service at any time by removing the bot from your Discord server and deleting your
+                account from the web dashboard. The host may terminate or restrict access to the Service at their sole
+                discretion, without notice. The original developers may discontinue the software project at any time,
+                including ceasing to provide updates or source code.
+            </p>
+
+            <h2>10. Changes to These Terms</h2>
+            <p>
+                We may update these Terms from time to time. We will reflect the date of the latest revision above.
+                Continued use of the Service after changes constitutes acceptance of the updated Terms.
+            </p>
+
+            <h2>11. Governing Law</h2>
+            <p>
+                Disputes regarding the operation of this specific instance shall be governed by the laws of the jurisdiction
+                in which the host operates. Disputes regarding the underlying software and the original developers shall be
+                governed by the laws of Portugal, without regard to conflict of law principles.
+            </p>
+
+            <h2>12. Contact</h2>
+            <p>
+                Questions about these Terms as they apply to this specific instance should be directed to the
+                <strong>host of this instance</strong> — the person or organization that deployed @AppInfo.AppName on their
+                own infrastructure. Questions about the software itself can be directed to the original @AppInfo.AppName
+                developers through the support channels provided on the <a href="/">home page</a>.
+            </p>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-4 font-mono" style="font-size:0.72rem;color:var(--bw-muted)">
+        <a href="/privacy-policy" class="text-decoration-none" style="color:var(--bw-primary)">// Privacy Policy →</a>
+        <a href="/" class="text-decoration-none" style="color:var(--bw-muted)">← Back to home</a>
+    </div>
+</div>
+
+@code {
+    private string WebHost {
+        get {
+            var baseUrl = Config["WEB:BASEURL"];
+            if (string.IsNullOrWhiteSpace(baseUrl)) return "N/A";
+            return Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri)
+                ? uri.IsDefaultPort ? uri.Host : $"{uri.Host}:{uri.Port}"
+                : baseUrl;
+        }
+    }
+}

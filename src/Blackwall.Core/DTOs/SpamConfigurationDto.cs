@@ -20,5 +20,6 @@ public sealed record SpamConfigurationDto(
     int AntiRaidJoinThreshold,
     int AntiRaidWindowSeconds,
     int AntiRaidCooldownMinutes,
-    bool IsLockedDown
+    bool IsLockedDown,
+    bool AutoLockdownEnabled
 );

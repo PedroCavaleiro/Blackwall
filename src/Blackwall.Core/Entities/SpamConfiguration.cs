@@ -27,6 +27,7 @@ public class SpamConfiguration: EntityBase {
     public int AntiRaidCooldownMinutes { get; set; } = 30;
 
     public bool IsLockedDown { get; set; }
+    public bool AutoLockdownEnabled { get; set; }
 
     public DateTime? UpdatedAtUtc { get; set; }
 }

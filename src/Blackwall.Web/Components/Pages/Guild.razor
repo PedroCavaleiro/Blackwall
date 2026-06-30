@@ -110,6 +110,16 @@
                             Instantly denies Send Messages, Send Messages in Threads, and Create Public Threads for @@everyone in every text channel and category via channel-specific permission overwrites. Higher-tier roles are unaffected. Use /lockdown or /unlock in Discord to toggle from chat.
                         </p>
 
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Auto-lockdown on infraction</div>
+                                <div class="form-text">When on, any detected infraction automatically triggers a full server lockdown. This is independent of the infraction action above — the user is still punished according to that setting.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="autoLockdown" @bind-Value="Form.AutoLockdownEnabled" style="width:2.5em;height:1.3em" />
+                            </div>
+                        </div>
+
                         <div class="bw-field" style="border-bottom:none;padding-bottom:0">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Lockdown status</div>
@@ -380,6 +390,7 @@
                 Form.AntiRaidJoinThreshold = s.AntiRaidJoinThreshold;
                 Form.AntiRaidWindowSeconds = s.AntiRaidWindowSeconds;
                 Form.AntiRaidCooldownMinutes = s.AntiRaidCooldownMinutes;
+                Form.AutoLockdownEnabled = s.AutoLockdownEnabled;
                 _isLockedDown = s.IsLockedDown;
             }
         } catch {
@@ -414,7 +425,8 @@
                 Form.AntiRaidJoinThreshold,
                 Form.AntiRaidWindowSeconds,
                 Form.AntiRaidCooldownMinutes,
-                _isLockedDown
+                _isLockedDown,
+                Form.AutoLockdownEnabled
             ));
             _saved = true;
             _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
@@ -488,5 +500,6 @@
         public int AntiRaidJoinThreshold { get; set; } = 10;
         public int AntiRaidWindowSeconds { get; set; } = 30;
         public int AntiRaidCooldownMinutes { get; set; } = 30;
+        public bool AutoLockdownEnabled { get; set; }
     }
 }

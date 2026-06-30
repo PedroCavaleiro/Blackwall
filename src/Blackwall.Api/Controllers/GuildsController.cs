@@ -133,7 +133,8 @@ public sealed class GuildsController(
                 instance.SpamConfiguration.AntiRaidJoinThreshold,
                 instance.SpamConfiguration.AntiRaidWindowSeconds,
                 instance.SpamConfiguration.AntiRaidCooldownMinutes,
-                instance.SpamConfiguration.IsLockedDown
+                instance.SpamConfiguration.IsLockedDown,
+                instance.SpamConfiguration.AutoLockdownEnabled
             )
         ));
     }
@@ -201,6 +202,7 @@ public sealed class GuildsController(
         spam.AntiRaidJoinThreshold = Math.Max(2, request.AntiRaidJoinThreshold);
         spam.AntiRaidWindowSeconds = Math.Clamp(request.AntiRaidWindowSeconds, 5, 300);
         spam.AntiRaidCooldownMinutes = Math.Max(1, request.AntiRaidCooldownMinutes);
+        spam.AutoLockdownEnabled = request.AutoLockdownEnabled;
         spam.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
