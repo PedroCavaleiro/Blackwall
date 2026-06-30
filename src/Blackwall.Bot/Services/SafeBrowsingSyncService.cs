@@ -202,7 +202,7 @@ public sealed class SafeBrowsingSyncService(
             var additions = RiceDeltaDecoder.Decode256Bit(list.AdditionsThirtyTwoBytes);
             if (additions.Count > 0) {
                 var hexValues = additions.Select(b => (RedisValue)Convert.ToHexString(b)).ToArray();
-                await _db.SetAddAsync(redisKey, hexValues);
+                await BatchSetAddAsync(redisKey, hexValues);
                 logger.LogInformation("Added {Count} entries to Global Cache", additions.Count);
             }
         } else if (isThreatList && list.AdditionsFourBytes is not null) {
@@ -211,7 +211,7 @@ public sealed class SafeBrowsingSyncService(
                 var hexValues = additions.Select(v => (RedisValue)Convert.ToHexString(BitConverter.IsLittleEndian
                     ? BitConverter.GetBytes(v).Reverse().ToArray()
                     : BitConverter.GetBytes(v))).ToArray();
-                await _db.SetAddAsync(redisKey, hexValues);
+                await BatchSetAddAsync(redisKey, hexValues);
                 logger.LogInformation("Added {Count} entries to threat list", additions.Count);
             }
         }
@@ -222,7 +222,7 @@ public sealed class SafeBrowsingSyncService(
                 var hexValues = removals.Select(v => (RedisValue)Convert.ToHexString(BitConverter.IsLittleEndian
                     ? BitConverter.GetBytes(v).Reverse().ToArray()
                     : BitConverter.GetBytes(v))).ToArray();
-                await _db.SetRemoveAsync(redisKey, hexValues);
+                await BatchSetRemoveAsync(redisKey, hexValues);
                 logger.LogInformation("Removed {Count} entries from threat list", removals.Count);
             }
         }
@@ -231,6 +231,25 @@ public sealed class SafeBrowsingSyncService(
             await _db.StringSetAsync($"{VersionKeyPrefix}{list.Name}", Convert.ToBase64String(list.Version.ToByteArray()));
 
         return ParseDuration(list.MinimumWaitDuration);
+    }
+
+    /// <summary>
+    /// Batches SADD calls to stay within Redis's command argument limit (~1M).
+    /// </summary>
+    private const int RedisBatchSize = 500_000;
+
+    private async Task BatchSetAddAsync(RedisKey key, RedisValue[] values) {
+        for (var i = 0; i < values.Length; i += RedisBatchSize) {
+            var chunk = values[i..Math.Min(i + RedisBatchSize, values.Length)];
+            await _db.SetAddAsync(key, chunk);
+        }
+    }
+
+    private async Task BatchSetRemoveAsync(RedisKey key, RedisValue[] values) {
+        for (var i = 0; i < values.Length; i += RedisBatchSize) {
+            var chunk = values[i..Math.Min(i + RedisBatchSize, values.Length)];
+            await _db.SetRemoveAsync(key, chunk);
+        }
     }
 
     /// <summary>

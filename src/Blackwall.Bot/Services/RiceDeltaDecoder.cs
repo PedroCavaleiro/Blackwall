@@ -110,18 +110,19 @@ public static class RiceDeltaDecoder {
     }
 
     /// <summary>
-    /// Reads individual bits from a byte array in MSB-first (big-endian) order.
+    /// Reads individual bits from a byte array in LSB-first (little-endian) order,
+    /// as Rice-Golomb encoded data is packed from the least significant bit.
     /// </summary>
     private sealed class BitReader(byte[] data) {
         private int _bytePos;
         private int _bitPos;
 
         /// <summary>
-        /// Reads a unary-coded value by counting zero bits until a one bit is encountered.
+        /// Reads a unary-coded value by counting one bits until a zero bit is encountered.
         /// </summary>
         public int ReadUnary() {
             var count = 0;
-            while (!ReadBit())
+            while (ReadBit())
                 count++;
             return count;
         }
@@ -132,7 +133,7 @@ public static class RiceDeltaDecoder {
         public uint ReadBits(int count) {
             uint result = 0;
             for (var i = 0; i < count; i++) {
-                result = (result << 1) | (ReadBit() ? 1u : 0u);
+                result |= (ReadBit() ? 1u : 0u) << i;
             }
             return result;
         }
@@ -144,20 +145,22 @@ public static class RiceDeltaDecoder {
         public BigInteger ReadBigBits(int count) {
             var result = BigInteger.Zero;
             for (var i = 0; i < count; i++) {
-                result = (result << 1) | (ReadBit() ? BigInteger.One : BigInteger.Zero);
+                if (ReadBit())
+                    result |= BigInteger.One << i;
             }
             return result;
         }
 
         /// <summary>
-        /// Reads a single bit from the underlying byte array in MSB-first order,
-        /// returning false when the data is exhausted.
+        /// Reads a single bit from the underlying byte array in LSB-first order,
+        /// as Rice-Golomb encoded data is packed little-endian within each byte.
+        /// Throws when the data is exhausted to prevent infinite loops in callers.
         /// </summary>
         private bool ReadBit() {
             if (_bytePos >= data.Length)
-                return false;
+                throw new EndOfStreamException("Rice-Golomb encoded data exhausted before all entries were decoded");
 
-            var bit = (data[_bytePos] & (0x80 >> _bitPos)) != 0;
+            var bit = (data[_bytePos] & (1 << _bitPos)) != 0;
             _bitPos++;
             if (_bitPos != 8) return bit;
             _bitPos = 0;
