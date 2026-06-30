@@ -66,11 +66,11 @@ Edit `.env` and fill in the required values:
 | `DISCORD__CLIENT_ID` | Discord OAuth2 client ID                                                             |
 | `DISCORD__CLIENT_SECRET` | Discord OAuth2 client secret                                                         |
 | `DISCORD__REDIRECT_URI` | OAuth2 callback URL (e.g. `https://public-url.tld/api/auth/discord/callback`)        |
-| `DISCORD__BOT_PERMISSIONS` | Bot permission integer (default `76806` — View, Send, Manage Messages, Read History) |
+| `DISCORD__BOT_PERMISSIONS` | Bot permission integer (default `10308992462014` — matches the listed permissions below; minimal permissions are `1374389610518`) |
 | `DISCORD__BOT_SCOPES` | Bot invite scopes (default `bot applications.commands`)                              |
 | `DISCORD__LOGIN_SCOPES` | OAuth2 login scopes (default `identify guilds`)                                      |
 
-> **Tip:** The default `76806` covers only the permissions Blackwall needs. If you want the bot to automatically see all channels without manual overrides, set this to `8` (Administrator). Use with caution — this grants full server access.
+> **Tip:** Using the default `10308992462014` keeps permissions fine-grained and matches the full Discord permissions listed for Blackwall. The minimal set is `1374389610518`.
 
 **JWT**
 
@@ -162,6 +162,41 @@ For production, publish Release builds and host them behind a reverse proxy:
 dotnet publish src/Blackwall.Api -c Release -o /opt/blackwall/api
 dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web
 ```
+
+### Discord Permissions
+#### Default Set `10308992462014`
+`Admin`,
+`Manager Server`,
+`Manage Roles`,
+`Manage Channels`,
+`Kick Members`,
+`Ban Members`,
+`Manage Nicknames`,
+`Change Nickname`,
+`Manage Expressions`,
+`Manage Webhooks`,
+`View Audit Log`,
+`View Channels`,
+`Moderate Members`,
+`Send Messages`,
+`Send Messages In Threads`,
+`Menage Messages`,
+`Embed Links`,
+`Read Message History`,
+`Use External Emoji`,
+`Use External Stickers`,
+`Connect`,
+`Move Members`
+
+#### Minimal Set `1374389610518`
+`Manage Channels`, 
+`Kick members`, 
+`Ban Members`, 
+`Moderate Members`, 
+`Send Messages`, 
+`Send Messages In Threads`,
+`Manage Messages`, 
+`Read Message History`
 
 ## API Documentation
 
