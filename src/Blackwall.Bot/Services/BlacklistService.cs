@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+// ReSharper disable NullableWarningSuppressionIsUsed
 
 namespace Blackwall.Bot.Services;
 
@@ -23,6 +24,13 @@ public sealed partial class BlacklistService(
         Timeout = TimeSpan.FromSeconds(30)
     };
 
+    /// <summary>
+    /// Downloads a blacklist file from the specified URL and extracts domains
+    /// in AdGuard filter list format using a compiled regex.
+    /// </summary>
+    /// <param name="url">The URL of the blacklist file to download.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>A set of extracted domain names, lowercased and case-insensitive.</returns>
     private static async Task<HashSet<string>> DownloadBlacklistAsync(
         string url,
         CancellationToken cancellationToken = default
@@ -41,6 +49,13 @@ public sealed partial class BlacklistService(
         return domains;
     }
 
+    /// <summary>
+    /// Refreshes the cached blacklist data for a single guild by downloading all
+    /// configured blacklist URLs, merging custom domains, and storing the result
+    /// in Redis with a 25-hour TTL.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID to refresh.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
     public async Task RefreshGuildAsync(
         long discordGuildId,
         CancellationToken cancellationToken = default
@@ -104,6 +119,11 @@ public sealed partial class BlacklistService(
             discordGuildId, blacklistDomains.Count, customDomains.Count, config.LinkWhitelistMode);
     }
 
+    /// <summary>
+    /// Refreshes the cached blacklist data for all active guilds that have
+    /// blacklists or custom domains configured.
+    /// </summary>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
     public async Task RefreshAllAsync(CancellationToken cancellationToken = default) {
         var guildIds = await dbContext.GuildInstances
             .Where(x => x.IsActive && (
@@ -125,6 +145,15 @@ public sealed partial class BlacklistService(
         }
     }
 
+    /// <summary>
+    /// Determines whether a link is blocked for the given guild based on the
+    /// cached blacklist and whitelist mode. In whitelist mode, only domains in
+    /// the custom domain set are allowed; all others are blocked. In blacklist
+    /// mode, domains present in the blacklist or custom domain set are blocked.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID to check against.</param>
+    /// <param name="url">The URL to evaluate.</param>
+    /// <returns><c>true</c> if the link is blocked; otherwise <c>false</c>.</returns>
     public async Task<bool> IsLinkBlockedAsync(long discordGuildId, string url) {
         var host = ExtractHost(url);
         if (host is null)
@@ -159,18 +188,32 @@ public sealed partial class BlacklistService(
         return false;
     }
 
+    /// <summary>
+    /// Returns the list of default blacklist URLs from configuration.
+    /// </summary>
+    /// <returns>A read-only list of default blacklist URLs.</returns>
     public IReadOnlyList<string> GetDefaultBlacklists() => options.Value.Defaults;
 
+    /// <summary>
+    /// Extracts the lowercase hostname from a URL, prepending "https://" if no
+    /// scheme is present.
+    /// </summary>
+    /// <param name="url">The URL or bare domain string.</param>
+    /// <returns>The lowercased hostname, or <c>null</c> if the URL is invalid.</returns>
     private static string? ExtractHost(string url) {
         if (!url.Contains("://"))
             url = "https://" + url;
 
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
-            return null;
-
-        return uri.Host.ToLowerInvariant();
+        return !Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            ? null
+            : uri.Host.ToLowerInvariant();
     }
 
+    /// <summary>
+    /// A compiled regex that matches AdGuard-style domain entries
+    /// (e.g. <c>||example.com^</c>) and captures the domain name.
+    /// </summary>
+    /// <returns>A compiled <see cref="Regex"/> for AdGuard domain patterns.</returns>
     [GeneratedRegex(@"^\|\|([a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?)+)\^", RegexOptions.Multiline | RegexOptions.Compiled)]
     private static partial Regex AdGuardDomainPattern();
 }

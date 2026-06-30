@@ -67,6 +67,10 @@ public sealed class InteractionHandler(
         }
     }
 
+    /// <summary>
+    /// Handles the /lockdown slash command by checking the current state and
+    /// applying a lockdown across all text channels in the guild.
+    /// </summary>
     private async Task HandleLockdownAsync(SocketSlashCommand command) {
         await command.DeferAsync(ephemeral: true);
 
@@ -87,6 +91,10 @@ public sealed class InteractionHandler(
         }
     }
 
+    /// <summary>
+    /// Handles the /unlock slash command by checking the current state and
+    /// lifting an active lockdown, restoring Send Messages permissions.
+    /// </summary>
     private async Task HandleUnlockAsync(SocketSlashCommand command) {
         await command.DeferAsync(ephemeral: true);
 

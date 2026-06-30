@@ -14,14 +14,14 @@ public sealed class BlacklistRefreshBackgroundService(
 
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
-        logger.LogInformation("Blacklist refresh background service started with interval {Hours}h.", Interval.TotalHours);
+        logger.LogInformation("Blacklist refresh background service started with interval {Hours}h", Interval.TotalHours);
 
         using (var scope = scopeFactory.CreateScope()) {
             var blacklistService = scope.ServiceProvider.GetRequiredService<BlacklistService>();
             try {
                 await blacklistService.RefreshAllAsync(stoppingToken);
             } catch (Exception ex) {
-                logger.LogError(ex, "Error during initial blacklist refresh.");
+                logger.LogError(ex, "Error during initial blacklist refresh");
             }
         }
 

@@ -13,6 +13,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<GuildBlacklist> GuildBlacklists => Set<GuildBlacklist>();
     public DbSet<GuildBlacklistDomain> GuildBlacklistDomains => Set<GuildBlacklistDomain>();
 
+    /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes()) {
             if (!typeof(EntityBase).IsAssignableFrom(entityType.ClrType))

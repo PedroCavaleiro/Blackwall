@@ -10,6 +10,12 @@ public sealed class GuildPermissionSyncService(
     DiscordSocketClient discordClient,
     ILogger<GuildPermissionSyncService> logger
 ) {
+    /// <summary>
+    /// Synchronizes all active guild instances with the bot's cached guild data,
+    /// updating name, icon, and owner information. Guilds no longer present in
+    /// the bot cache are marked as inactive.
+    /// </summary>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
     public async Task SyncAsync(CancellationToken cancellationToken = default) {
         var activeGuilds = await dbContext.GuildInstances
             .Include(x => x.Managers)
@@ -23,7 +29,7 @@ public sealed class GuildPermissionSyncService(
 
             if (socketGuild is null) {
                 logger.LogWarning(
-                    "Guild {GuildId} is marked active but is not present in the bot cache.",
+                    "Guild {GuildId} is marked active but is not present in the bot cache",
                     guildInstance.DiscordGuildId
                 );
 

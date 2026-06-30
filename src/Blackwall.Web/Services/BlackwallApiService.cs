@@ -123,6 +123,11 @@ public sealed class BlackwallApiService(
         response.EnsureSuccessStatusCode();
     }
 
+    /// <summary>
+    /// Retrieves the list of default blacklist URLs available for selection.
+    /// </summary>
+    /// <param name="ct">A token to cancel the operation.</param>
+    /// <returns>A read-only list of default blacklists, or an empty list if deserialization returns nothing.</returns>
     public async Task<IReadOnlyList<DefaultBlacklistResponse>> GetDefaultBlacklistsAsync(CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Get, "api/guilds/blacklists/defaults");
         ApplyAuth(request);
@@ -131,6 +136,12 @@ public sealed class BlackwallApiService(
         return await response.Content.ReadFromJsonAsync<IReadOnlyList<DefaultBlacklistResponse>>(ct) ?? [];
     }
 
+    /// <summary>
+    /// Retrieves all blacklists configured for the specified guild.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="ct">A token to cancel the operation.</param>
+    /// <returns>A read-only list of blacklists, or an empty list if deserialization returns nothing.</returns>
     public async Task<IReadOnlyList<BlacklistResponse>> GetBlacklistsAsync(long discordGuildId, CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/blacklists");
         ApplyAuth(request);
@@ -139,6 +150,13 @@ public sealed class BlackwallApiService(
         return await response.Content.ReadFromJsonAsync<IReadOnlyList<BlacklistResponse>>(ct) ?? [];
     }
 
+    /// <summary>
+    /// Adds a blacklist URL to the specified guild's spam configuration.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="url">The blacklist URL to add.</param>
+    /// <param name="ct">A token to cancel the operation.</param>
+    /// <returns>The created blacklist, or <c>null</c> if deserialization returns nothing.</returns>
     public async Task<BlacklistResponse?> AddBlacklistAsync(long discordGuildId, string url, CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/blacklists");
         ApplyAuth(request);
@@ -148,6 +166,12 @@ public sealed class BlackwallApiService(
         return await response.Content.ReadFromJsonAsync<BlacklistResponse>(ct);
     }
 
+    /// <summary>
+    /// Removes a specific blacklist from the specified guild's spam configuration.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="blacklistId">The ID of the blacklist to remove.</param>
+    /// <param name="ct">A token to cancel the operation.</param>
     public async Task RemoveBlacklistAsync(long discordGuildId, long blacklistId, CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/blacklists/{blacklistId}");
         ApplyAuth(request);
@@ -155,6 +179,11 @@ public sealed class BlackwallApiService(
         response.EnsureSuccessStatusCode();
     }
 
+    /// <summary>
+    /// Triggers a refresh of the cached blacklist data for the specified guild.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="ct">A token to cancel the operation.</param>
     public async Task RefreshBlacklistsAsync(long discordGuildId, CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/blacklists/refresh");
         ApplyAuth(request);
@@ -162,6 +191,12 @@ public sealed class BlackwallApiService(
         response.EnsureSuccessStatusCode();
     }
 
+    /// <summary>
+    /// Retrieves all custom blacklist domains configured for the specified guild.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="ct">A token to cancel the operation.</param>
+    /// <returns>A read-only list of custom blacklist domains, or an empty list if deserialization returns nothing.</returns>
     public async Task<IReadOnlyList<BlacklistDomainResponse>> GetBlacklistDomainsAsync(long discordGuildId, CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/blacklists/domains");
         ApplyAuth(request);
@@ -170,6 +205,13 @@ public sealed class BlackwallApiService(
         return await response.Content.ReadFromJsonAsync<IReadOnlyList<BlacklistDomainResponse>>(ct) ?? [];
     }
 
+    /// <summary>
+    /// Adds a custom blacklist domain to the specified guild's spam configuration.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="domain">The domain to blacklist.</param>
+    /// <param name="ct">A token to cancel the operation.</param>
+    /// <returns>The created blacklist domain entry, or <c>null</c> if deserialization returns nothing.</returns>
     public async Task<BlacklistDomainResponse?> AddBlacklistDomainAsync(long discordGuildId, string domain, CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/blacklists/domains");
         ApplyAuth(request);
@@ -179,6 +221,12 @@ public sealed class BlackwallApiService(
         return await response.Content.ReadFromJsonAsync<BlacklistDomainResponse>(ct);
     }
 
+    /// <summary>
+    /// Removes a specific custom blacklist domain from the specified guild's spam configuration.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="domainId">The ID of the blacklist domain to remove.</param>
+    /// <param name="ct">A token to cancel the operation.</param>
     public async Task RemoveBlacklistDomainAsync(long discordGuildId, long domainId, CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/blacklists/domains/{domainId}");
         ApplyAuth(request);
