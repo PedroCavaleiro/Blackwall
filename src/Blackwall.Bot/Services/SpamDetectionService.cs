@@ -11,6 +11,14 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
 
     private static readonly Regex InviteLinkPattern = InviteLinkPatternRegex();
     private static readonly Regex SuspiciousLinkPattern = SuspiciousLinkPatternRegex();
+    private static readonly Regex UrlPattern = UrlPatternRegex();
+
+    private static readonly HttpClient RedirectHttpClient = new(new HttpClientHandler {
+        AllowAutoRedirect = true,
+        MaxAutomaticRedirections = 10
+    }) {
+        Timeout = TimeSpan.FromSeconds(5)
+    };
 
     /// <summary>
     /// Increments a per-user per-guild message counter in Redis. Returns true if the count
@@ -75,15 +83,93 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     }
 
     /// <summary>Returns true if the content contains a Discord invite link.</summary>
-    public static bool ContainsInviteLink(string content) =>
+    private static bool ContainsInviteLink(string content) =>
         InviteLinkPattern.IsMatch(content);
+
+    /// <summary>
+    /// Checks if the content contains a Discord invite link, either directly or hidden behind
+    /// a URL shortener / redirect. First checks the raw content with the invite regex. If no
+    /// direct match is found, extracts all URLs and follows redirects to their final destination,
+    /// checking each resolved URL against the invite pattern.
+    /// </summary>
+    public static async Task<bool> ContainsInviteLinkWithRedirectAsync(string content) {
+        if (ContainsInviteLink(content))
+            return true;
+
+        var urls = UrlPattern.Matches(content);
+        if (urls.Count == 0)
+            return false;
+
+        foreach (Match match in urls) {
+            var url = match.Value;
+
+            if (InviteLinkPattern.IsMatch(url))
+                continue;
+
+            var resolved = await ResolveRedirectAsync(url);
+            if (resolved is not null && InviteLinkPattern.IsMatch(resolved))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Follows HTTP redirects for the given URL using a HEAD request and returns the final
+    /// destination URI, or <c>null</c> if the request fails or times out.
+    /// </summary>
+    private static async Task<string?> ResolveRedirectAsync(string url) {
+        try {
+            using var request = new HttpRequestMessage(HttpMethod.Head, url);
+            request.Headers.UserAgent.ParseAdd("Blackwall/1.0 (+https://blackwall.app)");
+
+            using var response = await RedirectHttpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead);
+
+            return response.RequestMessage?.RequestUri?.ToString();
+        } catch {
+            return null;
+        }
+    }
 
     /// <summary>Returns true if the content contains any non-Discord URL.</summary>
     public static bool ContainsSuspiciousLink(string content) =>
         SuspiciousLinkPattern.IsMatch(content);
+
+    /// <summary>
+    /// Checks if the content contains any URL whose domain (or redirect destination domain)
+    /// should be blocked for the guild. In blacklist mode, blocked if the domain is in the
+    /// blacklist or custom domain set. In whitelist mode, blocked if the domain is NOT in the
+    /// custom domain set. Follows redirects to check the final destination as well.
+    /// </summary>
+    public static async Task<bool> ContainsBlacklistedLinkAsync(
+        string content,
+        BlacklistService blacklistService,
+        long discordGuildId
+    ) {
+        var urls = UrlPattern.Matches(content);
+        if (urls.Count == 0)
+            return false;
+
+        foreach (Match match in urls) {
+            var url = match.Value;
+
+            if (await blacklistService.IsLinkBlockedAsync(discordGuildId, url))
+                return true;
+
+            var resolved = await ResolveRedirectAsync(url);
+            if (resolved is not null && await blacklistService.IsLinkBlockedAsync(discordGuildId, resolved))
+                return true;
+        }
+
+        return false;
+    }
     
     [GeneratedRegex(@"discord(?:\.gg|\.com/invite)/[a-zA-Z0-9-]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
     private static partial Regex InviteLinkPatternRegex();
     [GeneratedRegex(@"https?://(?!(?:cdn\.discordapp\.com|media\.discordapp\.net|discord\.com|discord\.gg))[^\s]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
     private static partial Regex SuspiciousLinkPatternRegex();
+    [GeneratedRegex(@"https?://[^\s]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
+    private static partial Regex UrlPatternRegex();
 }

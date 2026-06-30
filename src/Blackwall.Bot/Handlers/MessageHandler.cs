@@ -72,18 +72,23 @@ public sealed class MessageHandler(
                 shouldLockdown = true;
         }
 
-        if (config.BlockInviteLinks && SpamDetectionService.ContainsInviteLink(message.Content)) {
+        if (config.BlockInviteLinks && await SpamDetectionService.ContainsInviteLinkWithRedirectAsync(message.Content)) {
             violations.Add("invite_link");
             triggeredActions.Add(config.InviteLinkAction ?? config.Action);
             if ((config.InviteLinkAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
                 shouldLockdown = true;
         }
 
-        if (config.BlockSuspiciousLinks && SpamDetectionService.ContainsSuspiciousLink(message.Content)) {
-            violations.Add("suspicious_link");
-            triggeredActions.Add(config.SuspiciousLinkAction ?? config.Action);
-            if ((config.SuspiciousLinkAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
-                shouldLockdown = true;
+        if (config.BlockSuspiciousLinks) {
+            using var blacklistScope = scopeFactory.CreateScope();
+            var blacklistService = blacklistScope.ServiceProvider.GetRequiredService<BlacklistService>();
+
+            if (await SpamDetectionService.ContainsBlacklistedLinkAsync(message.Content, blacklistService, discordGuildId)) {
+                violations.Add("suspicious_link");
+                triggeredActions.Add(config.SuspiciousLinkAction ?? config.Action);
+                if ((config.SuspiciousLinkAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
+                    shouldLockdown = true;
+            }
         }
 
         if (violations.Count == 0)
@@ -200,11 +205,11 @@ public sealed class MessageHandler(
             .WithTitle(isDryRun ? "⚠️ Dry Run — Infraction Detected" : "🛡️ Infraction Action Taken")
             .AddField("User", $"{message.Author.Mention} (`{message.Author.Id}`)", true)
             .AddField("Channel", $"<#{message.Channel.Id}>", true)
-            .AddField("Triggers", string.Join(", ", violations), false)
+            .AddField("Triggers", string.Join(", ", violations))
             .AddField("Message", message.Content.Length > 1024
                 ? message.Content[..1021] + "..."
-                : message.Content, false)
-            .AddField("Action", actionLabel, false)
+                : message.Content)
+            .AddField("Action", actionLabel)
             .WithTimestamp(message.Timestamp)
             .Build();
 

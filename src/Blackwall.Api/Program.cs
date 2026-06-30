@@ -48,6 +48,9 @@ builder.Services.Configure<AppConfiguration>(
 builder.Services.Configure<GuildSyncOptions>(
     builder.Configuration.GetSection(GuildSyncOptions.SectionName));
 
+builder.Services.Configure<BlacklistOptions>(
+    builder.Configuration.GetSection(BlacklistOptions.SectionName));
+
 var jwtOptions = builder.Configuration
                         .GetSection(JwtOptions.SectionName)
                         .Get<JwtOptions>() ?? throw new InvalidOperationException("JWT configuration is missing.");
@@ -86,8 +89,10 @@ builder.Services.AddScoped<AuthHandoffService>();
 builder.Services.AddScoped<GuildClaimService>();
 builder.Services.AddScoped<GuildPermissionSyncService>();
 builder.Services.AddSingleton<DiscordGuildCacheService>();
+builder.Services.AddScoped<BlacklistService>();
 builder.Services.AddHostedService<BotWorker>();
 builder.Services.AddHostedService<GuildPermissionSyncBackgroundService>();
+builder.Services.AddHostedService<BlacklistRefreshBackgroundService>();
 
 builder.Services.AddAuthorization();
 

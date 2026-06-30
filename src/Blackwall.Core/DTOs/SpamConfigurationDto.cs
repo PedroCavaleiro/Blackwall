@@ -11,6 +11,7 @@ public sealed record SpamConfigurationDto(
     int MentionLimit,
     bool BlockInviteLinks,
     bool BlockSuspiciousLinks,
+    bool LinkWhitelistMode,
     bool IsEnabled,
     bool IsDryRun,
     InfractionAction Action,

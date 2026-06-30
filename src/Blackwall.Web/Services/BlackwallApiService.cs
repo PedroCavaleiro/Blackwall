@@ -122,4 +122,67 @@ public sealed class BlackwallApiService(
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<IReadOnlyList<DefaultBlacklistResponse>> GetDefaultBlacklistsAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/guilds/blacklists/defaults");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<DefaultBlacklistResponse>>(ct) ?? [];
+    }
+
+    public async Task<IReadOnlyList<BlacklistResponse>> GetBlacklistsAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/blacklists");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<BlacklistResponse>>(ct) ?? [];
+    }
+
+    public async Task<BlacklistResponse?> AddBlacklistAsync(long discordGuildId, string url, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/blacklists");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddBlacklistRequest(url));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<BlacklistResponse>(ct);
+    }
+
+    public async Task RemoveBlacklistAsync(long discordGuildId, long blacklistId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/blacklists/{blacklistId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task RefreshBlacklistsAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/blacklists/refresh");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<BlacklistDomainResponse>> GetBlacklistDomainsAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/blacklists/domains");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<BlacklistDomainResponse>>(ct) ?? [];
+    }
+
+    public async Task<BlacklistDomainResponse?> AddBlacklistDomainAsync(long discordGuildId, string domain, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/blacklists/domains");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddBlacklistDomainRequest(domain));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<BlacklistDomainResponse>(ct);
+    }
+
+    public async Task RemoveBlacklistDomainAsync(long discordGuildId, long domainId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/blacklists/domains/{domainId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

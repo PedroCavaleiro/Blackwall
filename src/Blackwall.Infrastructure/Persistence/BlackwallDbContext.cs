@@ -10,6 +10,8 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<GuildInstance> GuildInstances => Set<GuildInstance>();
     public DbSet<GuildManager> GuildManagers => Set<GuildManager>();
     public DbSet<SpamConfiguration> SpamConfigurations => Set<SpamConfiguration>();
+    public DbSet<GuildBlacklist> GuildBlacklists => Set<GuildBlacklist>();
+    public DbSet<GuildBlacklistDomain> GuildBlacklistDomains => Set<GuildBlacklistDomain>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes()) {
@@ -120,6 +122,10 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.Property(e => e.BlockSuspiciousLinks)
                   .IsRequired();
 
+            entity.Property(e => e.LinkWhitelistMode)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
             entity.Property(e => e.IsEnabled)
                   .IsRequired()
                   .HasDefaultValue(true);
@@ -174,6 +180,34 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.Property(e => e.SuspiciousLinkAutoLockdown);
 
             entity.Property(e => e.UpdatedAtUtc);
+
+            entity.HasMany(e => e.Blacklists)
+                  .WithOne(e => e.SpamConfiguration)
+                  .HasForeignKey(e => e.SpamConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.BlacklistDomains)
+                  .WithOne(e => e.SpamConfiguration)
+                  .HasForeignKey(e => e.SpamConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<GuildBlacklist>(entity => {
+            entity.Property(e => e.Url)
+                  .IsRequired()
+                  .HasMaxLength(2048);
+
+            entity.HasIndex(e => new { e.SpamConfigurationId, e.Url })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<GuildBlacklistDomain>(entity => {
+            entity.Property(e => e.Domain)
+                  .IsRequired()
+                  .HasMaxLength(512);
+
+            entity.HasIndex(e => new { e.SpamConfigurationId, e.Domain })
+                  .IsUnique();
         });
 
     }
