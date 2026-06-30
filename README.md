@@ -2,6 +2,9 @@
 
 Blackwall is a self-hosted Discord anti-spam system. It combines a real-time bot that detects and removes spam messages with a web dashboard for managing guild configurations — all backed by Discord OAuth2 authentication.
 
+This bot objective is to provide a simple and effective way to manage spam in your server, with a focus on ease of use and customization.
+Tools provided by the community and improving upon the existing ones.
+
 > **Don't want to self-host?** You can add the bot to your server directly at [blackwall.observer](https://blackwall.observer).
 
 ## Features
