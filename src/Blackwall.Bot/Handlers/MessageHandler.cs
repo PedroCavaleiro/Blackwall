@@ -56,11 +56,13 @@ public sealed class MessageHandler(
                 shouldLockdown = true;
         }
 
+        var fullContent = SpamDetectionService.ExtractFullContent(message);
+
         var dupResult = await spamDetectionService.IsDuplicateAsync(
             discordGuildId, discordUserId,
             (long)message.Channel.Id,
             message.Id,
-            message.Content, config.DuplicateMessageThreshold,
+            fullContent, config.DuplicateMessageThreshold,
             config.DuplicateWindowSeconds, config.DuplicateCrossChannelEnabled);
 
         if (dupResult.IsDuplicate) {

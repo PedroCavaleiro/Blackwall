@@ -90,6 +90,39 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     }
 
     /// <summary>
+    /// Extracts all textual content from a message, including its raw content and the text
+    /// fields of every embed (title, description, fields, footer, author, url). Used for
+    /// duplicate detection on messages that may have empty content but rich embeds.
+    /// </summary>
+    public static string ExtractFullContent(IMessage message) {
+        var parts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(message.Content))
+            parts.Add(message.Content.Trim());
+
+        foreach (var embed in message.Embeds) {
+            if (!string.IsNullOrWhiteSpace(embed.Title))
+                parts.Add(embed.Title.Trim());
+            if (!string.IsNullOrWhiteSpace(embed.Description))
+                parts.Add(embed.Description.Trim());
+            if (!string.IsNullOrWhiteSpace(embed.Url))
+                parts.Add(embed.Url.Trim());
+            if (embed.Author is { } author && !string.IsNullOrWhiteSpace(author.Name))
+                parts.Add(author.Name.Trim());
+            if (embed.Footer is { } footer && !string.IsNullOrWhiteSpace(footer.Text))
+                parts.Add(footer.Text.Trim());
+            foreach (var field in embed.Fields) {
+                if (!string.IsNullOrWhiteSpace(field.Name))
+                    parts.Add(field.Name.Trim());
+                if (!string.IsNullOrWhiteSpace(field.Value))
+                    parts.Add(field.Value.Trim());
+            }
+        }
+
+        return string.Join('\n', parts);
+    }
+
+    /// <summary>
     /// Returns true if the total number of user mentions, role mentions, or @everyone/@here
     /// in the message exceeds the configured limit.
     /// </summary>
