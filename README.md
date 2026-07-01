@@ -162,6 +162,17 @@ The `infra/lxc/` directory contains scripts for provisioning a Debian 13 LXC con
 
    This builds Release artifacts, uploads them via rsync, fixes ownership, and restarts the systemd services.
 
+   > **Preserving local config across deploys:** The deploy script excludes `.env` and `appsettings.Production.json` from rsync, so user customizations are never overwritten. `appsettings.json` (base defaults) is always synced, meaning structural changes from the repo propagate automatically. To override any settings locally, create `appsettings.Production.json` in `/opt/blackwall/api/` and/or `/opt/blackwall/web/` with only the keys you want to change — ASP.NET Core merges it on top of the base file at runtime (the services already run with `ASPNETCORE_ENVIRONMENT=Production`). For example:
+   >
+   > ```json
+   > {
+   >   "Blacklists": {
+   >     "Defaults": ["https://example.com/custom-blocklist.txt"]
+   >   },
+   >   "AllowedUsers": ["123456789012345678"]
+   > }
+   > ```
+
 ### Option C: Bare metal / VM
 
 Install the prerequisites directly on the host machine and run the projects natively. Useful for development or when you want full control.
