@@ -49,8 +49,8 @@ public sealed class SafeBrowsingService(
 
         var apiKey = options.Value.ApiKey;
         if (string.IsNullOrWhiteSpace(apiKey)) {
-            logger.LogWarning("Safe Browsing API key is not configured");
-            return SafeBrowsingResult.Unsure;
+            logger.LogWarning("Safe Browsing API key is not configured, skipping URL check");
+            return SafeBrowsingResult.Safe;
         }
 
         var expressions = GenerateHashExpressions(url);
