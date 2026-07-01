@@ -45,6 +45,7 @@ public sealed class MessageHandler(
         var violations = new List<string>(5);
         var triggeredActions = new List<InfractionAction>(5);
         var shouldLockdown = false;
+        List<(ulong ChannelId, ulong MessageId)>? duplicateMessagesToDelete = null;
 
         if (await spamDetectionService.IsRateLimitedAsync(
                 discordGuildId, discordUserId,
@@ -55,15 +56,19 @@ public sealed class MessageHandler(
                 shouldLockdown = true;
         }
 
-        if (await spamDetectionService.IsDuplicateAsync(
-                discordGuildId, discordUserId,
-                (long)message.Channel.Id,
-                message.Content, config.DuplicateMessageThreshold,
-                config.DuplicateWindowSeconds, config.DuplicateCrossChannelEnabled)) {
+        var dupResult = await spamDetectionService.IsDuplicateAsync(
+            discordGuildId, discordUserId,
+            (long)message.Channel.Id,
+            message.Id,
+            message.Content, config.DuplicateMessageThreshold,
+            config.DuplicateWindowSeconds, config.DuplicateCrossChannelEnabled);
+
+        if (dupResult.IsDuplicate) {
             violations.Add("duplicate");
             triggeredActions.Add(config.DuplicateAction ?? config.Action);
             if ((config.DuplicateAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
                 shouldLockdown = true;
+            duplicateMessagesToDelete = dupResult.MessagesToDelete.ToList();
         }
 
         if (SpamDetectionService.ExceedsMentionLimit(message, config.MentionLimit)) {
@@ -121,6 +126,23 @@ public sealed class MessageHandler(
                 logger.LogWarning(ex,
                     "Failed to delete spam message {MessageId} in guild {GuildId}",
                     message.Id, discordGuildId);
+            }
+
+            if (duplicateMessagesToDelete is not null) {
+                foreach (var (channelId, msgId) in duplicateMessagesToDelete) {
+                    if (msgId == message.Id)
+                        continue;
+
+                    try {
+                        var channel = guildChannel.Guild.GetTextChannel(channelId);
+                        if (channel is not null)
+                            await channel.DeleteMessageAsync(msgId);
+                    } catch (Exception ex) {
+                        logger.LogWarning(ex,
+                            "Failed to delete duplicate message {MessageId} in channel {ChannelId}",
+                            msgId, channelId);
+                    }
+                }
             }
 
             await ApplyActionAsync(message, guildChannel.Guild, effectiveAction, config.MessageDeleteDays);
