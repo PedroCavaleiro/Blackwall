@@ -235,6 +235,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await spamConfigurationCache.InvalidateAsync(discordGuildId);
+        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None), cancellationToken);
 
         return NoContent();
     }
