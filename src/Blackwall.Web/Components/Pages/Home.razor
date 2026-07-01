@@ -28,15 +28,15 @@
             </p>
 
             @if (_error == "new_users_disabled") {
-                <div class="alert alert-warning d-inline-block mb-4 font-mono" style="font-size:0.8rem">
+                <div class="bw-warning d-inline-block mb-4 font-mono">
                     // ACCESS DENIED: New user registration is currently disabled.
                 </div>
             } else if (_error == "not_allowed") {
-                <div class="alert alert-warning d-inline-block mb-4 font-mono" style="font-size:0.8rem">
+                <div class="bw-warning d-inline-block mb-4 font-mono">
                     // ACCESS DENIED: You are not authorized to join this instance.
                 </div>
             } else if (!string.IsNullOrEmpty(_error)) {
-                <div class="alert alert-danger d-inline-block mb-4 font-mono" style="font-size:0.8rem">
+                <div class="bw-error d-inline-block mb-4 font-mono">
                     // AUTH ERROR: Authentication failed. Please try again.
                 </div>
             }
