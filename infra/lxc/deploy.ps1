@@ -35,11 +35,13 @@ try {
     $ApiProj = Join-Path $RepoRoot "src\Blackwall.Api\Blackwall.Api.csproj"
     $ApiOut = Join-Path $OutDir "api"
     dotnet publish $ApiProj -c Release -o $ApiOut --nologo -v q
+    if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for Blackwall.Api (exit code $LASTEXITCODE)" }
 
     Write-Info "Publishing Blackwall.Web..."
     $WebProj = Join-Path $RepoRoot "src\Blackwall.Web\Blackwall.Web.csproj"
     $WebOut = Join-Path $OutDir "web"
     dotnet publish $WebProj -c Release -o $WebOut --nologo -v q
+    if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for Blackwall.Web (exit code $LASTEXITCODE)" }
 
     Write-Success "Publish complete."
 
@@ -61,6 +63,10 @@ try {
 
     # We pass a multi-line script to SSH to handle the remote processing
     $RemoteScript = @"
+        set -e
+        # Ensure the target directory exists
+        mkdir -p $AppDir
+
         # Clear out the target directory but preserve the .env file
         find $AppDir -mindepth 1 -maxdepth 1 ! -name '.env' -exec rm -rf {} + 2>/dev/null || true
 

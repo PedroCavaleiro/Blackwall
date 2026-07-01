@@ -1,6 +1,10 @@
 using Blackwall.Bot.Services;
 using Blackwall.Core.DTOs;
+using Blackwall.Core.Entities;
+using Blackwall.Infrastructure.Cache;
 using Blackwall.Infrastructure.Persistence;
+using Discord;
+using Discord.WebSocket;
 using Microsoft.AspNetCore.Mvc;
 using StackExchange.Redis;
 
@@ -12,7 +16,10 @@ public sealed class SystemController(
     BlackwallDbContext dbContext,
     IConnectionMultiplexer redis,
     SafeBrowsingService safeBrowsingService,
-    SafeBrowsingSyncService safeBrowsingSyncService
+    SafeBrowsingSyncService safeBrowsingSyncService,
+    DiscordSocketClient discordClient,
+    AccountScoringService accountScoringService,
+    SpamConfigurationCache spamConfigurationCache
 ): ControllerBase {
 
     /// <summary>
@@ -81,6 +88,141 @@ public sealed class SystemController(
                 synced
             )
         });
+    }
+
+    /// <summary>
+    /// Tests the threat level of a Discord user by running the account scoring service.
+    /// </summary>
+    /// <remarks>
+    /// Pass a Discord user ID to evaluate the user's account metadata (account age, avatar,
+    /// username patterns). If a guild ID is provided, the user is looked up in that specific
+    /// guild; otherwise the bot searches all guilds it is a member of. The response includes
+    /// the numeric score, threat level, and the list of contributing risk factors.
+    /// When <c>notify</c> is set to <c>true</c>, a test embed is sent to the audit (log) channel
+    /// of every guild the user is a member of that has a log channel configured.
+    /// </remarks>
+    /// <param name="userId">The Discord user ID to evaluate.</param>
+    /// <param name="guildId">Optional Discord guild ID to narrow the lookup.</param>
+    /// <param name="notify">If true, sends a test notification embed to the audit channel of each guild where the user is found.</param>
+    /// <response code="200">Returns the threat level assessment for the user.</response>
+    /// <response code="404">The user was not found in any guild the bot can see.</response>
+    [HttpGet("threat-level/test")]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(ThreatLevelTestResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> TestThreatLevel(
+        [FromQuery] ulong userId,
+        [FromQuery] ulong? guildId,
+        [FromQuery] bool notify = false
+    ) {
+        var matchingGuilds = new List<(IGuild Guild, IGuildUser User)>();
+
+        if (guildId.HasValue) {
+            var guild = discordClient.GetGuild(guildId.Value);
+            IGuildUser? guildUser = guild?.GetUser(userId);
+            if (guildUser is null)
+                guildUser = await discordClient.Rest.GetGuildUserAsync(guildId.Value, userId);
+            if (guild is not null && guildUser is not null)
+                matchingGuilds.Add((guild, guildUser));
+        } else {
+            foreach (var guild in discordClient.Guilds) {
+                var guildUser = guild.GetUser(userId);
+                if (guildUser is not null)
+                    matchingGuilds.Add((guild, guildUser));
+            }
+
+            if (matchingGuilds.Count == 0) {
+                foreach (var guild in discordClient.Guilds) {
+                    var guildUser = await discordClient.Rest.GetGuildUserAsync(guild.Id, userId);
+                    if (guildUser is not null)
+                        matchingGuilds.Add((guild, guildUser));
+                }
+            }
+        }
+
+        if (matchingGuilds.Count == 0) {
+            return NotFound(new ProblemDetails {
+                Title = "User not found.",
+                Detail = "The specified user was not found in any guild the bot is a member of.",
+                Status = StatusCodes.Status404NotFound
+            });
+        }
+
+        var firstUser = matchingGuilds[0].User;
+        var result = accountScoringService.ScoreUser(firstUser);
+
+        var notifiedGuilds = new List<ThreatLevelTestNotifiedGuild>();
+
+        if (!notify)
+            return Ok(new ThreatLevelTestResponse(
+                userId,
+                result.Score,
+                result.ThreatLevel.ToString(),
+                result.Factors,
+                notifiedGuilds
+            ));
+        
+        foreach (var (guild, user) in matchingGuilds) {
+            var config = await spamConfigurationCache.GetByDiscordGuildIdAsync((long)guild.Id);
+            ulong? logChannelId = config?.LogChannelId is { } cid ? (ulong)cid : null;
+            var sent = false;
+
+            if (logChannelId.HasValue) {
+                var channel = await guild.GetChannelAsync(logChannelId.Value) as ITextChannel;
+                if (channel is not null) {
+                    var embed = BuildThreatLevelTestEmbed(user, result);
+                    try {
+                        await channel.SendMessageAsync(embed: embed);
+                        sent = true;
+                    } catch {
+                        // Channel may be inaccessible or bot lacks send permissions
+                    }
+                }
+            }
+
+            notifiedGuilds.Add(new ThreatLevelTestNotifiedGuild(
+                guild.Id,
+                guild.Name,
+                logChannelId,
+                sent
+            ));
+        }
+
+        return Ok(new ThreatLevelTestResponse(
+            userId,
+            result.Score,
+            result.ThreatLevel.ToString(),
+            result.Factors,
+            notifiedGuilds
+        ));
+    }
+
+    /// <summary>
+    /// Builds the embed that is sent to a guild's audit channel when testing the threat level.
+    /// </summary>
+    private static Embed BuildThreatLevelTestEmbed(IGuildUser user, AccountScoreResult result) {
+        var color = result.ThreatLevel switch {
+            ThreatLevel.High => Color.Red,
+            ThreatLevel.Medium => Color.Gold,
+            _ => Color.Green
+        };
+
+        var levelEmoji = result.ThreatLevel switch {
+            ThreatLevel.High => "🔴",
+            ThreatLevel.Medium => "🟡",
+            _ => "🟢"
+        };
+
+        return new EmbedBuilder()
+            .WithColor(color)
+            .WithTitle($"{levelEmoji} Threat Level Test — {result.ThreatLevel} Risk")
+            .AddField("User", $"{user.Mention} (`{user.Id}`)", true)
+            .AddField("Score", result.Score.ToString(), true)
+            .AddField("Account age", $"{(int)(DateTimeOffset.UtcNow - user.CreatedAt).TotalDays} day(s)", true)
+            .AddField("Risk factors", result.Factors.Count > 0 ? string.Join("\n", result.Factors) : "None", false)
+            .WithFooter("Manual test via API")
+            .WithTimestamp(DateTimeOffset.UtcNow)
+            .Build();
     }
 
     /// <summary>

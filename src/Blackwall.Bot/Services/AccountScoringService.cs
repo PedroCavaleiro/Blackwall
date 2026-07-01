@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Blackwall.Core.Entities;
+using Discord;
 using Discord.WebSocket;
 
 namespace Blackwall.Bot.Services;
@@ -18,7 +19,7 @@ public sealed partial class AccountScoringService {
     /// and username patterns. Returns a <see cref="AccountScoreResult"/> containing
     /// the numeric score, threat level, and breakdown of contributing factors.
     /// </summary>
-    public AccountScoreResult ScoreUser(SocketGuildUser user) {
+    public AccountScoreResult ScoreUser(IGuildUser user) {
         var factors = new List<string>(4);
         var score = 0;
 
