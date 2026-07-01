@@ -5,6 +5,7 @@ using Blackwall.Core.Services;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace Blackwall.Api.Controllers;
@@ -18,7 +19,8 @@ public sealed class AuthController(
     DiscordGuildCacheService guildCache,
     BlackwallDbContext dbContext,
     IOptions<WebOptions> webOptions,
-    IOptions<AppConfiguration> appConfiguration
+    IOptions<AppConfiguration> appConfiguration,
+    IConfiguration configuration
 ) : ControllerBase {
     /// <summary>
     /// Builds and returns the Discord OAuth2 authorization URL to initiate login.
@@ -100,9 +102,9 @@ public sealed class AuthController(
         var encryptedRefreshToken = AesCrypto.EncryptString(tokens.RefreshToken, key, iv);
 
         if (user is null) {
-            if (appConfiguration.Value.DisableNewUsers) {
-                var disabledRedirectUrl = $"{webOptions.Value.BaseUrl.TrimEnd('/')}/auth/callback?error=new_users_disabled";
-                return Redirect(disabledRedirectUrl);
+            if (!IsRegistrationAllowed(discordUserId, out var errorCode)) {
+                var deniedRedirectUrl = $"{webOptions.Value.BaseUrl.TrimEnd('/')}/auth/callback?error={errorCode}";
+                return Redirect(deniedRedirectUrl);
             }
 
             user = new Core.Entities.AppUser {
@@ -185,5 +187,47 @@ public sealed class AuthController(
         var token = jwtService.GenerateToken(user);
 
         return Ok(new AuthExchangeResponse(token));
+    }
+
+    private bool IsRegistrationAllowed(long discordUserId, out string errorCode) {
+        var config = appConfiguration.Value;
+
+        if (config.DisableNewUsers) {
+            if (string.IsNullOrWhiteSpace(config.InstanceOwner)) {
+                errorCode = "new_users_disabled";
+                return false;
+            }
+
+            if (long.TryParse(config.InstanceOwner, out var ownerId) && ownerId == discordUserId) {
+                errorCode = string.Empty;
+                return true;
+            }
+
+            errorCode = "new_users_disabled";
+            return false;
+        }
+
+        if (config.PrivateInstance) {
+            var allowedUsers = configuration.GetSection("AllowedUsers").Get<string[]>() ?? [];
+            var allowedSet = new HashSet<string>(allowedUsers, StringComparer.OrdinalIgnoreCase);
+
+            if (allowedSet.Contains(discordUserId.ToString())) {
+                errorCode = string.Empty;
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(config.InstanceOwner) &&
+                long.TryParse(config.InstanceOwner, out var ownerId) &&
+                ownerId == discordUserId) {
+                errorCode = string.Empty;
+                return true;
+            }
+
+            errorCode = "not_allowed";
+            return false;
+        }
+
+        errorCode = string.Empty;
+        return true;
     }
 }

@@ -88,13 +88,15 @@ Edit `.env` and fill in the required values:
 | `JWT__AUDIENCE` | Token audience claim (default `Web`) |
 | `JWT__SECRET` | Symmetric key for signing JWTs (min 32 characters) |
 
-**Encryption**
+**Application**
 
 | Variable | Description |
 |----------|-------------|
 | `APP__ENC_KEY` | AES encryption key for stored Discord tokens |
 | `APP__ENC_IV` | AES initialisation vector |
-| `APP__DISABLE_NEW_USERS` | When `true`, prevents new users from creating an account (existing users can still log in). Defaults to `false`. |
+| `APP__DISABLE_NEW_USERS` | When `true`, only the instance owner can register new accounts (existing users can still log in). If `APP__INSTANCE_OWNER` is not set, no new users can register. Defaults to `false`. |
+| `APP__PRIVATE_INSTANCE` | When `true` (and `APP__DISABLE_NEW_USERS` is `false`), only users listed in `AllowedUsers` (in `appsettings.json`) and the instance owner can register. Defaults to `false`. |
+| `APP__INSTANCE_OWNER` | Discord user ID of the instance owner. The owner is always allowed to register when `APP__DISABLE_NEW_USERS` is `true`, and is also allowed when `APP__PRIVATE_INSTANCE` is `true` (even if not listed in `AllowedUsers`). Optional — the bot starts without it, but no one can register if `APP__DISABLE_NEW_USERS` is `true` and this is unset. |
 
 **API**
 
@@ -116,6 +118,16 @@ Edit `.env` and fill in the required values:
 |----------|-------------|
 | `GUILDSYNC__ENABLED` | Enable the guild permission sync background service (default `true`) |
 | `GUILDSYNC__INTERVALMINUTES` | Sync interval in minutes (default `15`) |
+
+### 3. Configure `appsettings.json`
+
+In `src/Blackwall.Api/appsettings.json`, set the `AllowedUsers` array to the Discord user IDs permitted to register when `APP__PRIVATE_INSTANCE=true`:
+
+```json
+"AllowedUsers": ["123456789012345678", "987654321098765432"]
+```
+
+> **Note:** The instance owner (set via `APP__INSTANCE_OWNER`) is always allowed to register even if not listed in `AllowedUsers`.
 
 ## Deployment
 

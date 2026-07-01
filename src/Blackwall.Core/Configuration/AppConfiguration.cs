@@ -13,4 +13,10 @@ public sealed record AppConfiguration {
 
     [ConfigurationKeyName("DISABLE_NEW_USERS")]
     public bool DisableNewUsers { get; set; } = false;
+
+    [ConfigurationKeyName("PRIVATE_INSTANCE")]
+    public bool PrivateInstance { get; set; } = false;
+
+    [ConfigurationKeyName("INSTANCE_OWNER")]
+    public string InstanceOwner { get; set; } = string.Empty;
 }
