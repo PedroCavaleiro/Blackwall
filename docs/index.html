@@ -3,799 +3,661 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Blackwall &mdash; .env Generator</title>
+<title>Blackwall &mdash; Wiki</title>
 <style>
   :root {
-    --bg: #0d1117;
-    --surface: #161b22;
-    --surface-hover: #1c2128;
-    --border: #30363d;
-    --text: #e6edf3;
-    --text-muted: #8b949e;
-    --accent: #58a6ff;
-    --accent-hover: #79c0ff;
-    --success: #3fb950;
-    --warning: #d29922;
-    --danger: #f85149;
-    --required: #f85149;
-    --radius: 8px;
+    --bg: #0d1117; --surface: #161b22; --surface-hover: #1c2128;
+    --border: #30363d; --text: #e6edf3; --text-muted: #8b949e;
+    --accent: #58a6ff; --accent-hover: #79c0ff; --success: #3fb950;
+    --warning: #d29922; --danger: #f85149; --radius: 8px; --sidebar-w: 280px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-    padding: 0;
-  }
-  header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 1.5rem 2rem;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  header h1 { font-size: 1.4rem; font-weight: 600; }
-  header h1 span { color: var(--accent); }
-  header p { color: var(--text-muted); font-size: 0.875rem; margin-top: 0.25rem; }
-  .container {
-    display: grid;
-    grid-template-columns: 1fr 420px;
-    gap: 0;
-    max-width: 1600px;
-    margin: 0 auto;
-    min-height: calc(100vh - 80px);
-  }
-  .form-panel {
-    padding: 2rem;
-    overflow-y: auto;
-  }
-  .preview-panel {
-    background: var(--surface);
-    border-left: 1px solid var(--border);
-    padding: 1.5rem;
-    position: sticky;
-    top: 80px;
-    height: calc(100vh - 80px);
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-  }
-  .section {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin-bottom: 1.25rem;
-    overflow: hidden;
-  }
-  .section-header {
-    padding: 0.875rem 1.25rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    user-select: none;
-    transition: background 0.15s;
-  }
-  .section-header:hover { background: var(--surface-hover); }
-  .section-header h2 {
-    font-size: 1rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .section-header .icon { font-size: 1.1rem; }
-  .section-header .chevron {
-    color: var(--text-muted);
-    transition: transform 0.2s;
-    font-size: 0.75rem;
-  }
-  .section.collapsed .chevron { transform: rotate(-90deg); }
-  .section-body {
-    padding: 0.5rem 1.25rem 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-  .section.collapsed .section-body { display: none; }
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-  }
-  .field-label {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-  .field-label code {
-    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    font-size: 0.8rem;
-    background: var(--bg);
-    padding: 0.15rem 0.5rem;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-    color: var(--accent);
-  }
-  .required-badge {
-    font-size: 0.65rem;
-    color: var(--required);
-    border: 1px solid var(--required);
-    padding: 0.05rem 0.35rem;
-    border-radius: 4px;
-    text-transform: uppercase;
-    font-weight: 600;
-  }
-  .optional-badge {
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    border: 1px solid var(--text-muted);
-    padding: 0.05rem 0.35rem;
-    border-radius: 4px;
-    text-transform: uppercase;
-  }
-  .field-desc {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-  }
-  .field-help {
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 0.6rem 0.75rem;
-  }
-  .field-help a { color: var(--accent); text-decoration: none; }
-  .field-help a:hover { text-decoration: underline; }
-  .field-help code {
-    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    font-size: 0.75rem;
-    background: var(--surface);
-    padding: 0.1rem 0.3rem;
-    border-radius: 3px;
-  }
-  .field-input {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-  }
-  .field-input input[type="text"],
-  .field-input input[type="password"],
-  .field-input input[type="number"] {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 0.5rem 0.75rem;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    transition: border-color 0.15s;
-  }
-  .field-input input:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
-  .field-input input::placeholder { color: var(--text-muted); opacity: 0.6; }
-  .toggle {
-    position: relative;
-    width: 40px;
-    height: 22px;
-    flex-shrink: 0;
-  }
-  .toggle input { opacity: 0; width: 0; height: 0; }
-  .toggle-slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: var(--border);
-    border-radius: 22px;
-    transition: 0.2s;
-  }
-  .toggle-slider:before {
-    content: "";
-    position: absolute;
-    height: 16px;
-    width: 16px;
-    left: 3px;
-    bottom: 3px;
-    background: var(--text);
-    border-radius: 50%;
-    transition: 0.2s;
-  }
-  .toggle input:checked + .toggle-slider { background: var(--success); }
-  .toggle input:checked + .toggle-slider:before { transform: translateX(18px); }
-  .btn-reset {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    padding: 0.3rem 0.6rem;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.75rem;
-    transition: all 0.15s;
-  }
-  .btn-reset:hover { border-color: var(--text-muted); color: var(--text); }
-  .preview-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1rem;
-  }
-  .preview-header h3 { font-size: 0.9rem; font-weight: 600; }
-  .preview-actions { display: flex; gap: 0.5rem; }
-  .btn {
-    padding: 0.4rem 0.85rem;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    cursor: pointer;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text);
-    transition: all 0.15s;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-  .btn:hover { background: var(--surface-hover); border-color: var(--text-muted); }
-  .btn-primary {
-    background: var(--accent);
-    color: #0d1117;
-    border-color: var(--accent);
-    font-weight: 600;
-  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: 0.875em; background: var(--surface); padding: 0.15rem 0.4rem; border-radius: 4px; border: 1px solid var(--border); }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; overflow-x: auto; line-height: 1.5; }
+  pre code { background: none; border: none; padding: 0; font-size: 0.85rem; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.9rem; }
+  th, td { border: 1px solid var(--border); padding: 0.6rem 0.8rem; text-align: left; }
+  th { background: var(--surface); font-weight: 600; }
+  td code { font-size: 0.8rem; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: var(--sidebar-w); flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); position: fixed; top: 0; left: 0; bottom: 0; overflow-y: auto; z-index: 100; transition: transform 0.2s; }
+  .sidebar-header { padding: 1.5rem 1.25rem 1rem; border-bottom: 1px solid var(--border); }
+  .sidebar-header h1 { font-size: 1.25rem; font-weight: 700; }
+  .sidebar-header h1 span { color: var(--accent); }
+  .sidebar-header p { color: var(--text-muted); font-size: 0.8rem; margin-top: 0.25rem; }
+  .sidebar-nav { padding: 0.75rem 0; }
+  .sidebar-nav .nav-section { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); padding: 0.75rem 1.25rem 0.35rem; font-weight: 600; }
+  .sidebar-nav a { display: block; padding: 0.4rem 1.25rem 0.4rem 1.5rem; color: var(--text); font-size: 0.875rem; text-decoration: none; border-left: 3px solid transparent; transition: all 0.15s; }
+  .sidebar-nav a:hover { background: var(--surface-hover); border-left-color: var(--border); text-decoration: none; }
+  .sidebar-nav a.active { border-left-color: var(--accent); color: var(--accent); }
+  .sidebar-footer { padding: 1rem 1.25rem; border-top: 1px solid var(--border); margin-top: auto; }
+  .sidebar-footer a { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-muted); }
+  .sidebar-footer a:hover { color: var(--accent); text-decoration: none; }
+  .content { margin-left: var(--sidebar-w); flex: 1; max-width: 100%; }
+  .content-inner { max-width: 900px; margin: 0 auto; padding: 2.5rem 2rem 4rem; }
+  .content-section { margin-bottom: 3rem; scroll-margin-top: 2rem; }
+  .content-section h2 { font-size: 1.6rem; font-weight: 700; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  .content-section h3 { font-size: 1.2rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.6rem; }
+  .content-section h4 { font-size: 1rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+  .content-section p { margin-bottom: 1rem; }
+  .content-section ul, .content-section ol { margin: 0.5rem 0 1rem 1.5rem; }
+  .content-section li { margin-bottom: 0.35rem; }
+  .content-section ul > li { list-style: disc; }
+  .content-section ol > li { list-style: decimal; }
+  .hero { text-align: center; padding: 3.5rem 2rem 3rem; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%); }
+  .hero h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem; }
+  .hero h1 span { color: var(--accent); }
+  .hero p { font-size: 1.1rem; color: var(--text-muted); max-width: 600px; margin: 0 auto 1.5rem; }
+  .hero-badges { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .hero-badge { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 0.3rem 0.85rem; font-size: 0.8rem; color: var(--text-muted); }
+  .hero-actions { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+  .btn { padding: 0.6rem 1.25rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.4rem; text-decoration: none; }
+  .btn:hover { background: var(--surface-hover); border-color: var(--text-muted); text-decoration: none; }
+  .btn-primary { background: var(--accent); color: #0d1117; border-color: var(--accent); }
   .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
-  .preview-content {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 1rem;
-    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    font-size: 0.78rem;
-    white-space: pre-wrap;
-    word-break: break-all;
-    overflow-y: auto;
-    line-height: 1.5;
-    color: var(--text);
-  }
-  .preview-content .env-key { color: var(--accent); }
-  .preview-content .env-comment { color: var(--text-muted); font-style: italic; }
-  .preview-content .env-empty { color: var(--danger); }
-  .copy-toast {
-    position: fixed;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--success);
-    color: #0d1117;
-    padding: 0.6rem 1.25rem;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    opacity: 0;
-    transition: opacity 0.3s;
-    pointer-events: none;
-    z-index: 200;
-  }
-  .copy-toast.show { opacity: 1; }
-  .gen-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.7rem;
-    transition: all 0.15s;
-  }
-  .gen-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .callout { border-radius: var(--radius); padding: 0.875rem 1rem; margin: 1rem 0; border: 1px solid; font-size: 0.9rem; }
+  .callout-info { border-color: var(--accent); background: rgba(88,166,255,0.08); }
+  .callout-warning { border-color: var(--warning); background: rgba(210,153,34,0.08); }
+  .callout-tip { border-color: var(--success); background: rgba(63,185,80,0.08); }
+  .callout strong { display: block; margin-bottom: 0.25rem; }
+  .callout-info strong { color: var(--accent); }
+  .callout-warning strong { color: var(--warning); }
+  .callout-tip strong { color: var(--success); }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; transition: border-color 0.15s; }
+  .card:hover { border-color: var(--text-muted); }
+  .card h4 { margin-top: 0; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .card p { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0; }
+  .card-icon { font-size: 1.25rem; }
+  .step { display: flex; gap: 1rem; margin: 1.5rem 0; }
+  .step-num { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #0d1117; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; }
+  .step-body { flex: 1; }
+  .step-body h4 { margin-top: 0.2rem; margin-bottom: 0.5rem; }
+  .menu-toggle { display: none; position: fixed; top: 0.75rem; left: 0.75rem; z-index: 200; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.7rem; cursor: pointer; color: var(--text); font-size: 1.2rem; }
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99; }
   @media (max-width: 900px) {
-    .container { grid-template-columns: 1fr; }
-    .preview-panel { position: relative; top: 0; height: auto; border-left: none; border-top: 1px solid var(--border); }
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .content { margin-left: 0; }
+    .menu-toggle { display: block; }
+    .overlay.show { display: block; }
+    .hero h1 { font-size: 1.8rem; }
+    .content-inner { padding: 2rem 1rem 3rem; }
   }
 </style>
 </head>
 <body>
-
-<header>
-  <h1>Blackwall <span>.env</span> Generator</h1>
-  <p>Fill in the fields below, then copy or download your <code>.env</code> file. Hover descriptions explain what each field does and how to obtain its value.</p>
-</header>
-
-<div class="container">
-  <div class="form-panel" id="formPanel"></div>
-  <div class="preview-panel">
-    <div class="preview-header">
-      <h3>Preview</h3>
-      <div class="preview-actions">
-        <button class="btn" onclick="copyEnv()">&#128203; Copy</button>
-        <button class="btn btn-primary" onclick="downloadEnv()">&#11015; Download .env</button>
-      </div>
+<div class="menu-toggle" onclick="toggleSidebar()">&#9776;</div>
+<div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+<div class="layout">
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h1>Blackwall <span>Wiki</span></h1>
+      <p>Self-hosted Discord anti-spam</p>
     </div>
-    <div class="preview-content" id="preview"></div>
+    <div class="sidebar-nav" id="sidebarNav">
+      <div class="nav-section">Getting Started</div>
+      <a href="#overview">Overview</a>
+      <a href="#features">Features</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#prerequisites">Prerequisites</a>
+      <a href="#installation">Installation</a>
+      <div class="nav-section">Configuration</div>
+      <a href="#env-variables">Environment Variables</a>
+      <a href="#appsettings">appsettings.json</a>
+      <a href="#env-generator">.env Generator</a>
+      <div class="nav-section">Deployment</div>
+      <a href="#deployment">Overview</a>
+      <a href="#docker-compose">Docker Compose</a>
+      <a href="#proxmox-lxc">Proxmox LXC</a>
+      <a href="#bare-metal">Bare Metal / VM</a>
+      <div class="nav-section">Reference</div>
+      <a href="#discord-permissions">Discord Permissions</a>
+      <a href="#account-scoring">Account Scoring</a>
+      <a href="#api-docs">API Documentation</a>
+      <a href="#project-structure">Project Structure</a>
+    </div>
+    <div class="sidebar-footer">
+      <a href="https://github.com/pedrocavaleiro/Blackwall" target="_blank">&#128279; GitHub</a>
+      &nbsp;&nbsp;
+      <a href="https://blackwall.observer" target="_blank">&#129302; Hosted Bot</a>
+    </div>
+  </nav>
+  <div class="content">
+    <div class="content-inner">
+
+      <!-- Hero -->
+      <div class="hero" id="overview">
+        <h1>Blackwall <span>Wiki</span></h1>
+        <p>A self-hosted Discord anti-spam system combining a real-time bot for spam detection with a web dashboard for guild configuration &mdash; all backed by Discord OAuth2 authentication.</p>
+        <div class="hero-badges">
+          <span class="hero-badge">.NET 10</span>
+          <span class="hero-badge">PostgreSQL 17</span>
+          <span class="hero-badge">Redis 7</span>
+          <span class="hero-badge">Blazor Server</span>
+          <span class="hero-badge">Docker</span>
+        </div>
+        <div class="hero-actions">
+          <a href="#installation" class="btn btn-primary">&#128221; Get Started</a>
+          <a href="env-generator.html" class="btn">&#9881; .env Generator</a>
+          <a href="https://github.com/pedrocavaleiro/Blackwall" target="_blank" class="btn">&#128279; GitHub</a>
+        </div>
+      </div>
+
+      <!-- Features -->
+      <section class="content-section" id="features">
+        <h2>Features</h2>
+        <div class="card-grid">
+          <div class="card"><h4><span class="card-icon">&#9889;</span> Real-time Spam Detection</h4><p>Rate limiting, duplicate message detection, mention flooding, invite link blocking, and suspicious link filtering &mdash; all in real time.</p></div>
+          <div class="card"><h4><span class="card-icon">&#127760;</span> Per-guild Configuration</h4><p>Each server gets its own spam thresholds managed through the web dashboard. No one-size-fits-all.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128273;</span> Discord OAuth2 Login</h4><p>Users authenticate via Discord. JWT tokens are issued for API and Web access.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128260;</span> Guild Permission Sync</h4><p>A background service periodically synchronises guild manager permissions from Discord.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128187;</span> Web Dashboard</h4><p>Blazor Server UI for guild owners and managers to configure spam rules visually.</p></div>
+          <div class="card"><h4><span class="card-icon">&#129302;</span> Account Scoring</h4><p>Evaluates new members on join and assigns a threat score based on account metadata.</p></div>
+        </div>
+      </section>
+
+      <!-- Architecture -->
+      <section class="content-section" id="architecture">
+        <h2>Architecture</h2>
+        <p>Blackwall is a .NET 10 solution split into five projects:</p>
+        <table>
+          <thead><tr><th>Project</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>Blackwall.Core</code></td><td>Shared entities, DTOs, and configuration models</td></tr>
+            <tr><td><code>Blackwall.Infrastructure</code></td><td>PostgreSQL persistence (EF Core) and Redis caching</td></tr>
+            <tr><td><code>Blackwall.Bot</code></td><td>Discord gateway client &mdash; spam detection, guild events, background sync</td></tr>
+            <tr><td><code>Blackwall.Api</code></td><td>ASP.NET Core Web API &mdash; OAuth flows, JWT auth, guild management endpoints</td></tr>
+            <tr><td><code>Blackwall.Web</code></td><td>Blazor Server dashboard &mdash; authenticates against the API</td></tr>
+          </tbody>
+        </table>
+        <div class="callout callout-info">
+          <strong>How it fits together</strong>
+          The API hosts the bot (as a hosted service), serves REST endpoints for the dashboard, and handles OAuth. The Web project is a Blazor Server app that calls the API. Both share the same JWT secret for authentication.
+        </div>
+      </section>
+
+      <!-- Prerequisites -->
+      <section class="content-section" id="prerequisites">
+        <h2>Prerequisites</h2>
+        <ul>
+          <li><strong>.NET 10 SDK</strong> &mdash; <a href="https://dotnet.microsoft.com/download" target="_blank">Download</a></li>
+          <li><strong>PostgreSQL 17+</strong> &mdash; for persistent data storage</li>
+          <li><strong>Redis 7+</strong> &mdash; for caching</li>
+          <li><strong>A Discord application</strong> with bot and OAuth2 credentials &mdash; create one at the <a href="https://discord.com/developers/applications" target="_blank">Discord Developer Portal</a></li>
+        </ul>
+        <div class="callout callout-tip">
+          <strong>Docker users</strong>
+          If you're using Docker Compose, you don't need to install .NET, PostgreSQL, or Redis manually &mdash; they're all containerised.
+        </div>
+      </section>
+
+      <!-- Installation -->
+      <section class="content-section" id="installation">
+        <h2>Installation</h2>
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <h4>Clone the repository</h4>
+            <pre><code>git clone https://github.com/pedrocavaleiro/Blackwall.git
+cd Blackwall</code></pre>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <h4>Configure environment variables</h4>
+            <p>Copy the example file and fill in your values:</p>
+            <pre><code>cp .env.example .env</code></pre>
+            <p>Edit <code>.env</code> with your configuration. See the <a href="#env-variables">Environment Variables</a> section for a full reference, or use the <a href="env-generator.html">.env Generator</a> to interactively build your file.</p>
+            <div class="callout callout-tip">
+              <strong>Quick start</strong>
+              Use the <a href="env-generator.html">.env Generator tool</a> &mdash; it provides one-click key generation for JWT secrets and AES encryption keys, plus inline help for every field.
+            </div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <h4>Configure <code>appsettings.json</code></h4>
+            <p>In <code>src/Blackwall.Api/appsettings.json</code>, set the <code>AllowedUsers</code> array to the Discord user IDs permitted to register when <code>APP__PRIVATE_INSTANCE=true</code>:</p>
+            <pre><code>"AllowedUsers": ["123456789012345678", "987654321098765432"]</code></pre>
+            <div class="callout callout-info">
+              <strong>Instance owner</strong>
+              The owner (set via <code>APP__INSTANCE_OWNER</code>) is always allowed to register even if not listed in <code>AllowedUsers</code>.
+            </div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <h4>Run Entity Framework migrations</h4>
+            <p>Apply the database schema before starting the API:</p>
+            <pre><code>dotnet ef database update --project src/Blackwall.Infrastructure --startup-project src/Blackwall.Api</code></pre>
+            <div class="callout callout-info">
+              <strong>Docker Compose</strong>
+              Migrations are applied automatically on first run when using Docker Compose.
+            </div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">5</div>
+          <div class="step-body">
+            <h4>Start the application</h4>
+            <p>Choose your deployment method &mdash; see the <a href="#deployment">Deployment</a> section below for detailed options.</p>
+          </div>
+        </div>
+      </section>
+      <!-- Environment Variables -->
+      <section class="content-section" id="env-variables">
+        <h2>Environment Variables</h2>
+        <p>All configuration is done through environment variables (or a <code>.env</code> file). Use the <a href="env-generator.html">.env Generator</a> for an interactive experience.</p>
+
+        <h3>Infrastructure</h3>
+        <table>
+          <thead><tr><th>Variable</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>POSTGRES__CONNECTION_STRING</code></td><td>Yes</td><td>PostgreSQL connection string. Format: <code>Host=...;Port=5432;Database=blackwall;Username=...;Password=...</code></td></tr>
+            <tr><td><code>REDIS__CONNECTION_STRING</code></td><td>Yes</td><td>Redis connection string. Format: <code>host:port</code> (e.g. <code>localhost:6379</code>)</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Discord OAuth &amp; Bot</h3>
+        <table>
+          <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>DISCORD__BOT_TOKEN</code></td><td>Yes</td><td>&mdash;</td><td>Discord bot token from the Developer Portal &rarr; Bot &rarr; Reset Token</td></tr>
+            <tr><td><code>DISCORD__CLIENT_ID</code></td><td>Yes</td><td>&mdash;</td><td>OAuth2 client ID (your application ID)</td></tr>
+            <tr><td><code>DISCORD__CLIENT_SECRET</code></td><td>Yes</td><td>&mdash;</td><td>OAuth2 client secret from General Information</td></tr>
+            <tr><td><code>DISCORD__REDIRECT_URI</code></td><td>Yes</td><td>&mdash;</td><td>OAuth2 callback URL (e.g. <code>https://your-domain.tld/api/auth/discord/callback</code>)</td></tr>
+            <tr><td><code>DISCORD__BOT_PERMISSIONS</code></td><td>No</td><td><code>10308992462014</code></td><td>Bot permission integer. Minimal set: <code>1374389610518</code></td></tr>
+            <tr><td><code>DISCORD__BOT_SCOPES</code></td><td>No</td><td><code>bot applications.commands</code></td><td>Scopes for the bot invite URL</td></tr>
+            <tr><td><code>DISCORD__LOGIN_SCOPES</code></td><td>No</td><td><code>identify guilds</code></td><td>Scopes for the OAuth2 user login flow</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Google Safe Browsing</h3>
+        <table>
+          <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>SAFE_BROWSING__ENABLED</code></td><td>No</td><td><code>false</code></td><td>Enable Google Safe Browsing for suspicious link filtering</td></tr>
+            <tr><td><code>SAFE_BROWSING__API_KEY</code></td><td>Conditional</td><td>&mdash;</td><td>Google Safe Browsing API key. Required if enabled. Get one from the <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></td></tr>
+            <tr><td><code>SAFE_BROWSING__BASE_URL</code></td><td>No</td><td><code>https://safebrowsing.googleapis.com/v5</code></td><td>Safe Browsing API base URL</td></tr>
+          </tbody>
+        </table>
+
+        <h3>JWT Authentication</h3>
+        <table>
+          <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>JWT__ISSUER</code></td><td>No</td><td><code>Api</code></td><td>Token issuer claim</td></tr>
+            <tr><td><code>JWT__AUDIENCE</code></td><td>No</td><td><code>Web</code></td><td>Token audience claim</td></tr>
+            <tr><td><code>JWT__SECRET</code></td><td>Yes</td><td>&mdash;</td><td>Symmetric key for signing JWTs (min 32 characters). Must be the same in both API and Web .env files</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Application</h3>
+        <table>
+          <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>APP__ENC_KEY</code></td><td>Yes</td><td>&mdash;</td><td>AES-256 encryption key for stored Discord tokens (32 bytes, base64-encoded)</td></tr>
+            <tr><td><code>APP__ENC_IV</code></td><td>Yes</td><td>&mdash;</td><td>AES initialization vector for token encryption (16 bytes, base64-encoded)</td></tr>
+            <tr><td><code>APP__DISABLE_NEW_USERS</code></td><td>No</td><td><code>false</code></td><td>When <code>true</code>, only the instance owner can register new accounts</td></tr>
+            <tr><td><code>APP__PRIVATE_INSTANCE</code></td><td>No</td><td><code>false</code></td><td>When <code>true</code> (and DISABLE_NEW_USERS is false), only allowed users and the owner can register</td></tr>
+            <tr><td><code>APP__INSTANCE_OWNER</code></td><td>No</td><td>&mdash;</td><td>Discord user ID of the instance owner. The owner is always allowed to register</td></tr>
+          </tbody>
+        </table>
+
+        <h3>API</h3>
+        <table>
+          <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>API__BASE_URL</code></td><td>No</td><td><code>https://localhost:7001</code></td><td>Base URL of the API. Used by the Web project to call the API. If updating the port also update the URL.</td></tr>
+            <tr><td><code>API__PORT</code></td><td>No</td><td><code>7001</code></td><td>Port the API listens on</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Web Dashboard</h3>
+        <table>
+          <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>WEB__BASEURL</code></td><td>No</td><td><code>https://localhost:7002</code></td><td>Public-facing URL of the Web dashboard. Used for OAuth redirects</td></tr>
+            <tr><td><code>WEB__PORT</code></td><td>No</td><td><code>7002</code></td><td>Port the Web dashboard listens on</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Guild Sync</h3>
+        <table>
+          <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>GUILD_SYNC__ENABLED</code></td><td>No</td><td><code>true</code></td><td>Enable the guild permission sync background service</td></tr>
+            <tr><td><code>GUILD_SYNC__INTERVAL_MINUTES</code></td><td>No</td><td><code>15</code></td><td>Sync interval in minutes. Lower values mean more frequent Discord API calls</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Miscellaneous</h3>
+        <table>
+          <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>ENABLE_DOCS</code></td><td>No</td><td><code>false</code></td><td>Enable OpenAPI spec and Scalar UI on the API</td></tr>
+          </tbody>
+        </table>
+      </section>
+      <!-- appsettings.json -->
+      <section class="content-section" id="appsettings">
+        <h2>appsettings.json</h2>
+        <p>Beyond environment variables, some settings live in <code>appsettings.json</code> (and can be overridden with <code>appsettings.Production.json</code>):</p>
+        <h3>API (<code>src/Blackwall.Api/appsettings.json</code>)</h3>
+        <pre><code>{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "Blacklists": {
+    "Defaults": [
+      "https://blocklistproject.github.io/Lists/adguard/abuse-ags.txt",
+      "https://blocklistproject.github.io/Lists/adguard/ads-ags.txt",
+      "https://blocklistproject.github.io/Lists/adguard/phishing-ags.txt"
+    ]
+  },
+  "AllowedUsers": [],
+  "AllowedHosts": "*"
+}</code></pre>
+        <ul>
+          <li><strong><code>Blacklists.Defaults</code></strong> &mdash; Array of URLs to blocklist files used for suspicious link filtering. Defaults to the <a href="https://blocklistproject.github.io/" target="_blank">Blocklist Project</a> AdGuard lists.</li>
+          <li><strong><code>AllowedUsers</code></strong> &mdash; Array of Discord user IDs permitted to register when <code>APP__PRIVATE_INSTANCE=true</code>.</li>
+        </ul>
+        <h3>Overriding in production</h3>
+        <p>Create <code>appsettings.Production.json</code> alongside the base file with only the keys you want to change. ASP.NET Core merges it at runtime:</p>
+        <pre><code>{
+  "Blacklists": {
+    "Defaults": ["https://example.com/custom-blocklist.txt"]
+  },
+  "AllowedUsers": ["123456789012345678"]
+}</code></pre>
+        <div class="callout callout-warning">
+          <strong>Deploy safety</strong>
+          The LXC deploy script excludes <code>.env</code> and <code>appsettings.Production.json</code> from rsync, so local customizations are never overwritten. <code>appsettings.json</code> (base defaults) is always synced.
+        </div>
+      </section>
+
+      <!-- .env Generator -->
+      <section class="content-section" id="env-generator">
+        <h2>.env Generator</h2>
+        <p>An interactive tool for building your <code>.env</code> file with inline help, one-click key generation, and live preview.</p>
+        <div class="card-grid">
+          <div class="card"><h4><span class="card-icon">&#9881;</span> Generate Keys</h4><p>One-click generation for JWT secrets (48-byte base64), AES-256 keys (32-byte base64), and AES IVs (16-byte base64).</p></div>
+          <div class="card"><h4><span class="card-icon">&#128203;</span> Copy &amp; Download</h4><p>Copy to clipboard or download a ready-to-use <code>.env</code> file directly.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128218;</span> Inline Help</h4><p>Every field has a description and help text explaining what it does and how to obtain its value.</p></div>
+        </div>
+        <a href="env-generator.html" class="btn btn-primary">&#9881; Open .env Generator</a>
+      </section>
+
+      <!-- Deployment -->
+      <section class="content-section" id="deployment">
+        <h2>Deployment</h2>
+        <p>Blackwall supports three deployment methods. Choose the one that fits your infrastructure:</p>
+        <div class="card-grid">
+          <div class="card"><h4><span class="card-icon">&#128051;</span> Docker Compose</h4><p>Quickest setup. Everything containerised &mdash; PostgreSQL, Redis, API, Web, and Nginx.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128425;</span> Proxmox LXC</h4><p>Provision a Debian 13 LXC container with automated setup scripts and systemd services.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128187;</span> Bare Metal / VM</h4><p>Install prerequisites directly and run natively. Full control for development or custom setups.</p></div>
+        </div>
+      </section>
+
+      <!-- Docker Compose -->
+      <section class="content-section" id="docker-compose">
+        <h2>Deployment: Docker Compose</h2>
+        <p>The quickest way to get everything running. Requires only Docker and Docker Compose.</p>
+        <h3>Services</h3>
+        <table>
+          <thead><tr><th>Service</th><th>Image</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>postgres</code></td><td><code>postgres:17-alpine</code></td><td>PostgreSQL database with health check and persistent volume</td></tr>
+            <tr><td><code>redis</code></td><td><code>redis:7-alpine</code></td><td>Redis cache with health check</td></tr>
+            <tr><td><code>api</code></td><td>Custom (<code>Dockerfile.api</code>)</td><td>ASP.NET Core API + embedded bot, depends on postgres &amp; redis</td></tr>
+            <tr><td><code>web</code></td><td>Custom (<code>Dockerfile.web</code>)</td><td>Blazor Server dashboard, depends on api</td></tr>
+            <tr><td><code>nginx</code></td><td><code>nginx:alpine</code></td><td>Reverse proxy on port 80, routes <code>/api/</code> to API and <code>/</code> to Web</td></tr>
+          </tbody>
+        </table>
+        <h3>Steps</h3>
+        <ol>
+          <li>Create your <code>.env</code> file (use the <a href="env-generator.html">.env Generator</a>).</li>
+          <li>Set <code>POSTGRES_PASSWORD</code> in your environment or <code>.env</code> for the Postgres container.</li>
+          <li>Run: <pre><code>docker compose up --build</code></pre></li>
+          <li>The stack will be available on port 80 via the Nginx reverse proxy.</li>
+        </ol>
+        <h3>Nginx routing</h3>
+        <ul>
+          <li><code>/api/</code> &rarr; API container (port 8080)</li>
+          <li><code>/</code> &rarr; Web container (port 8080, with WebSocket upgrade support for Blazor)</li>
+        </ul>
+        <div class="callout callout-info">
+          <strong>Docker internals</strong>
+          Inside Docker, the API and Web run on port 8080. Nginx maps port 80 externally. The Web container calls the API at <code>http://api:8080</code> using Docker's internal DNS.
+        </div>
+      </section>
+
+      <!-- Proxmox LXC -->
+      <section class="content-section" id="proxmox-lxc">
+        <h2>Deployment: Proxmox LXC</h2>
+        <p>The <code>infra/lxc/</code> directory contains scripts for provisioning a Debian 13 (Trixie) LXC container and deploying published builds.</p>
+        <h3>Step 1: Provision the container</h3>
+        <p>Run <code>setup.sh</code> as root inside the LXC. It installs:</p>
+        <ul>
+          <li>.NET 10 ASP.NET Core Runtime</li>
+          <li>PostgreSQL 17</li>
+          <li>Redis</li>
+          <li>Nginx</li>
+          <li>Creates the <code>blackwall</code> system user and directories at <code>/opt/blackwall</code></li>
+          <li>Creates the PostgreSQL database and user (prints credentials)</li>
+          <li>Installs systemd services (<code>blackwall-api</code>, <code>blackwall-web</code>)</li>
+          <li>Configures Nginx as a reverse proxy</li>
+        </ul>
+        <pre><code>scp -r infra/lxc/ root@&lt;lxc-ip&gt;:/tmp/blackwall-setup
+ssh root@&lt;lxc-ip&gt; "bash /tmp/blackwall-setup/setup.sh"</code></pre>
+        <div class="callout callout-warning">
+          <strong>Save the credentials</strong>
+          The setup script prints the PostgreSQL connection string. Save it &mdash; you'll need it in your <code>.env</code>.
+        </div>
+        <h3>Step 2: Place your .env</h3>
+        <p>Place your <code>.env</code> at <code>/opt/blackwall/.env</code> on the LXC:</p>
+        <pre><code>chown blackwall:blackwall /opt/blackwall/.env
+chmod 640 /opt/blackwall/.env</code></pre>
+        <h3>Step 3: Deploy</h3>
+        <p>From your dev machine, publish and upload both projects:</p>
+        <pre><code>./infra/lxc/deploy.sh &lt;lxc-ip&gt;</code></pre>
+        <p>This builds Release artifacts, uploads them via rsync, fixes ownership, and restarts the systemd services.</p>
+        <h3>Windows deploy script</h3>
+        <p>A PowerShell equivalent is also available:</p>
+        <pre><code>.\infra\lxc\deploy.ps1 -LxcIp &lt;lxc-ip&gt;</code></pre>
+        <h3>systemd services</h3>
+        <table>
+          <thead><tr><th>Service</th><th>Working Directory</th><th>Depends On</th></tr></thead>
+          <tbody>
+            <tr><td><code>blackwall-api</code></td><td><code>/opt/blackwall/api</code></td><td><code>postgresql</code>, <code>redis-server</code></td></tr>
+            <tr><td><code>blackwall-web</code></td><td><code>/opt/blackwall/web</code></td><td><code>blackwall-api</code></td></tr>
+          </tbody>
+        </table>
+        <p>Both services run with <code>ASPNETCORE_ENVIRONMENT=Production</code> and <code>ASPNETCORE_FORWARDEDHEADERS_ENABLED=true</code>.</p>
+        <h3>Managing services</h3>
+        <pre><code>systemctl start blackwall-api blackwall-web
+systemctl restart blackwall-api blackwall-web
+systemctl status blackwall-api blackwall-web
+journalctl -u blackwall-api -f
+journalctl -u blackwall-web -f</code></pre>
+        <h3>Preserving config across deploys</h3>
+        <p>The deploy script excludes <code>.env</code> and <code>appsettings.Production.json</code> from rsync, so user customizations are never overwritten. <code>appsettings.json</code> (base defaults) is always synced, meaning structural changes from the repo propagate automatically.</p>
+        <p>To override settings locally, create <code>appsettings.Production.json</code> in <code>/opt/blackwall/api/</code> and/or <code>/opt/blackwall/web/</code> with only the keys you want to change.</p>
+      </section>
+
+      <!-- Bare Metal -->
+      <section class="content-section" id="bare-metal">
+        <h2>Deployment: Bare Metal / VM</h2>
+        <p>Install the prerequisites directly on the host machine and run the projects natively. Useful for development or when you want full control.</p>
+        <h3>Development</h3>
+        <pre><code># Start PostgreSQL and Redis on the host (or point to remote instances in .env)
+
+# Run the API + Bot
+dotnet run --project src/Blackwall.Api
+
+# Run the Web dashboard (separate terminal)
+dotnet run --project src/Blackwall.Web</code></pre>
+        <h3>Production</h3>
+        <p>Publish Release builds and host them behind a reverse proxy:</p>
+        <pre><code>dotnet publish src/Blackwall.Api -c Release -o /opt/blackwall/api
+dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
+        <p>Then set up a reverse proxy (Nginx, Caddy, etc.) to route traffic:</p>
+        <ul>
+          <li><code>/api/</code> &rarr; <code>http://localhost:7001</code></li>
+          <li><code>/</code> &rarr; <code>http://localhost:7002</code> (with WebSocket support for Blazor)</li>
+        </ul>
+        <div class="callout callout-info">
+          <strong>Forwarded headers</strong>
+          Set <code>ASPNETCORE_FORWARDEDHEADERS_ENABLED=true</code> so the app correctly respects proxy headers (X-Forwarded-For, X-Forwarded-Proto).
+        </div>
+      </section>
+      <!-- Discord Permissions -->
+      <section class="content-section" id="discord-permissions">
+        <h2>Discord Permissions</h2>
+        <p>Blackwall requires a set of Discord permissions to function. The default permission integer is <code>10308992462014</code>. A minimal set is also available at <code>1374389610518</code>.</p>
+        <p>You can compute a custom value with the <a href="https://discordapi.com/permissions.html" target="_blank">Discord Permission Calculator</a>.</p>
+        <h3>Default Set (<code>10308992462014</code>)</h3>
+        <ul>
+          <li>Admin</li><li>Manage Server</li><li>Manage Roles</li><li>Manage Channels</li>
+          <li>Kick Members</li><li>Ban Members</li><li>Manage Nicknames</li><li>Change Nickname</li>
+          <li>Manage Expressions</li><li>Manage Webhooks</li><li>View Audit Log</li><li>View Channels</li>
+          <li>Moderate Members</li><li>Send Messages</li><li>Send Messages In Threads</li>
+          <li>Manage Messages</li><li>Embed Links</li><li>Read Message History</li>
+          <li>Use External Emoji</li><li>Use External Stickers</li><li>Connect</li><li>Move Members</li>
+        </ul>
+        <h3>Minimal Set (<code>1374389610518</code>)</h3>
+        <ul>
+          <li>Manage Channels</li><li>Kick Members</li><li>Ban Members</li><li>Moderate Members</li>
+          <li>Send Messages</li><li>Send Messages In Threads</li><li>Manage Messages</li><li>Read Message History</li>
+        </ul>
+      </section>
+
+      <!-- Account Scoring -->
+      <section class="content-section" id="account-scoring">
+        <h2>Account Scoring</h2>
+        <p>Account Scoring evaluates new members' account metadata the moment they join the server and assigns a hidden <strong>threat score</strong>. It works independently of anti-raid &mdash; you can enable it even if velocity lockdowns are off.</p>
+        <h3>Scoring Factors</h3>
+        <table>
+          <thead><tr><th>Factor</th><th>Condition</th><th>Points</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Account age</strong></td><td>Less than 1 day old</td><td>+3</td></tr>
+            <tr><td></td><td>Less than 7 days old</td><td>+2</td></tr>
+            <tr><td></td><td>Less than 30 days old</td><td>+1</td></tr>
+            <tr><td><strong>Profile picture</strong></td><td>Default avatar (no custom avatar set)</td><td>+2</td></tr>
+            <tr><td><strong>Username &mdash; numeric only</strong></td><td>Username consists entirely of digits</td><td>+2</td></tr>
+            <tr><td><strong>Username &mdash; gibberish</strong></td><td>Username is 6+ alphanumeric characters with no discernible pattern</td><td>+2</td></tr>
+            <tr><td><strong>Username &mdash; consecutive consonants</strong></td><td>Username contains 5+ consecutive consonants</td><td>+1</td></tr>
+          </tbody>
+        </table>
+        <h3>Threat Levels</h3>
+        <table>
+          <thead><tr><th>Level</th><th>Score Range</th><th>Behavior</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Low</strong></td><td>0&ndash;1</td><td>No action taken</td></tr>
+            <tr><td><strong>Medium</strong></td><td>2&ndash;3</td><td>Moderators are alerted in the audit log channel</td></tr>
+            <tr><td><strong>High</strong></td><td>4+</td><td>Moderators are alerted in the audit log channel</td></tr>
+          </tbody>
+        </table>
+        <h3>Configurable Actions</h3>
+        <p>For medium and high risk accounts, you can independently enable <strong>auto-timeout</strong>:</p>
+        <ul>
+          <li><strong>Auto-timeout medium risk</strong> &mdash; automatically places medium-risk users in a timeout on join</li>
+          <li><strong>Auto-timeout high risk</strong> &mdash; automatically places high-risk users in a timeout on join</li>
+        </ul>
+        <p>If auto-timeout is disabled for a given level, moderators are alerted only and can manually decide whether to intervene. The timeout duration is configurable (default: 10 minutes).</p>
+        <div class="callout callout-info">
+          <strong>Alerts</strong>
+          All alerts are sent to the configured <strong>audit log channel</strong> as an embed containing the user, their score, account age, the specific risk factors that contributed, and the action taken.
+        </div>
+      </section>
+
+      <!-- API Documentation -->
+      <section class="content-section" id="api-docs">
+        <h2>API Documentation</h2>
+        <p>When <code>ENABLE_DOCS=true</code> is set in your environment, the API exposes an OpenAPI spec and Scalar UI:</p>
+        <ul>
+          <li><strong>OpenAPI spec</strong> &mdash; <code>/openapi/v1.json</code></li>
+          <li><strong>Scalar UI</strong> &mdash; <code>/scalar/v1</code></li>
+        </ul>
+        <div class="callout callout-warning">
+          <strong>Production</strong>
+          It's recommended to keep <code>ENABLE_DOCS=false</code> in production to avoid exposing API documentation publicly.
+        </div>
+      </section>
+
+      <!-- Project Structure -->
+      <section class="content-section" id="project-structure">
+        <h2>Project Structure</h2>
+        <pre><code>Blackwall/
+├── src/
+│   ├── Blackwall.Api/              # Web API + Discord bot host
+│   ├── Blackwall.Bot/              # Bot worker, handlers, background services
+│   ├── Blackwall.Core/             # Entities, DTOs, configuration
+│   ├── Blackwall.Infrastructure/   # EF Core DbContext, Redis cache
+│   └── Blackwall.Web/              # Blazor Server dashboard
+├── docs/                           # Wiki & .env generator
+│   ├── index.html                  # This wiki
+│   └── env-generator.html          # Interactive .env generator
+├── infra/
+│   └── lxc/                        # Proxmox LXC provisioning & deploy scripts
+│       ├── setup.sh                # Container provisioning
+│       ├── deploy.sh               # Deploy from Linux/macOS
+│       ├── deploy.ps1              # Deploy from Windows
+│       ├── blackwall-api.service   # systemd unit for API
+│       ├── blackwall-web.service   # systemd unit for Web
+│       └── nginx.conf              # LXC Nginx config
+├── nginx/
+│   └── nginx.conf                  # Docker Compose Nginx config
+├── docker-compose.yml
+├── Dockerfile.api
+├── Dockerfile.web
+├── .env.example
+└── README.md</code></pre>
+      </section>
+
+      <!-- License -->
+      <section class="content-section">
+        <h2>License</h2>
+        <p>This project is licensed under the <a href="https://github.com/pedrocavaleiro/Blackwall/blob/main/LICENSE" target="_blank">GNU General Public License v3.0</a>.</p>
+      </section>
+
+    </div>
   </div>
 </div>
 
-<div class="copy-toast" id="toast">Copied to clipboard!</div>
-
 <script>
-const sections = [
-  {
-    title: "Infrastructure",
-    icon: "&#128229;",
-    fields: [
-      {
-        key: "POSTGRES__CONNECTION_STRING",
-        label: "POSTGRES__CONNECTION_STRING",
-        required: true,
-        type: "text",
-        placeholder: "Host=localhost;Port=5432;Database=blackwall;Username=blackwall;Password=yourpassword",
-        desc: "PostgreSQL connection string used by EF Core.",
-        help: "Format: <code>Host=...;Port=5432;Database=blackwall;Username=...;Password=...</code>. If using the Docker Compose setup, a Postgres container is provisioned automatically &mdash; just set the password. If self-hosting, install PostgreSQL 17+ and create a database named <code>blackwall</code>."
-      },
-      {
-        key: "REDIS__CONNECTION_STRING",
-        label: "REDIS__CONNECTION_STRING",
-        required: true,
-        type: "text",
-        placeholder: "localhost:6379",
-        desc: "Redis connection string for caching.",
-        help: "Format: <code>host:port</code> (e.g. <code>localhost:6379</code>). If using Docker Compose, Redis is provisioned automatically. For self-hosting, install Redis 7+."
-      }
-    ]
-  },
-  {
-    title: "Discord OAuth & Bot",
-    icon: "&#129302;",
-    fields: [
-      {
-        key: "DISCORD__BOT_TOKEN",
-        label: "DISCORD__BOT_TOKEN",
-        required: true,
-        type: "password",
-        placeholder: "MTIzNDU2Nzg5MDEyMzQ1Njc4OQ.GAbCdE...",
-        desc: "Discord bot token used to connect to the gateway.",
-        help: "Go to the <a href='https://discord.com/developers/applications' target='_blank'>Discord Developer Portal</a> &rarr; your application &rarr; <strong>Bot</strong> &rarr; click <strong>Reset Token</strong> to generate. Keep this secret."
-      },
-      {
-        key: "DISCORD__CLIENT_ID",
-        label: "DISCORD__CLIENT_ID",
-        required: true,
-        type: "text",
-        placeholder: "1234567890123456789",
-        desc: "Discord OAuth2 client ID (your application ID).",
-        help: "Found on the <strong>General Information</strong> page of your application in the <a href='https://discord.com/developers/applications' target='_blank'>Discord Developer Portal</a>."
-      },
-      {
-        key: "DISCORD__CLIENT_SECRET",
-        label: "DISCORD__CLIENT_SECRET",
-        required: true,
-        type: "password",
-        placeholder: "abcdef1234567890abcdef1234567890",
-        desc: "Discord OAuth2 client secret.",
-        help: "Found on the <strong>General Information</strong> page &rarr; <strong>Client Secret</strong> &rarr; click <strong>Reset Secret</strong>. Keep this secret."
-      },
-      {
-        key: "DISCORD__REDIRECT_URI",
-        label: "DISCORD__REDIRECT_URI",
-        required: true,
-        type: "text",
-        placeholder: "https://your-domain.tld/api/auth/discord/callback",
-        desc: "OAuth2 callback URL for Discord login redirects.",
-        help: "Must match the redirect URI configured in your Discord application under <strong>OAuth2 &rarr; Redirects</strong>. The path is <code>/api/auth/discord/callback</code> on your API base URL."
-      },
-      {
-        key: "DISCORD__BOT_PERMISSIONS",
-        label: "DISCORD__BOT_PERMISSIONS",
-        required: false,
-        type: "text",
-        default: "10308992462014",
-        desc: "Bot permission integer for the invite URL.",
-        help: "Default <code>10308992462014</code> grants the full permission set (Admin, Manage Server, Kick, Ban, Moderate, Send Messages, etc.). Minimal set is <code>1374389610518</code> (Manage Channels, Kick, Ban, Moderate, Send Messages, Read History). You can compute a custom value with the <a href='https://discordapi.com/permissions.html' target='_blank'>Discord Permission Calculator</a>."
-      },
-      {
-        key: "DISCORD__BOT_SCOPES",
-        label: "DISCORD__BOT_SCOPES",
-        required: false,
-        type: "text",
-        default: "bot applications.commands",
-        desc: "Scopes for the bot invite URL.",
-        help: "Default <code>bot applications.commands</code> &mdash; allows the bot to join servers and register slash commands."
-      },
-      {
-        key: "DISCORD__LOGIN_SCOPES",
-        label: "DISCORD__LOGIN_SCOPES",
-        required: false,
-        type: "text",
-        default: "identify guilds",
-        desc: "Scopes for the OAuth2 user login flow.",
-        help: "Default <code>identify guilds</code> &mdash; allows reading the user's profile and guild list."
-      }
-    ]
-  },
-  {
-    title: "Google Safe Browsing",
-    icon: "&#128737;",
-    fields: [
-      {
-        key: "SAFE_BROWSING__ENABLED",
-        label: "SAFE_BROWSING__ENABLED",
-        required: false,
-        type: "bool",
-        default: false,
-        desc: "Enable Google Safe Browsing for suspicious link filtering.",
-        help: "When <code>false</code>, the Safe Browsing card is hidden in the dashboard and all checks are skipped. The code default is <code>true</code> if unset, but the .env.example sets it to <code>false</code>."
-      },
-      {
-        key: "SAFE_BROWSING__API_KEY",
-        label: "SAFE_BROWSING__API_KEY",
-        required: false,
-        type: "password",
-        placeholder: "AIzaSy...",
-        desc: "Google Safe Browsing API key. Required if enabled.",
-        help: "Get one from the <a href='https://console.cloud.google.com/' target='_blank'>Google Cloud Console</a>: enable the <strong>Safe Browsing API</strong>, then create an API key under <strong>APIs &amp; Services &rarr; Credentials</strong>."
-      },
-      {
-        key: "SAFE_BROWSING__BASE_URL",
-        label: "SAFE_BROWSING__BASE_URL",
-        required: false,
-        type: "text",
-        default: "https://safebrowsing.googleapis.com/v5",
-        desc: "Safe Browsing API base URL.",
-        help: "Default <code>https://safebrowsing.googleapis.com/v5</code>. Only change if you're using a proxy or alternative endpoint."
-      }
-    ]
-  },
-  {
-    title: "JWT Authentication",
-    icon: "&#128273;",
-    fields: [
-      {
-        key: "JWT__ISSUER",
-        label: "JWT__ISSUER",
-        required: false,
-        type: "text",
-        default: "Api",
-        desc: "Token issuer claim. Must match between API and Web.",
-        help: "Default <code>Api</code>. Both <code>JWT__ISSUER</code> and <code>JWT__AUDIENCE</code> must be identical in the API and Web .env files."
-      },
-      {
-        key: "JWT__AUDIENCE",
-        label: "JWT__AUDIENCE",
-        required: false,
-        type: "text",
-        default: "Web",
-        desc: "Token audience claim. Must match between API and Web.",
-        help: "Default <code>Web</code>. Must match in both projects."
-      },
-      {
-        key: "JWT__SECRET",
-        label: "JWT__SECRET",
-        required: true,
-        type: "password",
-        placeholder: "your-super-secret-key-min-32-chars",
-        desc: "Symmetric key for signing JWTs (minimum 32 characters).",
-        help: "Generate a strong random string. <button class='gen-btn' onclick='genSecret(this)'>Generate</button> Must be the same in both API and Web .env files."
-      }
-    ]
-  },
-  {
-    title: "Application",
-    icon: "&#9881;&#65039;",
-    fields: [
-      {
-        key: "APP__ENC_KEY",
-        label: "APP__ENC_KEY",
-        required: true,
-        type: "text",
-        placeholder: "32-byte hex or base64 key",
-        desc: "AES-256 encryption key for stored Discord tokens.",
-        help: "Used to encrypt OAuth tokens at rest. Generate a 32-byte key. <button class='gen-btn' onclick='genAesKey(this, 32)'>Generate</button>"
-      },
-      {
-        key: "APP__ENC_IV",
-        label: "APP__ENC_IV",
-        required: true,
-        type: "text",
-        placeholder: "16-byte hex or base64 IV",
-        desc: "AES initialization vector for token encryption.",
-        help: "Generate a 16-byte IV. <button class='gen-btn' onclick='genAesKey(this, 16)'>Generate</button>"
-      },
-      {
-        key: "APP__DISABLE_NEW_USERS",
-        label: "APP__DISABLE_NEW_USERS",
-        required: false,
-        type: "bool",
-        default: false,
-        desc: "When true, only the instance owner can register new accounts.",
-        help: "Existing users can still log in. If <code>APP__INSTANCE_OWNER</code> is not set, no new users can register at all."
-      },
-      {
-        key: "APP__PRIVATE_INSTANCE",
-        label: "APP__PRIVATE_INSTANCE",
-        required: false,
-        type: "bool",
-        default: false,
-        desc: "When true (and DISABLE_NEW_USERS is false), only allowed users and the owner can register.",
-        help: "Allowed users are configured via the <code>AllowedUsers</code> array in <code>appsettings.json</code>."
-      },
-      {
-        key: "APP__INSTANCE_OWNER",
-        label: "APP__INSTANCE_OWNER",
-        required: false,
-        type: "text",
-        placeholder: "123456789012345678",
-        desc: "Discord user ID of the instance owner.",
-        help: "The owner is always allowed to register. To find your Discord user ID, enable Developer Mode in Discord settings, right-click your profile, and select <strong>Copy User ID</strong>."
-      }
-    ]
-  },
-  {
-    title: "API",
-    icon: "&#128187;",
-    fields: [
-      {
-        key: "API__BASE_URL",
-        label: "API__BASE_URL",
-        required: false,
-        type: "text",
-        default: "https://localhost:7001",
-        desc: "Base URL of the API. Used by the Web project to call the API.",
-        help: "Default <code>https://localhost:7001</code>. Not recommended to change. For production, set to your public API URL."
-      },
-      {
-        key: "API__PORT",
-        label: "API__PORT",
-        required: false,
-        type: "number",
-        default: "7001",
-        desc: "Port the API listens on.",
-        help: "Default <code>7001</code>."
-      }
-    ]
-  },
-  {
-    title: "Web Dashboard",
-    icon: "&#127760;",
-    fields: [
-      {
-        key: "WEB__BASEURL",
-        label: "WEB__BASEURL",
-        required: false,
-        type: "text",
-        default: "https://localhost:7002",
-        desc: "Public-facing URL of the Web dashboard.",
-        help: "Used for redirects after OAuth login. For production, set to your public Web URL (e.g. <code>https://blackwall.example.com</code>)."
-      },
-      {
-        key: "WEB__PORT",
-        label: "WEB__PORT",
-        required: false,
-        type: "number",
-        default: "7002",
-        desc: "Port the Web dashboard listens on.",
-        help: "Default <code>7002</code>."
-      }
-    ]
-  },
-  {
-    title: "Guild Sync",
-    icon: "&#128260;",
-    fields: [
-      {
-        key: "GUILD_SYNC__ENABLED",
-        label: "GUILD_SYNC__ENABLED",
-        required: false,
-        type: "bool",
-        default: true,
-        desc: "Enable the guild permission sync background service.",
-        help: "When enabled, the bot periodically synchronises guild manager permissions from Discord."
-      },
-      {
-        key: "GUILD_SYNC__INTERVAL_MINUTES",
-        label: "GUILD_SYNC__INTERVAL_MINUTES",
-        required: false,
-        type: "number",
-        default: "15",
-        desc: "Sync interval in minutes.",
-        help: "Default <code>15</code>. Lower values mean more frequent Discord API calls."
-      }
-    ]
-  },
-  {
-    title: "Miscellaneous",
-    icon: "&#128221;",
-    fields: [
-      {
-        key: "ENABLE_DOCS",
-        label: "ENABLE_DOCS",
-        required: false,
-        type: "bool",
-        default: false,
-        desc: "Enable OpenAPI spec and Scalar UI on the API.",
-        help: "When <code>true</code>, the API exposes <code>/openapi/v1.json</code> and <code>/scalar/v1</code> for interactive API documentation."
-      }
-    ]
-  }
-];
-
-const values = {};
-
-function initValues() {
-  sections.forEach(s => s.fields.forEach(f => {
-    values[f.key] = f.default !== undefined ? f.default : "";
-  }));
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('show');
 }
 
-function renderForm() {
-  const panel = document.getElementById("formPanel");
-  panel.innerHTML = "";
-  sections.forEach((s, si) => {
-    const sec = document.createElement("div");
-    sec.className = "section" + (si > 2 ? " collapsed" : "");
-    sec.innerHTML = `
-      <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
-        <h2><span class="icon">${s.icon}</span> ${s.title}</h2>
-        <span class="chevron">&#9660;</span>
-      </div>
-      <div class="section-body"></div>
-    `;
-    const body = sec.querySelector(".section-body");
-    s.fields.forEach(f => {
-      const field = document.createElement("div");
-      field.className = "field";
-      const badge = f.required
-        ? '<span class="required-badge">Required</span>'
-        : '<span class="optional-badge">Optional</span>';
-      let inputHtml;
-      if (f.type === "bool") {
-        inputHtml = `
-          <div class="field-input">
-            <label class="toggle">
-              <input type="checkbox" data-key="${f.key}" ${values[f.key] ? "checked" : ""} onchange="onBoolChange(this)">
-              <span class="toggle-slider"></span>
-            </label>
-            <span style="font-size:0.8rem;color:var(--text-muted)">${values[f.key] ? "true" : "false"}</span>
-          </div>
-        `;
-      } else {
-        inputHtml = `
-          <div class="field-input">
-            <input type="${f.type}" data-key="${f.key}" value="${escapeHtml(values[f.key])}" placeholder="${escapeHtml(f.placeholder || '')}" oninput="onInputChange(this)">
-            ${f.default !== undefined ? `<button class="btn-reset" onclick="resetField('${f.key}', this)">Reset</button>` : ''}
-          </div>
-        `;
-      }
-      field.innerHTML = `
-        <div class="field-label">
-          <code>${f.label}</code>
-          ${badge}
-        </div>
-        <div class="field-desc">${f.desc}</div>
-        <div class="field-help">${f.help}</div>
-        ${inputHtml}
-      `;
-      body.appendChild(field);
-    });
-    panel.appendChild(sec);
+var navLinks = document.querySelectorAll('.sidebar-nav a');
+var sections = document.querySelectorAll('.content-section');
+
+function updateActive() {
+  var scrollY = window.scrollY;
+  var current = '';
+  sections.forEach(function(s) {
+    if (s.offsetTop - 100 <= scrollY) current = s.id;
+  });
+  navLinks.forEach(function(a) {
+    a.classList.remove('active');
+    if (a.getAttribute('href') === '#' + current) a.classList.add('active');
   });
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function onInputChange(el) {
-  values[el.dataset.key] = el.value;
-  updatePreview();
-}
-
-function onBoolChange(el) {
-  values[el.dataset.key] = el.checked;
-  const span = el.parentElement.nextElementSibling;
-  if (span) span.textContent = el.checked ? "true" : "false";
-  updatePreview();
-}
-
-function resetField(key, btn) {
-  const field = sections.flatMap(s => s.fields).find(f => f.key === key);
-  if (field && field.default !== undefined) {
-    values[key] = field.default;
-    const input = btn.parentElement.querySelector("input");
-    if (input) input.value = field.default;
-    updatePreview();
-  }
-}
-
-function genSecret(btn) {
-  const arr = new Uint8Array(48);
-  crypto.getRandomValues(arr);
-  const secret = btoa(String.fromCharCode(...arr)).replace(/=/g, "");
-  const input = btn.parentElement.parentElement.querySelector("input");
-  input.value = secret;
-  values["JWT__SECRET"] = secret;
-  updatePreview();
-}
-
-function genAesKey(btn, bytes) {
-  const arr = new Uint8Array(bytes);
-  crypto.getRandomValues(arr);
-  const hex = Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
-  const input = btn.parentElement.parentElement.parentElement.querySelector("input");
-  input.value = hex;
-  values[input.dataset.key] = hex;
-  updatePreview();
-}
-
-function updatePreview() {
-  const preview = document.getElementById("preview");
-  let html = "";
-  sections.forEach((s, si) => {
-    html += `<span class="env-comment"># ${s.title}</span>\n`;
-    s.fields.forEach(f => {
-      const val = values[f.key];
-      const isBool = f.type === "bool";
-      const displayVal = isBool ? (val ? "true" : "false") : (val || "");
-      if (displayVal === "") {
-        html += `<span class="env-key">${f.key}</span>=<span class="env-empty"></span>\n`;
-      } else {
-        html += `<span class="env-key">${f.key}</span>=${escapeHtml(displayVal)}\n`;
-      }
-    });
-    if (si < sections.length - 1) html += "\n";
-  });
-  preview.innerHTML = html;
-}
-
-function getEnvText() {
-  let text = "";
-  sections.forEach((s, si) => {
-    text += `# ${s.title}\n`;
-    s.fields.forEach(f => {
-      const val = values[f.key];
-      const isBool = f.type === "bool";
-      const displayVal = isBool ? (val ? "true" : "false") : (val || "");
-      text += `${f.key}=${displayVal}\n`;
-    });
-    if (si < sections.length - 1) text += "\n";
-  });
-  return text;
-}
-
-function copyEnv() {
-  navigator.clipboard.writeText(getEnvText()).then(() => {
-    showToast("Copied to clipboard!");
-  });
-}
-
-function downloadEnv() {
-  const blob = new Blob([getEnvText()], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = ".env";
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast(".env downloaded!");
-}
-
-function showToast(msg) {
-  const toast = document.getElementById("toast");
-  toast.textContent = msg;
-  toast.classList.add("show");
-  setTimeout(() => toast.classList.remove("show"), 2000);
-}
-
-initValues();
-renderForm();
-updatePreview();
+window.addEventListener('scroll', updateActive);
+updateActive();
 </script>
-
 </body>
 </html>
