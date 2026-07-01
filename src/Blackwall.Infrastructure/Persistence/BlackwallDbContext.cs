@@ -169,6 +169,22 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .IsRequired()
                   .HasDefaultValue(30);
 
+            entity.Property(e => e.IsAccountScoringEnabled)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.AutoTimeoutMediumRiskOnJoin)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.AutoTimeoutHighRiskOnJoin)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.AccountScoringTimeoutMinutes)
+                  .IsRequired()
+                  .HasDefaultValue(10);
+
             entity.Property(e => e.IsLockedDown)
                   .IsRequired()
                   .HasDefaultValue(false);

@@ -15,6 +15,45 @@ Tools provided by the community and improving upon the existing ones.
 - **Guild permission sync** — a background service periodically synchronises guild manager permissions from Discord.
 - **Web dashboard** — Blazor Server UI for guild owners and managers to configure spam rules.
 
+## Account Scoring
+
+Account Scoring evaluates new members' account metadata the moment they join the server and assigns a hidden **threat score**. It works independently of anti-raid — you can enable it even if velocity lockdowns are off.
+
+### Scoring Factors
+
+Each factor adds points to the user's total score:
+
+| Factor | Condition | Points |
+|--------|-----------|--------|
+| **Account age** | Less than 1 day old | +3 |
+| | Less than 7 days old | +2 |
+| | Less than 30 days old | +1 |
+| **Profile picture** | Default avatar (no custom avatar set) | +2 |
+| **Username — numeric only** | Username consists entirely of digits | +2 |
+| **Username — gibberish** | Username is 6+ alphanumeric characters with no discernible pattern | +2 |
+| **Username — consecutive consonants** | Username contains 5+ consecutive consonants | +1 |
+
+### Threat Levels
+
+The total score maps to a threat level:
+
+| Level | Score Range | Behavior |
+|-------|-------------|----------|
+| **Low** | 0–1 | No action taken |
+| **Medium** | 2–3 | Moderators are alerted in the audit log channel |
+| **High** | 4+ | Moderators are alerted in the audit log channel |
+
+### Configurable Actions
+
+For medium and high risk accounts, you can independently enable **auto-timeout**:
+
+- **Auto-timeout medium risk** — automatically places medium-risk users in a timeout on join
+- **Auto-timeout high risk** — automatically places high-risk users in a timeout on join
+
+If auto-timeout is disabled for a given level, moderators are alerted only and can manually decide whether to intervene. The timeout duration is configurable (default: 10 minutes).
+
+All alerts are sent to the configured **audit log channel** as an embed containing the user, their score, account age, the specific risk factors that contributed, and the action taken.
+
 ## Architecture
 
 The solution is split into five projects:

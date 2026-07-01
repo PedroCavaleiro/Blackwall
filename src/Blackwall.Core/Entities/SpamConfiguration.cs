@@ -29,6 +29,11 @@ public class SpamConfiguration: EntityBase {
     public int AntiRaidWindowSeconds { get; set; } = 30;
     public int AntiRaidCooldownMinutes { get; set; } = 30;
 
+    public bool IsAccountScoringEnabled { get; set; }
+    public bool AutoTimeoutMediumRiskOnJoin { get; set; }
+    public bool AutoTimeoutHighRiskOnJoin { get; set; }
+    public int AccountScoringTimeoutMinutes { get; set; } = 10;
+
     public bool IsLockedDown { get; set; }
     public bool AutoLockdownEnabled { get; set; }
 
