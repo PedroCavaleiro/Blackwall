@@ -121,7 +121,7 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     /// </summary>
     private static async Task<string?> ResolveRedirectAsync(string url) {
         try {
-            using var request = new HttpRequestMessage(HttpMethod.Head, url);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.UserAgent.ParseAdd("Blackwall/1.0 (+https://blackwall.app)");
 
             using var response = await RedirectHttpClient.SendAsync(
