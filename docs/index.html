@@ -462,8 +462,8 @@ const sections = [
         required: false,
         type: "text",
         default: "Api",
-        desc: "Token issuer claim. Must match between API and Web.",
-        help: "Default <code>Api</code>. Both <code>JWT__ISSUER</code> and <code>JWT__AUDIENCE</code> must be identical in the API and Web .env files."
+        desc: "Token issuer claim.",
+        help: "Default <code>Api</code>."
       },
       {
         key: "JWT__AUDIENCE",
@@ -471,8 +471,8 @@ const sections = [
         required: false,
         type: "text",
         default: "Web",
-        desc: "Token audience claim. Must match between API and Web.",
-        help: "Default <code>Web</code>. Must match in both projects."
+        desc: "Token audience claim.",
+        help: "Default <code>Web</code>."
       },
       {
         key: "JWT__SECRET",
@@ -494,18 +494,18 @@ const sections = [
         label: "APP__ENC_KEY",
         required: true,
         type: "text",
-        placeholder: "32-byte hex or base64 key",
-        desc: "AES-256 encryption key for stored Discord tokens.",
-        help: "Used to encrypt OAuth tokens at rest. Generate a 32-byte key. <button class='gen-btn' onclick='genAesKey(this, 32)'>Generate</button>"
+        placeholder: "base64-encoded 32-byte key",
+        desc: "AES-256 encryption key for stored Discord tokens (32 bytes, base64-encoded).",
+        help: "Used to encrypt OAuth tokens at rest. Generate a 32-byte key encoded in base64. <button class='gen-btn' onclick='genAesKey(this, 32)'>Generate</button>"
       },
       {
         key: "APP__ENC_IV",
         label: "APP__ENC_IV",
         required: true,
         type: "text",
-        placeholder: "16-byte hex or base64 IV",
-        desc: "AES initialization vector for token encryption.",
-        help: "Generate a 16-byte IV. <button class='gen-btn' onclick='genAesKey(this, 16)'>Generate</button>"
+        placeholder: "base64-encoded 16-byte IV",
+        desc: "AES initialization vector for token encryption (16 bytes, base64-encoded).",
+        help: "Generate a 16-byte IV encoded in base64. <button class='gen-btn' onclick='genAesKey(this, 16)'>Generate</button>"
       },
       {
         key: "APP__DISABLE_NEW_USERS",
@@ -547,7 +547,7 @@ const sections = [
         type: "text",
         default: "https://localhost:7001",
         desc: "Base URL of the API. Used by the Web project to call the API.",
-        help: "Default <code>https://localhost:7001</code>. Not recommended to change. For production, set to your public API URL."
+        help: "Default <code>https://localhost:7001</code>. Not recommended to change. If updating the port also update the URL."
       },
       {
         key: "API__PORT",
@@ -726,10 +726,10 @@ function genSecret(btn) {
 function genAesKey(btn, bytes) {
   const arr = new Uint8Array(bytes);
   crypto.getRandomValues(arr);
-  const hex = Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
+  const b64 = btoa(String.fromCharCode(...arr));
   const input = btn.parentElement.parentElement.parentElement.querySelector("input");
-  input.value = hex;
-  values[input.dataset.key] = hex;
+  input.value = b64;
+  values[input.dataset.key] = b64;
   updatePreview();
 }
 
