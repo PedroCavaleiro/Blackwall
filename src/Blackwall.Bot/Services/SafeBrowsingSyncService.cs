@@ -191,7 +191,15 @@ public sealed class SafeBrowsingSyncService(
     /// returns the list's minimum wait duration.
     /// </summary>
     private async Task<TimeSpan> ProcessHashListAsync(HashList list, bool isGlobalCache, bool isThreatList) {
-        var redisKey = isGlobalCache ? GlobalCacheKey : ThreatPrefixesKey;
+        RedisKey redisKey;
+        if (isGlobalCache)
+            redisKey = GlobalCacheKey;
+        else if (isThreatList)
+            redisKey = ThreatPrefixesKey;
+        else {
+            logger.LogDebug("Skipping unsupported hash list {Name}", list.Name);
+            return ParseDuration(list.MinimumWaitDuration);
+        }
 
         if (!list.PartialUpdate) {
             logger.LogInformation("Full update for hash list {Name}, clearing existing data", list.Name);
