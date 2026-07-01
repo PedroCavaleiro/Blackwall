@@ -64,6 +64,10 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
         var key = crossChannelEnabled
             ? $"spam:dupes:{discordGuildId}:{discordUserId}:{hash}"
             : $"spam:dupes:{discordGuildId}:{discordUserId}:{channelId}:{hash}";
+        var handledKey = $"{key}:handled";
+
+        if (await _db.KeyExistsAsync(handledKey))
+            return new DuplicateDetectionResult(true, []);
 
         var entry = $"{channelId}:{messageId}";
         var count = await _db.ListRightPushAsync(key, entry);
@@ -85,6 +89,9 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
                 messagesToDelete.Add((chId, msgId));
             }
         }
+
+        await _db.KeyDeleteAsync(key);
+        await _db.StringSetAsync(handledKey, "1", TimeSpan.FromSeconds(windowSeconds));
 
         return new DuplicateDetectionResult(true, messagesToDelete);
     }
