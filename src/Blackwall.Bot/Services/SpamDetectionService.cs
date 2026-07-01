@@ -104,9 +104,10 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
             var url = match.Value;
 
             if (InviteLinkPattern.IsMatch(url))
-                continue;
+                return true;
 
-            var resolved = await ResolveRedirectAsync(url);
+            var redirectUrl = url.Contains("://") ? url : "https://" + url;
+            var resolved = await ResolveRedirectAsync(redirectUrl);
             if (resolved is not null && InviteLinkPattern.IsMatch(resolved))
                 return true;
         }
@@ -120,7 +121,7 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     /// </summary>
     private static async Task<string?> ResolveRedirectAsync(string url) {
         try {
-            using var request = new HttpRequestMessage(HttpMethod.Head, url);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.UserAgent.ParseAdd("Blackwall/1.0 (+https://blackwall.app)");
 
             using var response = await RedirectHttpClient.SendAsync(
