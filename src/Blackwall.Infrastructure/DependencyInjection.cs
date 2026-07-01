@@ -9,6 +9,16 @@ namespace Blackwall.Infrastructure;
 
 public static class DependencyInjection {
 
+    /// <summary>
+    /// Registers infrastructure services into the dependency injection container,
+    /// including the PostgreSQL <see cref="BlackwallDbContext"/>, a Redis
+    /// <see cref="IConnectionMultiplexer"/>, and the <see cref="SpamConfigurationCache"/>.
+    /// </summary>
+    /// <param name="services">The service collection to add services to.</param>
+    /// <param name="configuration">The application configuration containing connection strings.</param>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown if the PostgreSQL or Redis connection string is missing from configuration.
+    /// </exception>
     public static void AddInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration

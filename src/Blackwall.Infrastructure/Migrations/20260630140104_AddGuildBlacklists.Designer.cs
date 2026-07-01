@@ -3,6 +3,7 @@ using System;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Blackwall.Infrastructure.Migrations
 {
     [DbContext(typeof(BlackwallDbContext))]
-    partial class BlackwallDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260630140104_AddGuildBlacklists")]
+    partial class AddGuildBlacklists
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -89,34 +92,6 @@ namespace Blackwall.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("GuildBlacklists");
-                });
-
-            modelBuilder.Entity("Blackwall.Core.Entities.GuildBlacklistDomain", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Domain")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<long>("SpamConfigurationId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SpamConfigurationId", "Domain")
-                        .IsUnique();
-
-                    b.ToTable("GuildBlacklistDomains");
                 });
 
             modelBuilder.Entity("Blackwall.Core.Entities.GuildInstance", b =>
@@ -288,11 +263,6 @@ namespace Blackwall.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
-                    b.Property<bool>("LinkWhitelistMode")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
                     b.Property<long?>("LogChannelId")
                         .HasColumnType("bigint");
 
@@ -322,16 +292,6 @@ namespace Blackwall.Infrastructure.Migrations
                     b.Property<int>("RateLimitWindowSeconds")
                         .HasColumnType("integer");
 
-                    b.Property<bool>("SafeBrowsingBlockUnsure")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("SafeBrowsingEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
                     b.Property<int?>("SuspiciousLinkAction")
                         .HasColumnType("integer");
 
@@ -353,17 +313,6 @@ namespace Blackwall.Infrastructure.Migrations
                 {
                     b.HasOne("Blackwall.Core.Entities.SpamConfiguration", "SpamConfiguration")
                         .WithMany("Blacklists")
-                        .HasForeignKey("SpamConfigurationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("SpamConfiguration");
-                });
-
-            modelBuilder.Entity("Blackwall.Core.Entities.GuildBlacklistDomain", b =>
-                {
-                    b.HasOne("Blackwall.Core.Entities.SpamConfiguration", "SpamConfiguration")
-                        .WithMany("BlacklistDomains")
                         .HasForeignKey("SpamConfigurationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -428,8 +377,6 @@ namespace Blackwall.Infrastructure.Migrations
 
             modelBuilder.Entity("Blackwall.Core.Entities.SpamConfiguration", b =>
                 {
-                    b.Navigation("BlacklistDomains");
-
                     b.Navigation("Blacklists");
                 });
 #pragma warning restore 612, 618

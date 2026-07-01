@@ -1,60 +1,94 @@
-#!/usr/bin/env bash
-# Blackwall — deploy published artifacts to a remote LXC
-# Usage: ./deploy.sh <lxc-ip> [ssh-user]
-set -euo pipefail
+<#
+.SYNOPSIS
+Blackwall — deploy published artifacts to a remote LXC
 
-LXC_HOST="${1:?Usage: $0 <lxc-ip> [ssh-user]}"
-SSH_USER="${2:-root}"
-REMOTE="$SSH_USER@$LXC_HOST"
-APP_DIR="/opt/blackwall"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-OUT_DIR="$REPO_ROOT/.publish"
+.DESCRIPTION
+Usage: .\deploy.ps1 -LxcIp <lxc-ip> [-SshUser <ssh-user>]
+#>
 
-# Define a temporary socket file for the SSH master connection
-SSH_SOCKET="/tmp/blackwall_deploy_socket_$$"
+param (
+    [Parameter(Mandatory=$true, Position=0, HelpMessage="IP address of the remote LXC container")]
+    [string]$LxcIp,
 
-info()    { echo -e "\e[34m[INFO]\e[0m  $*"; }
-success() { echo -e "\e[32m[OK]\e[0m    $*"; }
+    [Parameter(Position=1)]
+    [string]$SshUser = "root"
+)
 
-# Clean up the SSH master connection and output dir when the script exits (success or fail)
-cleanup() {
-info "Closing SSH master connection and cleaning up..."
-ssh -S "$SSH_SOCKET" -O exit "$REMOTE" 2>/dev/null || true
-rm -rf "$OUT_DIR"
-}
-trap cleanup EXIT
+$ErrorActionPreference = "Stop"
+
+# ─── Variables ────────────────────────────────────────────────────────────────
+$Remote = "$SshUser@$LxcIp"
+$AppDir = "/opt/blackwall"
+
+# Resolve repo root (2 levels up from script directory)
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$OutDir = Join-Path $RepoRoot ".publish"
+$TarFile = Join-Path $RepoRoot "publish.tar.gz"
+
+# ─── Helper Functions ─────────────────────────────────────────────────────────
+function Write-Info { param([string]$Message) Write-Host "[INFO]  $Message" -ForegroundColor Cyan }
+function Write-Success { param([string]$Message) Write-Host "[OK]    $Message" -ForegroundColor Green }
 
 # ─── Publish ──────────────────────────────────────────────────────────────────
-info "Publishing Blackwall.Api..."
-dotnet publish "$REPO_ROOT/src/Blackwall.Api/Blackwall.Api.csproj" \
--c Release -o "$OUT_DIR/api" --nologo -v q
+try {
+    Write-Info "Publishing Blackwall.Api..."
+    $ApiProj = Join-Path $RepoRoot "src\Blackwall.Api\Blackwall.Api.csproj"
+    $ApiOut = Join-Path $OutDir "api"
+    dotnet publish $ApiProj -c Release -o $ApiOut --nologo -v q
 
-info "Publishing Blackwall.Web..."
-dotnet publish "$REPO_ROOT/src/Blackwall.Web/Blackwall.Web.csproj" \
--c Release -o "$OUT_DIR/web" --nologo -v q
+    Write-Info "Publishing Blackwall.Web..."
+    $WebProj = Join-Path $RepoRoot "src\Blackwall.Web\Blackwall.Web.csproj"
+    $WebOut = Join-Path $OutDir "web"
+    dotnet publish $WebProj -c Release -o $WebOut --nologo -v q
 
-success "Publish complete."
+    Write-Success "Publish complete."
 
-# ─── Open Master SSH Connection ───────────────────────────────────────────────
-info "Opening master SSH connection to $REMOTE..."
-# This is the ONLY time you will be prompted for a password.
-ssh -M -S "$SSH_SOCKET" -fnNT "$REMOTE"
-success "Master connection established."
+    # ─── Compress ─────────────────────────────────────────────────────────────
+    Write-Info "Compressing published files for transfer..."
+    Push-Location $OutDir
+    # Using Windows' native tar to compress the contents of the publish folder
+    tar -czf $TarFile .
+    Pop-Location
+    Write-Success "Archive created."
 
-# ─── Upload ───────────────────────────────────────────────────────────────────
-info "Uploading API and Web to $REMOTE:$APP_DIR/ ..."
-# Using a single rsync command to sync the parent directory saves time.
-# The -e flag tells rsync to use our existing SSH socket.
-rsync -az -e "ssh -S $SSH_SOCKET" --delete --exclude=".env" "$OUT_DIR/" "$REMOTE:$APP_DIR/"
+    # ─── Upload ───────────────────────────────────────────────────────────────
+    Write-Info "Uploading application payload to $Remote..."
+    scp $TarFile "${Remote}:/tmp/publish.tar.gz"
+    Write-Success "Upload complete."
 
-success "Upload complete."
+    # ─── Remote Execution (Clean, Extract, Restart) ───────────────────────────
+    Write-Info "Deploying and restarting services on remote host..."
 
-# ─── Fix ownership and restart ────────────────────────────────────────────────
-info "Fixing ownership and restarting services..."
-# We pass the -S flag so ssh uses the master socket and doesn't ask for a password.
-ssh -S "$SSH_SOCKET" "$REMOTE" "chown -R blackwall:blackwall $APP_DIR/api $APP_DIR/web && \
-               systemctl restart blackwall-api blackwall-web && \
-               systemctl is-active blackwall-api && \
-               systemctl is-active blackwall-web"
+    # We pass a multi-line script to SSH to handle the remote processing
+    $RemoteScript = @"
+        # Clear out the target directory but preserve the .env file
+        find $AppDir -mindepth 1 -maxdepth 1 ! -name '.env' -exec rm -rf {} + 2>/dev/null || true
 
-success "Deployment done. Both services are running."
+        # Extract the new payload
+        tar -xzf /tmp/publish.tar.gz -C $AppDir/
+        
+        # Clean up the temporary archive
+        rm /tmp/publish.tar.gz
+
+        # Fix ownership
+        chown -R blackwall:blackwall $AppDir/api $AppDir/web
+
+        # Restart and verify services
+    systemctl restart blackwall-api blackwall-web
+    systemctl is-active blackwall-api
+    systemctl is-active blackwall-web
+"@
+
+    # Convert Windows CRLF line endings to Linux LF line endings
+    $RemoteScript = $RemoteScript.Replace("`r`n", "`n")
+
+    ssh $Remote $RemoteScript
+    Write-Success "Deployment done. Both services are running."
+
+}
+finally {
+    # ─── Cleanup ──────────────────────────────────────────────────────────────
+    Write-Info "Cleaning up local temporary files..."
+    if (Test-Path $OutDir) { Remove-Item -Path $OutDir -Recurse -Force -ErrorAction SilentlyContinue }
+    if (Test-Path $TarFile) { Remove-Item -Path $TarFile -Force -ErrorAction SilentlyContinue }
+}

@@ -3,6 +3,7 @@ using System;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Blackwall.Infrastructure.Migrations
 {
     [DbContext(typeof(BlackwallDbContext))]
-    partial class BlackwallDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260630142355_AddBlacklistDomainsAndWhitelistMode")]
+    partial class AddBlacklistDomainsAndWhitelistMode
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -321,16 +324,6 @@ namespace Blackwall.Infrastructure.Migrations
 
                     b.Property<int>("RateLimitWindowSeconds")
                         .HasColumnType("integer");
-
-                    b.Property<bool>("SafeBrowsingBlockUnsure")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("SafeBrowsingEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
 
                     b.Property<int?>("SuspiciousLinkAction")
                         .HasColumnType("integer");

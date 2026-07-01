@@ -72,6 +72,14 @@ Edit `.env` and fill in the required values:
 
 > **Tip:** Using the default `10308992462014` keeps permissions fine-grained and matches the full Discord permissions listed for Blackwall. The minimal set is `1374389610518`.
 
+**Google Safe Browsing**
+
+| Variable | Description |
+|----------|-------------|
+| `SAFE_BROWSING__ENABLED` | Enable or disable Google Safe Browsing (default `true`). When `false`, the Safe Browsing card is hidden in the dashboard and all checks are skipped. |
+| `SAFE_BROWSING__API_KEY` | Google Safe Browsing API key. Get one from the [Google Cloud Console](https://console.cloud.google.com/) by enabling the **Safe Browsing API** and creating an API key under **APIs & Services → Credentials**. |
+| `SAFE_BROWSING__BASE_URL` | Safe Browsing API base URL (default `https://safebrowsing.googleapis.com/v5`) |
+
 **JWT**
 
 | Variable | Description |

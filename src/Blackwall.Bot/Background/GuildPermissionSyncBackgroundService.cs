@@ -17,14 +17,14 @@ public sealed class GuildPermissionSyncBackgroundService(
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
         if (!_options.Enabled) {
-            logger.LogInformation("Guild permission sync background service is disabled.");
+            logger.LogInformation("Guild permission sync background service is disabled");
             return;
         }
 
         var interval = TimeSpan.FromMinutes(Math.Max(1, _options.IntervalMinutes));
 
         logger.LogInformation(
-            "Guild permission sync background service started with interval {IntervalMinutes} minute(s).",
+            "Guild permission sync background service started with interval {IntervalMinutes} minute(s)",
             interval.TotalMinutes
         );
 
@@ -36,7 +36,7 @@ public sealed class GuildPermissionSyncBackgroundService(
             } catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) {
                 break;
             } catch (Exception ex) {
-                logger.LogError(ex, "Error while syncing guild permissions.");
+                logger.LogError(ex, "Error while syncing guild permissions");
             }
 
             try {
@@ -47,7 +47,7 @@ public sealed class GuildPermissionSyncBackgroundService(
             }
         }
 
-        logger.LogInformation("Guild permission sync background service stopped.");
+        logger.LogInformation("Guild permission sync background service stopped");
     }
 
     /// <summary>

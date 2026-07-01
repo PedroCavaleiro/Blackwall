@@ -14,6 +14,9 @@ public class SpamConfiguration: EntityBase {
     public int MentionLimit { get; set; }
     public bool BlockInviteLinks { get; set; }
     public bool BlockSuspiciousLinks { get; set; }
+    public bool LinkWhitelistMode { get; set; }
+    public bool SafeBrowsingEnabled { get; set; }
+    public bool SafeBrowsingBlockUnsure { get; set; }
 
     public bool IsEnabled { get; set; } = true;
     public bool IsDryRun { get; set; }
@@ -45,4 +48,7 @@ public class SpamConfiguration: EntityBase {
     public bool? SuspiciousLinkAutoLockdown { get; set; }
 
     public DateTime? UpdatedAtUtc { get; set; }
+
+    public ICollection<GuildBlacklist> Blacklists { get; set; } = [];
+    public ICollection<GuildBlacklistDomain> BlacklistDomains { get; set; } = [];
 }

@@ -2,9 +2,9 @@ using System.Security.Claims;
 using Blackwall.Api.Services;
 using Blackwall.Bot.Services;
 using Blackwall.Core.DTOs;
+using Blackwall.Core.Entities;
 using Blackwall.Infrastructure.Cache;
 using Blackwall.Infrastructure.Persistence;
-using Discord;
 using Discord.WebSocket;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,7 +22,8 @@ public sealed class GuildsController(
     SpamConfigurationCache spamConfigurationCache,
     DiscordGuildCacheService guildCache,
     DiscordSocketClient discordClient,
-    LockdownService lockdownService
+    LockdownService lockdownService,
+    BlacklistService blacklistService
 ) : ControllerBase {
     
     /// <summary>
@@ -124,6 +125,9 @@ public sealed class GuildsController(
                 instance.SpamConfiguration.MentionLimit,
                 instance.SpamConfiguration.BlockInviteLinks,
                 instance.SpamConfiguration.BlockSuspiciousLinks,
+                instance.SpamConfiguration.LinkWhitelistMode,
+                instance.SpamConfiguration.SafeBrowsingEnabled,
+                instance.SpamConfiguration.SafeBrowsingBlockUnsure,
                 instance.SpamConfiguration.IsEnabled,
                 instance.SpamConfiguration.IsDryRun,
                 instance.SpamConfiguration.Action,
@@ -203,6 +207,9 @@ public sealed class GuildsController(
         spam.MentionLimit = request.MentionLimit;
         spam.BlockInviteLinks = request.BlockInviteLinks;
         spam.BlockSuspiciousLinks = request.BlockSuspiciousLinks;
+        spam.LinkWhitelistMode = request.LinkWhitelistMode;
+        spam.SafeBrowsingEnabled = request.SafeBrowsingEnabled;
+        spam.SafeBrowsingBlockUnsure = request.SafeBrowsingBlockUnsure;
         spam.IsEnabled = request.IsEnabled;
         spam.IsDryRun = request.IsDryRun;
         spam.Action = request.Action;
@@ -228,6 +235,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await spamConfigurationCache.InvalidateAsync(discordGuildId);
+        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None), cancellationToken);
 
         return NoContent();
     }
@@ -444,6 +452,459 @@ public sealed class GuildsController(
         instance.UpdatedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         await spamConfigurationCache.InvalidateAsync(discordGuildId);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Returns the list of default blacklist URLs available from configuration.
+    /// </summary>
+    /// <returns>A list of default blacklist URLs.</returns>
+    /// <response code="200">Returns the list of default blacklists.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    [HttpGet("blacklists/defaults")]
+    [ProducesResponseType(typeof(IReadOnlyList<DefaultBlacklistResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<DefaultBlacklistResponse>>> GetDefaultBlacklists(
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        await Task.CompletedTask;
+        return Ok(blacklistService.GetDefaultBlacklists()
+            .Select(url => new DefaultBlacklistResponse(url))
+            .ToList());
+    }
+
+    /// <summary>
+    /// Returns all blacklists configured for a guild the authenticated user can manage.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of blacklists configured for the guild.</returns>
+    /// <response code="200">Returns the list of guild blacklists.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpGet("{discordGuildId:long}/blacklists")]
+    [ProducesResponseType(typeof(IReadOnlyList<BlacklistResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<BlacklistResponse>>> GetBlacklists(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.Blacklists)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        return Ok(instance.SpamConfiguration.Blacklists
+            .Select(b => new BlacklistResponse(b.Id, b.Url))
+            .ToList());
+    }
+
+    /// <summary>
+    /// Adds a blacklist URL to the guild's configuration. The URL can be one of the defaults
+    /// or a custom AdGuard-format blacklist URL provided by the user.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="request">The blacklist URL to add.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Blacklist added successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    /// <response code="409">The blacklist URL is already configured for this guild.</response>
+    [HttpPost("{discordGuildId:long}/blacklists")]
+    [ProducesResponseType(typeof(BlacklistResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<BlacklistResponse>> AddBlacklist(
+        long discordGuildId,
+        [FromBody] AddBlacklistRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.Blacklists)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        if (string.IsNullOrWhiteSpace(request.Url) || !Uri.TryCreate(request.Url, UriKind.Absolute, out var uri) || (uri.Scheme != "http" && uri.Scheme != "https"))
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid URL.",
+                Detail = "The blacklist URL must be a valid HTTP or HTTPS URL.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        if (instance.SpamConfiguration.Blacklists.Any(b => b.Url.Equals(request.Url, StringComparison.OrdinalIgnoreCase)))
+            return Conflict(new ProblemDetails {
+                Title = "Blacklist already configured.",
+                Detail = "This blacklist URL is already configured for this guild.",
+                Status = StatusCodes.Status409Conflict
+            });
+
+        var blacklist = new GuildBlacklist {
+            SpamConfigurationId = instance.SpamConfiguration.Id,
+            Url = request.Url
+        };
+
+        instance.SpamConfiguration.Blacklists.Add(blacklist);
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None));
+
+        return Ok(new BlacklistResponse(blacklist.Id, blacklist.Url));
+    }
+
+    /// <summary>
+    /// Removes a blacklist URL from the guild's configuration.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="blacklistId">The ID of the blacklist to remove.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">Blacklist removed successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance or blacklist does not exist.</response>
+    [HttpDelete("{discordGuildId:long}/blacklists/{blacklistId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveBlacklist(
+        long discordGuildId,
+        long blacklistId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.Blacklists)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var blacklist = instance.SpamConfiguration.Blacklists.FirstOrDefault(b => b.Id == blacklistId);
+        if (blacklist is null)
+            return NotFound(new ProblemDetails {
+                Title = "Blacklist not found.",
+                Detail = "No blacklist with this ID exists for this guild.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        instance.SpamConfiguration.Blacklists.Remove(blacklist);
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None));
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Manually triggers a refresh of all blacklists for the specified guild,
+    /// re-downloading and updating the Redis domain set.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Blacklists refreshed successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpPost("{discordGuildId:long}/blacklists/refresh")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RefreshBlacklists(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        await blacklistService.RefreshGuildAsync(discordGuildId, cancellationToken);
+
+        return Ok(new { Message = "Blacklists refreshed." });
+    }
+
+    /// <summary>
+    /// Returns all custom domains configured for a guild the authenticated user can manage.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of custom domains configured for the guild.</returns>
+    /// <response code="200">Returns the list of custom domains.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpGet("{discordGuildId:long}/blacklists/domains")]
+    [ProducesResponseType(typeof(IReadOnlyList<BlacklistDomainResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<BlacklistDomainResponse>>> GetBlacklistDomains(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.BlacklistDomains)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        return Ok(instance.SpamConfiguration.BlacklistDomains
+            .Select(d => new BlacklistDomainResponse(d.Id, d.Domain))
+            .ToList());
+    }
+
+    /// <summary>
+    /// Adds a custom domain to the guild's configuration. In blacklist mode, this domain
+    /// is treated as blocked. In whitelist mode, this domain is treated as allowed.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="request">The domain to add.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Domain added successfully.</response>
+    /// <response code="400">The domain is invalid.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    /// <response code="409">The domain is already configured for this guild.</response>
+    [HttpPost("{discordGuildId:long}/blacklists/domains")]
+    [ProducesResponseType(typeof(BlacklistDomainResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<BlacklistDomainResponse>> AddBlacklistDomain(
+        long discordGuildId,
+        [FromBody] AddBlacklistDomainRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.BlacklistDomains)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var domain = request.Domain.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(domain) || domain.Contains(' ') || domain.Contains('/'))
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid domain.",
+                Detail = "The domain must be a valid hostname without protocol or path.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        if (instance.SpamConfiguration.BlacklistDomains.Any(d => d.Domain.Equals(domain, StringComparison.OrdinalIgnoreCase)))
+            return Conflict(new ProblemDetails {
+                Title = "Domain already configured.",
+                Detail = "This domain is already configured for this guild.",
+                Status = StatusCodes.Status409Conflict
+            });
+
+        var entry = new GuildBlacklistDomain {
+            SpamConfigurationId = instance.SpamConfiguration.Id,
+            Domain = domain
+        };
+
+        instance.SpamConfiguration.BlacklistDomains.Add(entry);
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None));
+
+        return Ok(new BlacklistDomainResponse(entry.Id, entry.Domain));
+    }
+
+    /// <summary>
+    /// Removes a custom domain from the guild's configuration.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="domainId">The ID of the domain entry to remove.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">Domain removed successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance or domain does not exist.</response>
+    [HttpDelete("{discordGuildId:long}/blacklists/domains/{domainId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveBlacklistDomain(
+        long discordGuildId,
+        long domainId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.BlacklistDomains)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var entry = instance.SpamConfiguration.BlacklistDomains.FirstOrDefault(d => d.Id == domainId);
+        if (entry is null)
+            return NotFound(new ProblemDetails {
+                Title = "Domain not found.",
+                Detail = "No domain with this ID exists for this guild.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        instance.SpamConfiguration.BlacklistDomains.Remove(entry);
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None));
 
         return NoContent();
     }
