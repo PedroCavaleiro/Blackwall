@@ -56,16 +56,16 @@ public sealed class SystemController(
     [Produces("application/json")]
     [ProducesResponseType(typeof(List<SafeBrowsingTestResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> TestSafeBrowsing([FromQuery] string? url) {
+
+        var synced = await safeBrowsingSyncService.IsSyncedAsync();
         if (!string.IsNullOrWhiteSpace(url)) {
-            var synced = await safeBrowsingSyncService.IsSyncedAsync();
             var result = await safeBrowsingService.CheckUrlAsync(url);
             return Ok(new List<SafeBrowsingTestResponse> { new(url, result.ToString(), synced) });
         }
 
-        var unsafeTest = "https://testsafebrowsing.appspot.com/s/malware.html";
-        var safeTest = "github.com/PedroCavaleiro/Blackwall";
+        const string unsafeTest = "https://testsafebrowsing.appspot.com/s/malware.html";
+        const string safeTest = "github.com/PedroCavaleiro/Blackwall";
 
-        var synced = await safeBrowsingSyncService.IsSyncedAsync();
         var unsafeResult = await safeBrowsingService.CheckUrlAsync(unsafeTest);
         var safeResult = await safeBrowsingService.CheckUrlAsync(safeTest);
 

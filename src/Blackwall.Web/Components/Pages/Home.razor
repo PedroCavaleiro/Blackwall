@@ -31,6 +31,10 @@
                 <div class="alert alert-warning d-inline-block mb-4 font-mono" style="font-size:0.8rem">
                     // ACCESS DENIED: New user registration is currently disabled.
                 </div>
+            } else if (_error == "not_allowed") {
+                <div class="alert alert-warning d-inline-block mb-4 font-mono" style="font-size:0.8rem">
+                    // ACCESS DENIED: You are not authorized to join this instance.
+                </div>
             } else if (!string.IsNullOrEmpty(_error)) {
                 <div class="alert alert-danger d-inline-block mb-4 font-mono" style="font-size:0.8rem">
                     // AUTH ERROR: Authentication failed. Please try again.
