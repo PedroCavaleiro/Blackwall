@@ -136,7 +136,7 @@ public sealed class MessageHandler(
                         continue;
 
                     try {
-                        var channel = guildChannel.Guild.GetTextChannel(channelId);
+                        var channel = guildChannel.Guild.GetChannel(channelId) as IMessageChannel;
                         if (channel is not null)
                             await channel.DeleteMessageAsync(msgId);
                     } catch (Exception ex) {
