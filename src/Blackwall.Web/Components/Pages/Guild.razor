@@ -695,9 +695,16 @@
                 _isLockedDown = s.IsLockedDown;
             }
 
-            _blacklists = await Api.GetBlacklistsAsync(DiscordGuildId);
-            _defaultBlacklists = await Api.GetDefaultBlacklistsAsync();
-            _blacklistDomains = await Api.GetBlacklistDomainsAsync(DiscordGuildId);
+            try {
+                _blacklists = await Api.GetBlacklistsAsync(DiscordGuildId);
+                _defaultBlacklists = await Api.GetDefaultBlacklistsAsync();
+                _blacklistDomains = await Api.GetBlacklistDomainsAsync(DiscordGuildId);
+            } catch {
+                _blacklists = [];
+                _defaultBlacklists = [];
+                _blacklistDomains = [];
+                _error = "Failed to load blacklist configuration.";
+            }
         } catch {
             _settings = null;
         } finally {
