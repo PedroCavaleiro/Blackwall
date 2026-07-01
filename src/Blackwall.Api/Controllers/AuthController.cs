@@ -95,18 +95,20 @@ public sealed class AuthController(
 
         var user = await dbContext.AppUsers
             .FirstOrDefaultAsync(x => x.DiscordUserId == discordUserId, cancellationToken);
-        
+
+        if (user is null) {
+            if (!IsRegistrationAllowed(discordUserId, out var errorCode)) {
+                var deniedRedirectUrl = $"{webOptions.Value.BaseUrl.TrimEnd('/')}/auth/callback?error={Uri.EscapeDataString(errorCode)}";
+                return Redirect(deniedRedirectUrl);
+            }
+        }
+
         var key = AesCrypto.GetBytes(appConfiguration.Value.EncryptionKey);
         var iv = AesCrypto.GetBytes(appConfiguration.Value.EncryptionIv);
         var encryptedAccessToken = AesCrypto.EncryptString(tokens.AccessToken, key, iv);
         var encryptedRefreshToken = AesCrypto.EncryptString(tokens.RefreshToken, key, iv);
 
         if (user is null) {
-            if (!IsRegistrationAllowed(discordUserId, out var errorCode)) {
-                var deniedRedirectUrl = $"{webOptions.Value.BaseUrl.TrimEnd('/')}/auth/callback?error={errorCode}";
-                return Redirect(deniedRedirectUrl);
-            }
-
             user = new Core.Entities.AppUser {
                 DiscordUserId = discordUserId,
                 Username = discordUser.Username,
