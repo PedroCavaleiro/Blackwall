@@ -88,7 +88,7 @@ cd Blackwall
 cp .env.example .env
 ```
 
-Edit `.env` and fill in the required values:
+Edit `.env` and fill in the required values. You can use the **[.env Generator](https://pedrocavaleiro.github.io/Blackwall/)** to interactively build your `.env` file with helpful descriptions and one-click key generation.
 
 **Infrastructure**
 
