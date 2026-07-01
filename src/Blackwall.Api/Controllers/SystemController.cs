@@ -1,6 +1,8 @@
 using Blackwall.Bot.Services;
 using Blackwall.Core.DTOs;
 using Blackwall.Infrastructure.Persistence;
+using Discord;
+using Discord.WebSocket;
 using Microsoft.AspNetCore.Mvc;
 using StackExchange.Redis;
 
@@ -12,7 +14,9 @@ public sealed class SystemController(
     BlackwallDbContext dbContext,
     IConnectionMultiplexer redis,
     SafeBrowsingService safeBrowsingService,
-    SafeBrowsingSyncService safeBrowsingSyncService
+    SafeBrowsingSyncService safeBrowsingSyncService,
+    DiscordSocketClient discordClient,
+    AccountScoringService accountScoringService
 ): ControllerBase {
 
     /// <summary>
@@ -81,6 +85,65 @@ public sealed class SystemController(
                 synced
             )
         });
+    }
+
+    /// <summary>
+    /// Tests the threat level of a Discord user by running the account scoring service.
+    /// </summary>
+    /// <remarks>
+    /// Pass a Discord user ID to evaluate the user's account metadata (account age, avatar,
+    /// username patterns). If a guild ID is provided, the user is looked up in that specific
+    /// guild; otherwise the bot searches all guilds it is a member of. The response includes
+    /// the numeric score, threat level, and the list of contributing risk factors.
+    /// </remarks>
+    /// <param name="userId">The Discord user ID to evaluate.</param>
+    /// <param name="guildId">Optional Discord guild ID to narrow the lookup.</param>
+    /// <response code="200">Returns the threat level assessment for the user.</response>
+    /// <response code="404">The user was not found in any guild the bot can see.</response>
+    [HttpGet("threat-level/test")]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(ThreatLevelTestResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> TestThreatLevel([FromQuery] ulong userId, [FromQuery] ulong? guildId) {
+        IGuildUser? guildUser = null;
+
+        if (guildId.HasValue) {
+            var guild = discordClient.GetGuild(guildId.Value);
+            guildUser = guild?.GetUser(userId);
+            if (guildUser is null)
+                guildUser = await discordClient.Rest.GetGuildUserAsync(guildId.Value, userId);
+        } else {
+            foreach (var guild in discordClient.Guilds) {
+                guildUser = guild.GetUser(userId);
+                if (guildUser is not null)
+                    break;
+            }
+
+            if (guildUser is null) {
+                foreach (var guild in discordClient.Guilds) {
+                    guildUser = await discordClient.Rest.GetGuildUserAsync(guild.Id, userId);
+                    if (guildUser is not null)
+                        break;
+                }
+            }
+        }
+
+        if (guildUser is null) {
+            return NotFound(new ProblemDetails {
+                Title = "User not found.",
+                Detail = "The specified user was not found in any guild the bot is a member of.",
+                Status = StatusCodes.Status404NotFound
+            });
+        }
+
+        var result = accountScoringService.ScoreUser(guildUser);
+
+        return Ok(new ThreatLevelTestResponse(
+            userId,
+            result.Score,
+            result.ThreatLevel.ToString(),
+            result.Factors
+        ));
     }
 
     /// <summary>

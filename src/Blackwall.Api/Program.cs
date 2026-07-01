@@ -78,7 +78,7 @@ builder.Services
     });
 
 builder.Services.AddSingleton<DiscordSocketClient>(_ => new DiscordSocketClient(new DiscordSocketConfig {
-    GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent
+    GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent | GatewayIntents.GuildMembers
 }));
 builder.Services.AddSingleton<GuildHandler>();
 builder.Services.AddSingleton<MessageHandler>();
