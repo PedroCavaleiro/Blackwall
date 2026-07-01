@@ -104,9 +104,10 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
             var url = match.Value;
 
             if (InviteLinkPattern.IsMatch(url))
-                continue;
+                return true;
 
-            var resolved = await ResolveRedirectAsync(url);
+            var redirectUrl = url.Contains("://") ? url : "https://" + url;
+            var resolved = await ResolveRedirectAsync(redirectUrl);
             if (resolved is not null && InviteLinkPattern.IsMatch(resolved))
                 return true;
         }
