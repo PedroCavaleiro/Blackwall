@@ -45,6 +45,11 @@
                 // ERROR: @_error
             </div>
         }
+        @if (string.IsNullOrWhiteSpace(Form.LogChannelId)) {
+            <div class="font-mono mb-4" style="font-size:0.8rem;padding:0.75rem 1.25rem;border:1px solid #b8860b;border-radius:0.25rem;background:rgba(184,134,11,0.12);color:#e6b800">
+                // WARNING: No audit log channel set. Infractions, raids, and account scoring alerts will not be visible to moderators. Configure one in the AUDIT tab.
+            </div>
+        }
 
         <EditForm Model="Form" OnValidSubmit="SaveAsync">
             <DataAnnotationsValidator />
@@ -54,6 +59,7 @@
                 <button type="button" class="bw-tab-btn @(_activeTab == "detection" ? "active" : "")" @onclick='() => _activeTab = "detection"'>DETECTION</button>
                 <button type="button" class="bw-tab-btn @(_activeTab == "links"     ? "active" : "")" @onclick='() => _activeTab = "links"'>LINKS</button>
                 <button type="button" class="bw-tab-btn @(_activeTab == "antiraid"  ? "active" : "")" @onclick='() => _activeTab = "antiraid"'>ANTI-RAID</button>
+                <button type="button" class="bw-tab-btn @(_activeTab == "scoring"   ? "active" : "")" @onclick='() => _activeTab = "scoring"'>SCORING</button>
                 <button type="button" class="bw-tab-btn @(_activeTab == "audit"     ? "active" : "")" @onclick='() => _activeTab = "audit"'>AUDIT</button>
             </div>
 
@@ -547,12 +553,62 @@
                             </div>
                             <InputNumber class="form-control" style="max-width:140px" min="5" max="300" @bind-Value="Form.AntiRaidWindowSeconds" disabled="@(!Form.IsAntiRaidEnabled)" />
                         </div>
-                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                        <div class="bw-field">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Cooldown (minutes)</div>
                                 <div class="form-text">How long invites remain paused before the lockdown lifts automatically.</div>
                             </div>
                             <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.AntiRaidCooldownMinutes" disabled="@(!Form.IsAntiRaidEnabled)" />
+                        </div>
+                    </div>
+                </div>
+
+            }
+
+            @if (_activeTab == "scoring") {
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">ACCOUNT SCORING</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                            Assigns a hidden threat score to users on join based on account age, profile picture, and username patterns. Medium and high risk accounts trigger a mod alert and can optionally be timed out automatically. Works independently of anti-raid.
+                        </p>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Enable account scoring</div>
+                                <div class="form-text">Evaluate joining users' account metadata and alert moderators for suspicious accounts.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="isAccountScoringEnabled" @bind-Value="Form.IsAccountScoringEnabled" style="width:2.5em;height:1.3em" />
+                            </div>
+                        </div>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Auto-timeout medium risk</div>
+                                <div class="form-text">Automatically timeout medium-risk accounts on join. If disabled, mods are alerted only.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="autoTimeoutMediumRisk" @bind-Value="Form.AutoTimeoutMediumRiskOnJoin" style="width:2.5em;height:1.3em" disabled="@(!Form.IsAccountScoringEnabled)" />
+                            </div>
+                        </div>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Auto-timeout high risk</div>
+                                <div class="form-text">Automatically timeout high-risk accounts on join. If disabled, mods are alerted only.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="autoTimeoutHighRisk" @bind-Value="Form.AutoTimeoutHighRiskOnJoin" style="width:2.5em;height:1.3em" disabled="@(!Form.IsAccountScoringEnabled)" />
+                            </div>
+                        </div>
+
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Timeout duration (minutes)</div>
+                                <div class="form-text">How long the user is timed out when auto-timeout is triggered. Minimum: 1 minute.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.AccountScoringTimeoutMinutes" disabled="@(!Form.IsAccountScoringEnabled)" />
                         </div>
                     </div>
                 </div>
@@ -681,6 +737,10 @@
                 Form.AntiRaidJoinThreshold = s.AntiRaidJoinThreshold;
                 Form.AntiRaidWindowSeconds = s.AntiRaidWindowSeconds;
                 Form.AntiRaidCooldownMinutes = s.AntiRaidCooldownMinutes;
+                Form.IsAccountScoringEnabled = s.IsAccountScoringEnabled;
+                Form.AutoTimeoutMediumRiskOnJoin = s.AutoTimeoutMediumRiskOnJoin;
+                Form.AutoTimeoutHighRiskOnJoin = s.AutoTimeoutHighRiskOnJoin;
+                Form.AccountScoringTimeoutMinutes = s.AccountScoringTimeoutMinutes;
                 Form.AutoLockdownEnabled = s.AutoLockdownEnabled;
                 Form.RateLimitActionStr = s.RateLimitAction?.ToString() ?? "";
                 Form.RateLimitAutoLockdownStr = s.RateLimitAutoLockdown?.ToString().ToLowerInvariant() ?? "";
@@ -740,6 +800,10 @@
                 Form.AntiRaidJoinThreshold,
                 Form.AntiRaidWindowSeconds,
                 Form.AntiRaidCooldownMinutes,
+                Form.IsAccountScoringEnabled,
+                Form.AutoTimeoutMediumRiskOnJoin,
+                Form.AutoTimeoutHighRiskOnJoin,
+                Form.AccountScoringTimeoutMinutes,
                 _isLockedDown,
                 Form.AutoLockdownEnabled,
                 ParseAction(Form.RateLimitActionStr),
@@ -828,6 +892,10 @@
         public int AntiRaidJoinThreshold { get; set; } = 10;
         public int AntiRaidWindowSeconds { get; set; } = 30;
         public int AntiRaidCooldownMinutes { get; set; } = 30;
+        public bool IsAccountScoringEnabled { get; set; }
+        public bool AutoTimeoutMediumRiskOnJoin { get; set; }
+        public bool AutoTimeoutHighRiskOnJoin { get; set; }
+        public int AccountScoringTimeoutMinutes { get; set; } = 10;
         public bool AutoLockdownEnabled { get; set; }
         public string RateLimitActionStr { get; set; } = "";
         public string RateLimitAutoLockdownStr { get; set; } = "";

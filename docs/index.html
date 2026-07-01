@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blackwall &mdash; .env Generator</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface-hover: #1c2128;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-hover: #79c0ff;
+    --success: #3fb950;
+    --warning: #d29922;
+    --danger: #f85149;
+    --required: #f85149;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+  }
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 1.5rem 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  header h1 { font-size: 1.4rem; font-weight: 600; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--text-muted); font-size: 0.875rem; margin-top: 0.25rem; }
+  .container {
+    display: grid;
+    grid-template-columns: 1fr 420px;
+    gap: 0;
+    max-width: 1600px;
+    margin: 0 auto;
+    min-height: calc(100vh - 80px);
+  }
+  .form-panel {
+    padding: 2rem;
+    overflow-y: auto;
+  }
+  .preview-panel {
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    padding: 1.5rem;
+    position: sticky;
+    top: 80px;
+    height: calc(100vh - 80px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 0.875rem 1.25rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .section-header:hover { background: var(--surface-hover); }
+  .section-header h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .section-header .icon { font-size: 1.1rem; }
+  .section-header .chevron {
+    color: var(--text-muted);
+    transition: transform 0.2s;
+    font-size: 0.75rem;
+  }
+  .section.collapsed .chevron { transform: rotate(-90deg); }
+  .section-body {
+    padding: 0.5rem 1.25rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .section.collapsed .section-body { display: none; }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+  .field-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .field-label code {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.8rem;
+    background: var(--bg);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    color: var(--accent);
+  }
+  .required-badge {
+    font-size: 0.65rem;
+    color: var(--required);
+    border: 1px solid var(--required);
+    padding: 0.05rem 0.35rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .optional-badge {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    border: 1px solid var(--text-muted);
+    padding: 0.05rem 0.35rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .field-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  .field-help {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.6rem 0.75rem;
+  }
+  .field-help a { color: var(--accent); text-decoration: none; }
+  .field-help a:hover { text-decoration: underline; }
+  .field-help code {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.75rem;
+    background: var(--surface);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+  }
+  .field-input {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .field-input input[type="text"],
+  .field-input input[type="password"],
+  .field-input input[type="number"] {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    transition: border-color 0.15s;
+  }
+  .field-input input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .field-input input::placeholder { color: var(--text-muted); opacity: 0.6; }
+  .toggle {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--border);
+    border-radius: 22px;
+    transition: 0.2s;
+  }
+  .toggle-slider:before {
+    content: "";
+    position: absolute;
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background: var(--text);
+    border-radius: 50%;
+    transition: 0.2s;
+  }
+  .toggle input:checked + .toggle-slider { background: var(--success); }
+  .toggle input:checked + .toggle-slider:before { transform: translateX(18px); }
+  .btn-reset {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: all 0.15s;
+  }
+  .btn-reset:hover { border-color: var(--text-muted); color: var(--text); }
+  .preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .preview-header h3 { font-size: 0.9rem; font-weight: 600; }
+  .preview-actions { display: flex; gap: 0.5rem; }
+  .btn {
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .btn:hover { background: var(--surface-hover); border-color: var(--text-muted); }
+  .btn-primary {
+    background: var(--accent);
+    color: #0d1117;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .preview-content {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.78rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-y: auto;
+    line-height: 1.5;
+    color: var(--text);
+  }
+  .preview-content .env-key { color: var(--accent); }
+  .preview-content .env-comment { color: var(--text-muted); font-style: italic; }
+  .preview-content .env-empty { color: var(--danger); }
+  .copy-toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--success);
+    color: #0d1117;
+    padding: 0.6rem 1.25rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 200;
+  }
+  .copy-toast.show { opacity: 1; }
+  .gen-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.7rem;
+    transition: all 0.15s;
+  }
+  .gen-btn:hover { border-color: var(--accent); color: var(--accent); }
+  @media (max-width: 900px) {
+    .container { grid-template-columns: 1fr; }
+    .preview-panel { position: relative; top: 0; height: auto; border-left: none; border-top: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Blackwall <span>.env</span> Generator</h1>
+  <p>Fill in the fields below, then copy or download your <code>.env</code> file. Hover descriptions explain what each field does and how to obtain its value.</p>
+</header>
+
+<div class="container">
+  <div class="form-panel" id="formPanel"></div>
+  <div class="preview-panel">
+    <div class="preview-header">
+      <h3>Preview</h3>
+      <div class="preview-actions">
+        <button class="btn" onclick="copyEnv()">&#128203; Copy</button>
+        <button class="btn btn-primary" onclick="downloadEnv()">&#11015; Download .env</button>
+      </div>
+    </div>
+    <div class="preview-content" id="preview"></div>
+  </div>
+</div>
+
+<div class="copy-toast" id="toast">Copied to clipboard!</div>
+
+<script>
+const sections = [
+  {
+    title: "Infrastructure",
+    icon: "&#128229;",
+    fields: [
+      {
+        key: "POSTGRES__CONNECTION_STRING",
+        label: "POSTGRES__CONNECTION_STRING",
+        required: true,
+        type: "text",
+        placeholder: "Host=localhost;Port=5432;Database=blackwall;Username=blackwall;Password=yourpassword",
+        desc: "PostgreSQL connection string used by EF Core.",
+        help: "Format: <code>Host=...;Port=5432;Database=blackwall;Username=...;Password=...</code>. If using the Docker Compose setup, a Postgres container is provisioned automatically &mdash; just set the password. If self-hosting, install PostgreSQL 17+ and create a database named <code>blackwall</code>."
+      },
+      {
+        key: "REDIS__CONNECTION_STRING",
+        label: "REDIS__CONNECTION_STRING",
+        required: true,
+        type: "text",
+        placeholder: "localhost:6379",
+        desc: "Redis connection string for caching.",
+        help: "Format: <code>host:port</code> (e.g. <code>localhost:6379</code>). If using Docker Compose, Redis is provisioned automatically. For self-hosting, install Redis 7+."
+      }
+    ]
+  },
+  {
+    title: "Discord OAuth & Bot",
+    icon: "&#129302;",
+    fields: [
+      {
+        key: "DISCORD__BOT_TOKEN",
+        label: "DISCORD__BOT_TOKEN",
+        required: true,
+        type: "password",
+        placeholder: "MTIzNDU2Nzg5MDEyMzQ1Njc4OQ.GAbCdE...",
+        desc: "Discord bot token used to connect to the gateway.",
+        help: "Go to the <a href='https://discord.com/developers/applications' target='_blank'>Discord Developer Portal</a> &rarr; your application &rarr; <strong>Bot</strong> &rarr; click <strong>Reset Token</strong> to generate. Keep this secret."
+      },
+      {
+        key: "DISCORD__CLIENT_ID",
+        label: "DISCORD__CLIENT_ID",
+        required: true,
+        type: "text",
+        placeholder: "1234567890123456789",
+        desc: "Discord OAuth2 client ID (your application ID).",
+        help: "Found on the <strong>General Information</strong> page of your application in the <a href='https://discord.com/developers/applications' target='_blank'>Discord Developer Portal</a>."
+      },
+      {
+        key: "DISCORD__CLIENT_SECRET",
+        label: "DISCORD__CLIENT_SECRET",
+        required: true,
+        type: "password",
+        placeholder: "abcdef1234567890abcdef1234567890",
+        desc: "Discord OAuth2 client secret.",
+        help: "Found on the <strong>General Information</strong> page &rarr; <strong>Client Secret</strong> &rarr; click <strong>Reset Secret</strong>. Keep this secret."
+      },
+      {
+        key: "DISCORD__REDIRECT_URI",
+        label: "DISCORD__REDIRECT_URI",
+        required: true,
+        type: "text",
+        placeholder: "https://your-domain.tld/api/auth/discord/callback",
+        desc: "OAuth2 callback URL for Discord login redirects.",
+        help: "Must match the redirect URI configured in your Discord application under <strong>OAuth2 &rarr; Redirects</strong>. The path is <code>/api/auth/discord/callback</code> on your API base URL."
+      },
+      {
+        key: "DISCORD__BOT_PERMISSIONS",
+        label: "DISCORD__BOT_PERMISSIONS",
+        required: false,
+        type: "text",
+        default: "10308992462014",
+        desc: "Bot permission integer for the invite URL.",
+        help: "Default <code>10308992462014</code> grants the full permission set (Admin, Manage Server, Kick, Ban, Moderate, Send Messages, etc.). Minimal set is <code>1374389610518</code> (Manage Channels, Kick, Ban, Moderate, Send Messages, Read History). You can compute a custom value with the <a href='https://discordapi.com/permissions.html' target='_blank'>Discord Permission Calculator</a>."
+      },
+      {
+        key: "DISCORD__BOT_SCOPES",
+        label: "DISCORD__BOT_SCOPES",
+        required: false,
+        type: "text",
+        default: "bot applications.commands",
+        desc: "Scopes for the bot invite URL.",
+        help: "Default <code>bot applications.commands</code> &mdash; allows the bot to join servers and register slash commands."
+      },
+      {
+        key: "DISCORD__LOGIN_SCOPES",
+        label: "DISCORD__LOGIN_SCOPES",
+        required: false,
+        type: "text",
+        default: "identify guilds",
+        desc: "Scopes for the OAuth2 user login flow.",
+        help: "Default <code>identify guilds</code> &mdash; allows reading the user's profile and guild list."
+      }
+    ]
+  },
+  {
+    title: "Google Safe Browsing",
+    icon: "&#128737;",
+    fields: [
+      {
+        key: "SAFE_BROWSING__ENABLED",
+        label: "SAFE_BROWSING__ENABLED",
+        required: false,
+        type: "bool",
+        default: false,
+        desc: "Enable Google Safe Browsing for suspicious link filtering.",
+        help: "When <code>false</code>, the Safe Browsing card is hidden in the dashboard and all checks are skipped. The code default is <code>true</code> if unset, but the .env.example sets it to <code>false</code>."
+      },
+      {
+        key: "SAFE_BROWSING__API_KEY",
+        label: "SAFE_BROWSING__API_KEY",
+        required: false,
+        type: "password",
+        placeholder: "AIzaSy...",
+        desc: "Google Safe Browsing API key. Required if enabled.",
+        help: "Get one from the <a href='https://console.cloud.google.com/' target='_blank'>Google Cloud Console</a>: enable the <strong>Safe Browsing API</strong>, then create an API key under <strong>APIs &amp; Services &rarr; Credentials</strong>."
+      },
+      {
+        key: "SAFE_BROWSING__BASE_URL",
+        label: "SAFE_BROWSING__BASE_URL",
+        required: false,
+        type: "text",
+        default: "https://safebrowsing.googleapis.com/v5",
+        desc: "Safe Browsing API base URL.",
+        help: "Default <code>https://safebrowsing.googleapis.com/v5</code>. Only change if you're using a proxy or alternative endpoint."
+      }
+    ]
+  },
+  {
+    title: "JWT Authentication",
+    icon: "&#128273;",
+    fields: [
+      {
+        key: "JWT__ISSUER",
+        label: "JWT__ISSUER",
+        required: false,
+        type: "text",
+        default: "Api",
+        desc: "Token issuer claim. Must match between API and Web.",
+        help: "Default <code>Api</code>. Both <code>JWT__ISSUER</code> and <code>JWT__AUDIENCE</code> must be identical in the API and Web .env files."
+      },
+      {
+        key: "JWT__AUDIENCE",
+        label: "JWT__AUDIENCE",
+        required: false,
+        type: "text",
+        default: "Web",
+        desc: "Token audience claim. Must match between API and Web.",
+        help: "Default <code>Web</code>. Must match in both projects."
+      },
+      {
+        key: "JWT__SECRET",
+        label: "JWT__SECRET",
+        required: true,
+        type: "password",
+        placeholder: "your-super-secret-key-min-32-chars",
+        desc: "Symmetric key for signing JWTs (minimum 32 characters).",
+        help: "Generate a strong random string. <button class='gen-btn' onclick='genSecret(this)'>Generate</button> Must be the same in both API and Web .env files."
+      }
+    ]
+  },
+  {
+    title: "Application",
+    icon: "&#9881;&#65039;",
+    fields: [
+      {
+        key: "APP__ENC_KEY",
+        label: "APP__ENC_KEY",
+        required: true,
+        type: "text",
+        placeholder: "32-byte hex or base64 key",
+        desc: "AES-256 encryption key for stored Discord tokens.",
+        help: "Used to encrypt OAuth tokens at rest. Generate a 32-byte key. <button class='gen-btn' onclick='genAesKey(this, 32)'>Generate</button>"
+      },
+      {
+        key: "APP__ENC_IV",
+        label: "APP__ENC_IV",
+        required: true,
+        type: "text",
+        placeholder: "16-byte hex or base64 IV",
+        desc: "AES initialization vector for token encryption.",
+        help: "Generate a 16-byte IV. <button class='gen-btn' onclick='genAesKey(this, 16)'>Generate</button>"
+      },
+      {
+        key: "APP__DISABLE_NEW_USERS",
+        label: "APP__DISABLE_NEW_USERS",
+        required: false,
+        type: "bool",
+        default: false,
+        desc: "When true, only the instance owner can register new accounts.",
+        help: "Existing users can still log in. If <code>APP__INSTANCE_OWNER</code> is not set, no new users can register at all."
+      },
+      {
+        key: "APP__PRIVATE_INSTANCE",
+        label: "APP__PRIVATE_INSTANCE",
+        required: false,
+        type: "bool",
+        default: false,
+        desc: "When true (and DISABLE_NEW_USERS is false), only allowed users and the owner can register.",
+        help: "Allowed users are configured via the <code>AllowedUsers</code> array in <code>appsettings.json</code>."
+      },
+      {
+        key: "APP__INSTANCE_OWNER",
+        label: "APP__INSTANCE_OWNER",
+        required: false,
+        type: "text",
+        placeholder: "123456789012345678",
+        desc: "Discord user ID of the instance owner.",
+        help: "The owner is always allowed to register. To find your Discord user ID, enable Developer Mode in Discord settings, right-click your profile, and select <strong>Copy User ID</strong>."
+      }
+    ]
+  },
+  {
+    title: "API",
+    icon: "&#128187;",
+    fields: [
+      {
+        key: "API__BASE_URL",
+        label: "API__BASE_URL",
+        required: false,
+        type: "text",
+        default: "https://localhost:7001",
+        desc: "Base URL of the API. Used by the Web project to call the API.",
+        help: "Default <code>https://localhost:7001</code>. Not recommended to change. For production, set to your public API URL."
+      },
+      {
+        key: "API__PORT",
+        label: "API__PORT",
+        required: false,
+        type: "number",
+        default: "7001",
+        desc: "Port the API listens on.",
+        help: "Default <code>7001</code>."
+      }
+    ]
+  },
+  {
+    title: "Web Dashboard",
+    icon: "&#127760;",
+    fields: [
+      {
+        key: "WEB__BASEURL",
+        label: "WEB__BASEURL",
+        required: false,
+        type: "text",
+        default: "https://localhost:7002",
+        desc: "Public-facing URL of the Web dashboard.",
+        help: "Used for redirects after OAuth login. For production, set to your public Web URL (e.g. <code>https://blackwall.example.com</code>)."
+      },
+      {
+        key: "WEB__PORT",
+        label: "WEB__PORT",
+        required: false,
+        type: "number",
+        default: "7002",
+        desc: "Port the Web dashboard listens on.",
+        help: "Default <code>7002</code>."
+      }
+    ]
+  },
+  {
+    title: "Guild Sync",
+    icon: "&#128260;",
+    fields: [
+      {
+        key: "GUILD_SYNC__ENABLED",
+        label: "GUILD_SYNC__ENABLED",
+        required: false,
+        type: "bool",
+        default: true,
+        desc: "Enable the guild permission sync background service.",
+        help: "When enabled, the bot periodically synchronises guild manager permissions from Discord."
+      },
+      {
+        key: "GUILD_SYNC__INTERVAL_MINUTES",
+        label: "GUILD_SYNC__INTERVAL_MINUTES",
+        required: false,
+        type: "number",
+        default: "15",
+        desc: "Sync interval in minutes.",
+        help: "Default <code>15</code>. Lower values mean more frequent Discord API calls."
+      }
+    ]
+  },
+  {
+    title: "Miscellaneous",
+    icon: "&#128221;",
+    fields: [
+      {
+        key: "ENABLE_DOCS",
+        label: "ENABLE_DOCS",
+        required: false,
+        type: "bool",
+        default: false,
+        desc: "Enable OpenAPI spec and Scalar UI on the API.",
+        help: "When <code>true</code>, the API exposes <code>/openapi/v1.json</code> and <code>/scalar/v1</code> for interactive API documentation."
+      }
+    ]
+  }
+];
+
+const values = {};
+
+function initValues() {
+  sections.forEach(s => s.fields.forEach(f => {
+    values[f.key] = f.default !== undefined ? f.default : "";
+  }));
+}
+
+function renderForm() {
+  const panel = document.getElementById("formPanel");
+  panel.innerHTML = "";
+  sections.forEach((s, si) => {
+    const sec = document.createElement("div");
+    sec.className = "section" + (si > 2 ? " collapsed" : "");
+    sec.innerHTML = `
+      <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+        <h2><span class="icon">${s.icon}</span> ${s.title}</h2>
+        <span class="chevron">&#9660;</span>
+      </div>
+      <div class="section-body"></div>
+    `;
+    const body = sec.querySelector(".section-body");
+    s.fields.forEach(f => {
+      const field = document.createElement("div");
+      field.className = "field";
+      const badge = f.required
+        ? '<span class="required-badge">Required</span>'
+        : '<span class="optional-badge">Optional</span>';
+      let inputHtml;
+      if (f.type === "bool") {
+        inputHtml = `
+          <div class="field-input">
+            <label class="toggle">
+              <input type="checkbox" data-key="${f.key}" ${values[f.key] ? "checked" : ""} onchange="onBoolChange(this)">
+              <span class="toggle-slider"></span>
+            </label>
+            <span style="font-size:0.8rem;color:var(--text-muted)">${values[f.key] ? "true" : "false"}</span>
+          </div>
+        `;
+      } else {
+        inputHtml = `
+          <div class="field-input">
+            <input type="${f.type}" data-key="${f.key}" value="${escapeHtml(values[f.key])}" placeholder="${escapeHtml(f.placeholder || '')}" oninput="onInputChange(this)">
+            ${f.default !== undefined ? `<button class="btn-reset" onclick="resetField('${f.key}', this)">Reset</button>` : ''}
+          </div>
+        `;
+      }
+      field.innerHTML = `
+        <div class="field-label">
+          <code>${f.label}</code>
+          ${badge}
+        </div>
+        <div class="field-desc">${f.desc}</div>
+        <div class="field-help">${f.help}</div>
+        ${inputHtml}
+      `;
+      body.appendChild(field);
+    });
+    panel.appendChild(sec);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function onInputChange(el) {
+  values[el.dataset.key] = el.value;
+  updatePreview();
+}
+
+function onBoolChange(el) {
+  values[el.dataset.key] = el.checked;
+  const span = el.parentElement.nextElementSibling;
+  if (span) span.textContent = el.checked ? "true" : "false";
+  updatePreview();
+}
+
+function resetField(key, btn) {
+  const field = sections.flatMap(s => s.fields).find(f => f.key === key);
+  if (field && field.default !== undefined) {
+    values[key] = field.default;
+    const input = btn.parentElement.querySelector("input");
+    if (input) input.value = field.default;
+    updatePreview();
+  }
+}
+
+function genSecret(btn) {
+  const arr = new Uint8Array(48);
+  crypto.getRandomValues(arr);
+  const secret = btoa(String.fromCharCode(...arr)).replace(/=/g, "");
+  const input = btn.parentElement.parentElement.querySelector("input");
+  input.value = secret;
+  values["JWT__SECRET"] = secret;
+  updatePreview();
+}
+
+function genAesKey(btn, bytes) {
+  const arr = new Uint8Array(bytes);
+  crypto.getRandomValues(arr);
+  const hex = Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
+  const input = btn.parentElement.parentElement.parentElement.querySelector("input");
+  input.value = hex;
+  values[input.dataset.key] = hex;
+  updatePreview();
+}
+
+function updatePreview() {
+  const preview = document.getElementById("preview");
+  let html = "";
+  sections.forEach((s, si) => {
+    html += `<span class="env-comment"># ${s.title}</span>\n`;
+    s.fields.forEach(f => {
+      const val = values[f.key];
+      const isBool = f.type === "bool";
+      const displayVal = isBool ? (val ? "true" : "false") : (val || "");
+      if (displayVal === "") {
+        html += `<span class="env-key">${f.key}</span>=<span class="env-empty"></span>\n`;
+      } else {
+        html += `<span class="env-key">${f.key}</span>=${escapeHtml(displayVal)}\n`;
+      }
+    });
+    if (si < sections.length - 1) html += "\n";
+  });
+  preview.innerHTML = html;
+}
+
+function getEnvText() {
+  let text = "";
+  sections.forEach((s, si) => {
+    text += `# ${s.title}\n`;
+    s.fields.forEach(f => {
+      const val = values[f.key];
+      const isBool = f.type === "bool";
+      const displayVal = isBool ? (val ? "true" : "false") : (val || "");
+      text += `${f.key}=${displayVal}\n`;
+    });
+    if (si < sections.length - 1) text += "\n";
+  });
+  return text;
+}
+
+function copyEnv() {
+  navigator.clipboard.writeText(getEnvText()).then(() => {
+    showToast("Copied to clipboard!");
+  });
+}
+
+function downloadEnv() {
+  const blob = new Blob([getEnvText()], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = ".env";
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(".env downloaded!");
+}
+
+function showToast(msg) {
+  const toast = document.getElementById("toast");
+  toast.textContent = msg;
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), 2000);
+}
+
+initValues();
+renderForm();
+updatePreview();
+</script>
+
+</body>
+</html>
