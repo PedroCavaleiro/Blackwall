@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Api", "src\Blackwall.Api\Blackwall.Api.csproj", "{F97C4577-96B4-423F-B665-5A0F592066EE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Bot", "src\Blackwall.Bot\Blackwall.Bot.csproj", "{8A4B43BD-1AA5-47A1-998F-00AD99FF119C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Core", "src\Blackwall.Core\Blackwall.Core.csproj", "{8AE09C9B-EAA8-4FAB-9A3F-857FD20F93AE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Infrastructure", "src\Blackwall.Infrastructure\Blackwall.Infrastructure.csproj", "{F24609F9-667D-4B8B-9FAB-CA3FCB1B7AE9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Web", "src\Blackwall.Web\Blackwall.Web.csproj", "{80B8BDBE-727E-4D26-AC06-CA553DD80997}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F97C4577-96B4-423F-B665-5A0F592066EE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F97C4577-96B4-423F-B665-5A0F592066EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F97C4577-96B4-423F-B665-5A0F592066EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F97C4577-96B4-423F-B665-5A0F592066EE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8A4B43BD-1AA5-47A1-998F-00AD99FF119C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8A4B43BD-1AA5-47A1-998F-00AD99FF119C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8A4B43BD-1AA5-47A1-998F-00AD99FF119C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8A4B43BD-1AA5-47A1-998F-00AD99FF119C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8AE09C9B-EAA8-4FAB-9A3F-857FD20F93AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8AE09C9B-EAA8-4FAB-9A3F-857FD20F93AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8AE09C9B-EAA8-4FAB-9A3F-857FD20F93AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8AE09C9B-EAA8-4FAB-9A3F-857FD20F93AE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F24609F9-667D-4B8B-9FAB-CA3FCB1B7AE9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F24609F9-667D-4B8B-9FAB-CA3FCB1B7AE9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F24609F9-667D-4B8B-9FAB-CA3FCB1B7AE9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F24609F9-667D-4B8B-9FAB-CA3FCB1B7AE9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{80B8BDBE-727E-4D26-AC06-CA553DD80997}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{80B8BDBE-727E-4D26-AC06-CA553DD80997}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{80B8BDBE-727E-4D26-AC06-CA553DD80997}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{80B8BDBE-727E-4D26-AC06-CA553DD80997}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

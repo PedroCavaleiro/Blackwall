@@ -1,0 +1,103 @@
+@page "/"
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+
+<PageTitle>Blackwall — Discord Anti-Spam</PageTitle>
+
+<div class="d-flex flex-column" style="min-height:calc(100vh - 64px)">
+    <main class="flex-grow-1">
+
+        <!-- Hero -->
+        <section class="text-center" style="padding:5rem 1.5rem 4rem;position:relative;overflow:hidden">
+            <div style="position:absolute;top:1rem;left:50%;transform:translateX(-50%);width:520px;height:520px;border-radius:50%;background:var(--bw-primary);opacity:0.06;filter:blur(90px);pointer-events:none"></div>
+
+            <div class="d-inline-flex align-items-center gap-2 px-3 py-1 mb-4 font-mono"
+                 style="border:1px solid rgba(34,211,238,0.4);color:var(--bw-primary);font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;position:relative">
+                <span class="rounded-circle bw-pulse" style="width:6px;height:6px;background:var(--bw-primary);flex-shrink:0;display:inline-block"></span>
+                System online &middot; protecting Discord servers
+            </div>
+
+            <h1 class="font-display mb-3" style="font-size:clamp(2.2rem,5.5vw,4.2rem);line-height:1.1;position:relative">
+                Blocks rogue threats<br/>
+                <span class="neon-text">like the barrier</span> itself.
+            </h1>
+
+            <p class="mx-auto mb-5 font-mono" style="max-width:580px;color:var(--bw-muted);font-size:0.92rem;line-height:1.7;position:relative">
+                Blackwall is an autonomous countermeasure for Discord — spam scoring,
+                raid detection, and automated enforcement when something nasty tries to breach your server.
+            </p>
+
+            @if (_error == "new_users_disabled") {
+                <div class="alert alert-warning d-inline-block mb-4 font-mono" style="font-size:0.8rem">
+                    // ACCESS DENIED: New user registration is currently disabled.
+                </div>
+            } else if (_error == "not_allowed") {
+                <div class="alert alert-warning d-inline-block mb-4 font-mono" style="font-size:0.8rem">
+                    // ACCESS DENIED: You are not authorized to join this instance.
+                </div>
+            } else if (!string.IsNullOrEmpty(_error)) {
+                <div class="alert alert-danger d-inline-block mb-4 font-mono" style="font-size:0.8rem">
+                    // AUTH ERROR: Authentication failed. Please try again.
+                </div>
+            }
+
+            <div style="position:relative">
+                <a href="/auth/login" class="btn btn-primary btn-lg cut-corner font-display" style="letter-spacing:0.12em;padding:0.75rem 2.5rem">
+                    DEPLOY BLACKWALL
+                </a>
+            </div>
+        </section>
+
+        <!-- Feature cards -->
+        <section style="padding:0 1.5rem 5rem;max-width:1000px;margin:0 auto">
+            <div class="row g-3">
+                @foreach (var f in Features) {
+                    <div class="col-md-4">
+                        <div class="cut-corner border h-100 p-4" style="background:var(--bs-card-bg);position:relative">
+                            <div style="position:absolute;top:0;left:0;width:3rem;height:1px;background:var(--bw-primary)"></div>
+                            <div class="mb-3" style="color:var(--bw-primary);font-size:1.4rem">@f.Icon</div>
+                            <h3 class="font-display mb-2" style="font-size:0.9rem;letter-spacing:0.08em">@f.Title</h3>
+                            <p class="font-mono mb-0" style="font-size:0.78rem;color:var(--bw-muted);line-height:1.6">@f.Desc</p>
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+    </main>
+
+    <footer style="border-top:1px solid rgba(34,211,238,0.12);padding:1.5rem">
+        <div class="bw-container d-flex align-items-center justify-content-between">
+            <span class="font-mono" style="font-size:0.68rem;color:var(--bw-muted)">
+                BLACKWALL.SYS // v1.0.0
+            </span>
+            <div class="d-flex align-items-center gap-3">
+                <a lass="font-mono" href="https://github.com/PedroCavaleiro/Blackwall" target="_blank" class="font-mono text-decoration-none" style="font-size:0.68rem;color:var(--bw-muted)">GitHub</a>
+                <a lass="font-mono" href="/terms-of-service" class="font-mono text-decoration-none" style="font-size:0.68rem;color:var(--bw-muted)">Terms</a>
+                <a lass="font-mono" href="/privacy-policy" class="font-mono text-decoration-none" style="font-size:0.68rem;color:var(--bw-muted)">Privacy</a>
+                <span class="font-mono" style="font-size:0.68rem;color:var(--bw-muted)">NOT AFFILIATED WITH DISCORD INC.</span>
+            </div>
+        </div>
+    </footer>
+</div>
+
+@code {
+    private string? _error;
+
+    private static readonly (string Icon, string Title, string Desc)[] Features = [
+        ("⚡", "Quickhack Defense", "Automatic message scoring on every guild event. Spam vectors neutralized before they spread."),
+        ("👁", "Total Netrunner Visibility", "Per-server dashboards and tunable thresholds. You control what trips the barrier."),
+        ("🛡", "Hard-Coded Safeguards", "Smart defaults with zero tolerance for false positives on legitimate users."),
+    ];
+
+    protected override async Task OnInitializedAsync() {
+        var query = Nav.ToAbsoluteUri(Nav.Uri).Query;
+        if (query.Contains("error=")) {
+            var match = System.Text.RegularExpressions.Regex.Match(query, @"[?&]error=([^&]*)");
+            _error = match.Success ? Uri.UnescapeDataString(match.Groups[1].Value) : "auth_failed";
+        }
+
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+            Nav.NavigateTo("/dashboard", replace: true);
+    }
+}

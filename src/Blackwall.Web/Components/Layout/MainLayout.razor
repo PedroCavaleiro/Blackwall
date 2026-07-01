@@ -1,0 +1,32 @@
+@inherits LayoutComponentBase
+
+<div class="d-flex flex-column min-vh-100">
+    <header class="bw-header">
+        <div class="bw-container d-flex align-items-center justify-content-between">
+            <a href="/" class="text-decoration-none d-flex align-items-center gap-2">
+                <span class="font-display neon-text" style="font-size:1.05rem;letter-spacing:0.18em">BLACKWALL</span>
+            </a>
+            <AuthorizeView>
+                <Authorized>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="font-mono" style="font-size:0.68rem;letter-spacing:0.1em;color:var(--bw-muted)">
+                            @context.User.Identity?.Name?.ToUpperInvariant()
+                        </span>
+                        <a href="/auth/logout" class="btn btn-outline-secondary btn-sm font-display" style="font-size:0.62rem;padding:0.25rem 0.75rem">
+                            DISCONNECT
+                        </a>
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/auth/login" class="btn btn-primary btn-sm cut-corner font-display" style="font-size:0.62rem;padding:0.25rem 0.9rem">
+                        JACK IN
+                    </a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </header>
+
+    <main class="flex-grow-1">
+        @Body
+    </main>
+</div>

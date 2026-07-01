@@ -1,0 +1,1002 @@
+@page "/guild/{DiscordGuildId:long}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Blackwall.Core.Entities
+@using Blackwall.Core.Configuration
+@using Microsoft.Extensions.Options
+@inject BlackwallApiService Api
+@inject NavigationManager Nav
+@inject IOptions<SafeBrowsingOptions> SafeBrowsingOptions
+
+<PageTitle>@(_settings?.Name ?? "Config") — Blackwall</PageTitle>
+
+<div style="max-width:760px;margin:0 auto;padding:2.5rem 1.5rem">
+    @if (_loading) {
+        <div class="font-mono" style="color:var(--bw-muted);font-size:0.85rem">&gt; Loading configuration...</div>
+    } else if (_settings is null) {
+        <div class="font-mono mb-4" style="color:var(--bw-danger);font-size:0.85rem">&gt; SIGNAL LOST: Guild not found or access denied.</div>
+        <a href="/dashboard" class="btn btn-primary cut-corner font-display" style="font-size:0.72rem">RETURN TO GRID</a>
+    } else {
+        <a href="/dashboard" class="d-inline-flex align-items-center gap-2 mb-4 font-mono text-decoration-none"
+           style="font-size:0.68rem;letter-spacing:0.12em;color:var(--bw-muted)">
+            &#8592; BACK TO GRID
+        </a>
+
+        <div class="d-flex align-items-center gap-3 mb-5">
+            <GuildAvatar Name="@_settings.Name" Icon="@_settings.IconHash" GuildId="@_settings.DiscordGuildId" />
+            <div>
+                <div class="font-mono mb-1" style="font-size:0.65rem;letter-spacing:0.15em;color:var(--bw-primary)">
+                    // GUILD CONFIG &middot; @_settings.DiscordGuildId
+                </div>
+                <h1 class="font-display mb-0" style="font-size:1.8rem;letter-spacing:0.04em">@_settings.Name.ToUpperInvariant()</h1>
+                <div class="font-mono mt-1" style="font-size:0.68rem;color:var(--bw-muted)">
+                    @(_settings.IsActive ? "BARRIER ACTIVE" : "BARRIER OFFLINE")
+                </div>
+            </div>
+        </div>
+
+        @if (_saved) {
+            <div class="alert alert-success font-mono mb-4" style="font-size:0.8rem">
+                // CONFIGURATION UPLOADED SUCCESSFULLY
+            </div>
+        }
+        @if (_error is not null) {
+            <div class="alert alert-danger font-mono mb-4" style="font-size:0.8rem">
+                // ERROR: @_error
+            </div>
+        }
+        @if (string.IsNullOrWhiteSpace(Form.LogChannelId)) {
+            <div class="font-mono mb-4" style="font-size:0.8rem;padding:0.75rem 1.25rem;border:1px solid #b8860b;border-radius:0.25rem;background:rgba(184,134,11,0.12);color:#e6b800">
+                // WARNING: No audit log channel set. Infractions, raids, and account scoring alerts will not be visible to moderators. Configure one in the AUDIT tab.
+            </div>
+        }
+
+        <EditForm Model="Form" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+
+            <div class="bw-tabs">
+                <button type="button" class="bw-tab-btn @(_activeTab == "general"   ? "active" : "")" @onclick='() => _activeTab = "general"'>GENERAL</button>
+                <button type="button" class="bw-tab-btn @(_activeTab == "detection" ? "active" : "")" @onclick='() => _activeTab = "detection"'>DETECTION</button>
+                <button type="button" class="bw-tab-btn @(_activeTab == "links"     ? "active" : "")" @onclick='() => _activeTab = "links"'>LINKS</button>
+                <button type="button" class="bw-tab-btn @(_activeTab == "antiraid"  ? "active" : "")" @onclick='() => _activeTab = "antiraid"'>ANTI-RAID</button>
+                <button type="button" class="bw-tab-btn @(_activeTab == "scoring"   ? "active" : "")" @onclick='() => _activeTab = "scoring"'>SCORING</button>
+                <button type="button" class="bw-tab-btn @(_activeTab == "audit"     ? "active" : "")" @onclick='() => _activeTab = "audit"'>AUDIT</button>
+            </div>
+
+            @if (_activeTab == "general") {
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">BARRIER CONTROL</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Master controls for barrier activation and enforcement mode.</p>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Enable barrier</div>
+                                <div class="form-text">When off, the bot will not process any messages in this server.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="isEnabled" @bind-Value="Form.IsEnabled" style="width:2.5em;height:1.3em" />
+                            </div>
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Dry run</div>
+                                <div class="form-text">Detections are logged but no action is taken against the user.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="isDryRun" @bind-Value="Form.IsDryRun" style="width:2.5em;height:1.3em" />
+                            </div>
+                        </div>
+                        <div class="bw-field" style="@(Form.Action is InfractionAction.Kick or InfractionAction.Ban ? "" : "border-bottom:none;padding-bottom:0")">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Infraction action</div>
+                                <div class="form-text">What the bot does to an offending user when a violation is detected.</div>
+                            </div>
+                            <InputSelect class="form-select" style="max-width:200px" @bind-Value="Form.Action">
+                                <option value="@InfractionAction.DeleteOnly">Delete message only</option>
+                                <option value="@InfractionAction.Timeout">Timeout user</option>
+                                <option value="@InfractionAction.Kick">Kick user</option>
+                                <option value="@InfractionAction.Ban">Ban user</option>
+                            </InputSelect>
+                        </div>
+
+                        @if (Form.Action is InfractionAction.Kick or InfractionAction.Ban) {
+                            <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">Delete messages (days)</div>
+                                    <div class="form-text">Number of days of message history to purge when kicking or banning. Maximum is 7 days.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="0" max="7" @bind-Value="Form.MessageDeleteDays" />
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg);border-color:var(--bw-danger) !important">
+                    <div class="card-header" style="color:var(--bw-danger)">LOCKDOWN</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                            Instantly denies Send Messages, Send Messages in Threads, and Create Public Threads for @@everyone in every text channel and category via channel-specific permission overwrites. Higher-tier roles are unaffected. Use /lockdown or /unlock in Discord to toggle from chat.
+                        </p>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Auto-lockdown on infraction</div>
+                                <div class="form-text">When on, any detected infraction automatically triggers a full server lockdown. This is independent of the infraction action above — the user is still punished according to that setting.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="autoLockdown" @bind-Value="Form.AutoLockdownEnabled" style="width:2.5em;height:1.3em" />
+                            </div>
+                        </div>
+
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Lockdown status</div>
+                                <div class="form-text">
+                                    @if (_isLockedDown) {
+                                        <text><span style="color:var(--bw-danger);font-weight:600">LOCKDOWN ACTIVE</span> &mdash; @("@everyone") is denied Send Messages in all text channels.</text>
+                                    } else {
+                                        <text><span style="color:var(--bw-muted)">Inactive</span> &mdash; all channels are operating normally.</text>
+                                    }
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                @if (_isLockedDown) {
+                                    <button type="button" class="btn btn-outline-success cut-corner font-display"
+                                            style="font-size:0.72rem;letter-spacing:0.1em"
+                                            disabled="@_lockdownBusy"
+                                            @onclick="UnlockAsync">
+                                        @(_lockdownBusy ? "LIFTING..." : "LIFT LOCKDOWN")
+                                    </button>
+                                } else {
+                                    <button type="button" class="btn btn-outline-danger cut-corner font-display"
+                                            style="font-size:0.72rem;letter-spacing:0.1em"
+                                            disabled="@_lockdownBusy"
+                                            @onclick="LockdownAsync">
+                                        @(_lockdownBusy ? "LOCKING..." : "INITIATE LOCKDOWN")
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (_activeTab == "detection") {
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">DETECTION MATRIX</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Controls how the barrier detects and neutralizes spam, duplicate floods, and mass-mention attacks. Each filter runs independently and stacks with the infraction action set in General.</p>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Rate limit window (seconds)</div>
+                                <div class="form-text">Rolling time window in which messages from a single user are counted. The counter resets once the window expires with no new messages.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.RateLimitWindowSeconds" />
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Max messages per window</div>
+                                <div class="form-text">Maximum messages a user may send within the rate limit window. The next message after this limit triggers an infraction.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.MaxMessagesPerWindow" />
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Duplicate threshold</div>
+                                <div class="form-text">Number of identical messages a user must send within the duplicate window before the filter trips. Set to 0 to disable duplicate detection.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.DuplicateMessageThreshold" />
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Duplicate window (seconds)</div>
+                                <div class="form-text">How long identical message hashes are remembered per user. Shorter windows catch burst spam; longer windows catch slow repeated floods. Range: 1–300 s.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" min="1" max="300" @bind-Value="Form.DuplicateWindowSeconds" />
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Cross-channel duplicate detection</div>
+                                <div class="form-text">When on, identical messages posted in different channels by the same user count toward the duplicate threshold. When off, duplicates are tracked per channel, so the same message repeated across channels will not trigger.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="dupCrossChannel" @bind-Value="Form.DuplicateCrossChannelEnabled" style="width:2.5em;height:1.3em" />
+                            </div>
+                        </div>
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Mention limit</div>
+                                <div class="form-text">Maximum combined user, role, and @@everyone/@@here mentions allowed in a single message. Messages exceeding this are flagged as mass-ping spam.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" @bind-Value="Form.MentionLimit" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">MODULE OVERRIDES</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Override the global infraction action and auto-lockdown behavior for individual detection modules. Set to "Default" to inherit from the General tab.</p>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Rate limit &mdash; action</div>
+                                <div class="form-text">Action taken when a user exceeds the message rate limit.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.RateLimitActionStr">
+                                <option value="">Default</option>
+                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
+                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
+                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
+                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
+                            </select>
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Rate limit &mdash; auto-lockdown</div>
+                                <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.RateLimitAutoLockdownStr">
+                                <option value="">Default</option>
+                                <option value="true">Lockdown</option>
+                                <option value="false">No lockdown</option>
+                            </select>
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Duplicate &mdash; action</div>
+                                <div class="form-text">Action taken when a user sends duplicate messages.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.DuplicateActionStr">
+                                <option value="">Default</option>
+                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
+                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
+                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
+                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
+                            </select>
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Duplicate &mdash; auto-lockdown</div>
+                                <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.DuplicateAutoLockdownStr">
+                                <option value="">Default</option>
+                                <option value="true">Lockdown</option>
+                                <option value="false">No lockdown</option>
+                            </select>
+                        </div>
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Mention limit &mdash; action</div>
+                                <div class="form-text">Action taken when a user exceeds the mention limit.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.MentionLimitActionStr">
+                                <option value="">Default</option>
+                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
+                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
+                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
+                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
+                            </select>
+                        </div>
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Mention limit &mdash; auto-lockdown</div>
+                                <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.MentionLimitAutoLockdownStr">
+                                <option value="">Default</option>
+                                <option value="true">Lockdown</option>
+                                <option value="false">No lockdown</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (_activeTab == "links") {
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">LINK BLOCKING</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Configure which external vectors are neutralized automatically.</p>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Block Discord invite links</div>
+                                <div class="form-text">Deletes messages containing discord.gg invite URLs.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="blockInvites" @bind-Value="Form.BlockInviteLinks" style="width:2.5em;height:1.3em" />
+                            </div>
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Block external links</div>
+                                <div class="form-text">Checks message URLs against AdGuard blacklists and custom domains.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="blockSuspicious" @bind-Value="Form.BlockSuspiciousLinks" style="width:2.5em;height:1.3em" />
+                            </div>
+                        </div>
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Whitelist mode</div>
+                                <div class="form-text">When on, blacklists are ignored and only domains in the custom domain list below are allowed. Everything else is blocked.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="linkWhitelist" @bind-Value="Form.LinkWhitelistMode" style="width:2.5em;height:1.3em" disabled="@(!Form.BlockSuspiciousLinks)" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @if (SafeBrowsingOptions.Value.Enabled) {
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">GOOGLE SAFE BROWSING</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Real-Time threat check powered by a locally synchronized Global Cache from Google Safe Browsing. All URL checks are resolved locally against the synced cache &mdash; no URL data or hash prefixes are ever sent to Google.</p>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Enable Google Safe Browsing</div>
+                                <div class="form-text">Checks URLs that pass the blacklist/whitelist filter against Google's threat lists in real-time.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="safeBrowsing" @bind-Value="Form.SafeBrowsingEnabled" style="width:2.5em;height:1.3em" disabled="@(!Form.BlockSuspiciousLinks)" />
+                            </div>
+                        </div>
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Block level</div>
+                                <div class="form-text">Choose which Safe Browsing results to block. <strong>Unsafe only</strong> blocks confirmed threats. <strong>Unsafe and Unsure</strong> also blocks URLs where the result is uncertain.</div>
+                            </div>
+                            <select class="form-select" style="max-width:250px" @bind="Form.SafeBrowsingBlockUnsure" disabled="@(!Form.SafeBrowsingEnabled)">
+                                <option value="false">Unsafe only</option>
+                                <option value="true">Unsafe and Unsure</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                }
+
+                @if (!Form.LinkWhitelistMode) {
+                    <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                        <div class="card-header">BLACKLIST SOURCES</div>
+                        <div class="p-4">
+                            <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">AdGuard-format blacklist URLs. Domains from these lists are downloaded, merged, and cached in Redis. Refreshed daily.</p>
+
+                            @if (_blacklists.Any()) {
+                                <div class="mb-3">
+                                    @foreach (var bl in _blacklists) {
+                                        <div class="d-flex align-items-center justify-content-between border-bottom py-2">
+                                            <div class="font-mono text-break" style="font-size:0.75rem;color:var(--bw-muted)">@bl.Url</div>
+                                            <button type="button" class="btn btn-sm btn-outline-danger ms-2" style="font-size:0.7rem"
+                                                    disabled="@_blacklistBusy"
+                                                    @onclick="() => RemoveBlacklistAsync(bl.Id)">
+                                                REMOVE
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            } else {
+                                <div class="font-mono mb-3" style="font-size:0.75rem;color:var(--bw-muted)">No blacklists configured.</div>
+                            }
+
+                            <div class="mb-3">
+                                <label class="form-label font-mono" style="font-size:0.7rem;letter-spacing:0.1em">ADD FROM DEFAULTS</label>
+                                <select class="form-select mb-2" @bind="_selectedDefaultBlacklist">
+                                    <option value="">— Select a default blacklist —</option>
+                                    @foreach (var def in _defaultBlacklists) {
+                                        <option value="@def.Url">@def.Url</option>
+                                    }
+                                </select>
+                                <button type="button" class="btn btn-outline-primary cut-corner font-display" style="font-size:0.7rem;letter-spacing:0.1em"
+                                        disabled="@(string.IsNullOrWhiteSpace(_selectedDefaultBlacklist) || _blacklistBusy)"
+                                        @onclick="AddDefaultBlacklistAsync">
+                                    ADD SELECTED
+                                </button>
+                            </div>
+
+                            <div>
+                                <label class="form-label font-mono" style="font-size:0.7rem;letter-spacing:0.1em">ADD CUSTOM URL</label>
+                                <div class="d-flex gap-2">
+                                    <input type="url" class="form-control" placeholder="https://example.com/blocklist.txt"
+                                           @bind="_newBlacklistUrl" disabled="@_blacklistBusy" />
+                                    <button type="button" class="btn btn-outline-primary cut-corner font-display" style="font-size:0.7rem;letter-spacing:0.1em;white-space:nowrap"
+                                            disabled="@(string.IsNullOrWhiteSpace(_newBlacklistUrl) || _blacklistBusy)"
+                                            @onclick="AddCustomBlacklistAsync">
+                                        ADD
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="mt-3">
+                                <button type="button" class="btn btn-outline-secondary cut-corner font-display" style="font-size:0.7rem;letter-spacing:0.1em"
+                                        disabled="@_blacklistBusy"
+                                        @onclick="RefreshBlacklistsAsync">
+                                    @(_blacklistBusy ? "REFRESHING..." : "REFRESH NOW")
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">@(Form.LinkWhitelistMode ? "ALLOWED DOMAINS" : "CUSTOM BLOCKED DOMAINS")</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                            @(Form.LinkWhitelistMode
+                                ? "Only links to these domains will be allowed. All other external links are blocked."
+                                : "Individual domains to block in addition to the blacklists above. Subdomains are matched automatically.")
+                        </p>
+
+                        @if (_blacklistDomains.Any()) {
+                            <div class="mb-3">
+                                @foreach (var dom in _blacklistDomains) {
+                                    <div class="d-flex align-items-center justify-content-between border-bottom py-2">
+                                        <div class="font-mono" style="font-size:0.75rem">@dom.Domain</div>
+                                        <button type="button" class="btn btn-sm btn-outline-danger ms-2" style="font-size:0.7rem"
+                                                disabled="@_blacklistBusy"
+                                                @onclick="() => RemoveBlacklistDomainAsync(dom.Id)">
+                                            REMOVE
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        } else {
+                            <div class="font-mono mb-3" style="font-size:0.75rem;color:var(--bw-muted)">No custom domains configured.</div>
+                        }
+
+                        <div>
+                            <label class="form-label font-mono" style="font-size:0.7rem;letter-spacing:0.1em">ADD DOMAIN</label>
+                            <div class="d-flex gap-2">
+                                <input type="text" class="form-control" placeholder="example.com"
+                                       @bind="_newDomain" disabled="@_blacklistBusy" />
+                                <button type="button" class="btn btn-outline-primary cut-corner font-display" style="font-size:0.7rem;letter-spacing:0.1em;white-space:nowrap"
+                                        disabled="@(string.IsNullOrWhiteSpace(_newDomain) || _blacklistBusy)"
+                                        @onclick="AddBlacklistDomainAsync">
+                                    ADD
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">MODULE OVERRIDES</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Override the global infraction action and auto-lockdown behavior for individual link protection modules. Set to "Default" to inherit from the General tab.</p>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Invite link &mdash; action</div>
+                                <div class="form-text">Action taken when a user posts a Discord invite link.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.InviteLinkActionStr">
+                                <option value="">Default</option>
+                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
+                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
+                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
+                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
+                            </select>
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Invite link &mdash; auto-lockdown</div>
+                                <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.InviteLinkAutoLockdownStr">
+                                <option value="">Default</option>
+                                <option value="true">Lockdown</option>
+                                <option value="false">No lockdown</option>
+                            </select>
+                        </div>
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">External link &mdash; action</div>
+                                <div class="form-text">Action taken when a user posts a blocked external link.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.SuspiciousLinkActionStr">
+                                <option value="">Default</option>
+                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
+                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
+                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
+                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
+                            </select>
+                        </div>
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">External link &mdash; auto-lockdown</div>
+                                <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
+                            </div>
+                            <select class="form-select" style="max-width:200px" @bind="Form.SuspiciousLinkAutoLockdownStr">
+                                <option value="">Default</option>
+                                <option value="true">Lockdown</option>
+                                <option value="false">No lockdown</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (_activeTab == "antiraid") {
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">ANTI-RAID</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                            Automatically deletes all active invite links when an abnormal surge of joins is detected. During the cooldown period the action cannot re-trigger.
+                        </p>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Enable anti-raid</div>
+                                <div class="form-text">Monitor join rate and automatically pause invites when a raid is detected.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="isAntiRaidEnabled" @bind-Value="Form.IsAntiRaidEnabled" style="width:2.5em;height:1.3em" />
+                            </div>
+                        </div>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Join threshold</div>
+                                <div class="form-text">Number of joins within the window that triggers the lockdown.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" min="2" @bind-Value="Form.AntiRaidJoinThreshold" disabled="@(!Form.IsAntiRaidEnabled)" />
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Detection window (seconds)</div>
+                                <div class="form-text">Rolling time window used to count joins. Range: 5–300 s.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" min="5" max="300" @bind-Value="Form.AntiRaidWindowSeconds" disabled="@(!Form.IsAntiRaidEnabled)" />
+                        </div>
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Cooldown (minutes)</div>
+                                <div class="form-text">How long invites remain paused before the lockdown lifts automatically.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.AntiRaidCooldownMinutes" disabled="@(!Form.IsAntiRaidEnabled)" />
+                        </div>
+                    </div>
+                </div>
+
+            }
+
+            @if (_activeTab == "scoring") {
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">ACCOUNT SCORING</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                            Assigns a hidden threat score to users on join based on account age, profile picture, and username patterns. Medium and high risk accounts trigger a mod alert and can optionally be timed out automatically. Works independently of anti-raid.
+                        </p>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Enable account scoring</div>
+                                <div class="form-text">Evaluate joining users' account metadata and alert moderators for suspicious accounts.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="isAccountScoringEnabled" @bind-Value="Form.IsAccountScoringEnabled" style="width:2.5em;height:1.3em" />
+                            </div>
+                        </div>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Auto-timeout medium risk</div>
+                                <div class="form-text">Automatically timeout medium-risk accounts on join. If disabled, mods are alerted only.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="autoTimeoutMediumRisk" @bind-Value="Form.AutoTimeoutMediumRiskOnJoin" style="width:2.5em;height:1.3em" disabled="@(!Form.IsAccountScoringEnabled)" />
+                            </div>
+                        </div>
+
+                        <div class="bw-field">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Auto-timeout high risk</div>
+                                <div class="form-text">Automatically timeout high-risk accounts on join. If disabled, mods are alerted only.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="autoTimeoutHighRisk" @bind-Value="Form.AutoTimeoutHighRiskOnJoin" style="width:2.5em;height:1.3em" disabled="@(!Form.IsAccountScoringEnabled)" />
+                            </div>
+                        </div>
+
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Timeout duration (minutes)</div>
+                                <div class="form-text">How long the user is timed out when auto-timeout is triggered. Minimum: 1 minute.</div>
+                            </div>
+                            <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.AccountScoringTimeoutMinutes" disabled="@(!Form.IsAccountScoringEnabled)" />
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (_activeTab == "audit") {
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">AUDIT LOG</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                            Select a channel where Blackwall will post an embed for each infraction: who triggered it, which filter fired, the message content, and the action taken.
+                        </p>
+
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Log channel</div>
+                                <div class="form-text">Leave blank to disable audit logging.</div>
+                            </div>
+                            <InputSelect class="form-select" style="max-width:260px" @bind-Value="Form.LogChannelId">
+                                <option value="">— None —</option>
+                                @foreach (var ch in _channels) {
+                                    <option value="@ch.Id">#@ch.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="d-flex align-items-center gap-3 mt-2">
+                <button type="submit" class="btn btn-primary cut-corner font-display" style="font-size:0.75rem;letter-spacing:0.1em">
+                    COMMIT CHANGES
+                </button>
+                <a href="/dashboard" class="btn btn-outline-secondary font-display" style="font-size:0.75rem;letter-spacing:0.1em">
+                    CANCEL
+                </a>
+            </div>
+        </EditForm>
+
+        <hr style="border-color:var(--bw-danger);opacity:0.25;margin:3rem 0 2rem" />
+
+        <div class="cut-corner border mb-4" style="background:var(--bs-card-bg);border-color:var(--bw-danger) !important">
+            <div class="card-header" style="color:var(--bw-danger)">DANGER ZONE</div>
+            <div class="p-4">
+                <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                    Removing the bot will immediately kick it from your Discord server and deactivate this Blackwall instance. Your configuration will be preserved if you re-add the bot later.
+                </p>
+
+                @if (!_confirmRemove) {
+                    <button type="button" class="btn btn-outline-danger cut-corner font-display"
+                            style="font-size:0.75rem;letter-spacing:0.1em"
+                            @onclick="() => _confirmRemove = true">
+                        REMOVE BOT FROM SERVER
+                    </button>
+                } else {
+                    <div class="font-mono mb-3" style="font-size:0.8rem;color:var(--bw-danger)">
+                        // WARNING: This will kick the bot from @_settings.Name. Are you sure?
+                    </div>
+                    <div class="d-flex gap-3">
+                        <button type="button" class="btn btn-danger cut-corner font-display"
+                                style="font-size:0.75rem;letter-spacing:0.1em"
+                                disabled="@_removing"
+                                @onclick="RemoveBotAsync">
+                            @(_removing ? "REMOVING..." : "CONFIRM REMOVAL")
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary font-display"
+                                style="font-size:0.75rem;letter-spacing:0.1em"
+                                @onclick="() => _confirmRemove = false">
+                            ABORT
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public long DiscordGuildId { get; set; }
+
+    private SpamConfigForm Form { get; set; } = new();
+
+    private GuildSettingsResponse? _settings;
+    private IReadOnlyList<DiscordChannelDto> _channels = [];
+    private bool _loading = true;
+    private bool _saved;
+    private string? _error;
+    private bool _confirmRemove;
+    private bool _removing;
+    private string _activeTab = "general";
+    private bool _isLockedDown;
+    private bool _lockdownBusy;
+
+    private IReadOnlyList<BlacklistResponse> _blacklists = [];
+    private IReadOnlyList<DefaultBlacklistResponse> _defaultBlacklists = [];
+    private IReadOnlyList<BlacklistDomainResponse> _blacklistDomains = [];
+    private string _selectedDefaultBlacklist = "";
+    private string _newBlacklistUrl = "";
+    private string _newDomain = "";
+    private bool _blacklistBusy;
+
+    protected override async Task OnInitializedAsync() {
+        try {
+            _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
+            _channels = await Api.GetChannelsAsync(DiscordGuildId);
+
+            if (_settings is not null) {
+                var s = _settings.SpamConfiguration;
+                Form.MaxMessagesPerWindow = s.MaxMessagesPerWindow;
+                Form.RateLimitWindowSeconds = s.RateLimitWindowSeconds;
+                Form.DuplicateMessageThreshold = s.DuplicateMessageThreshold;
+                Form.DuplicateWindowSeconds = s.DuplicateWindowSeconds;
+                Form.DuplicateCrossChannelEnabled = s.DuplicateCrossChannelEnabled;
+                Form.MentionLimit = s.MentionLimit;
+                Form.BlockInviteLinks = s.BlockInviteLinks;
+                Form.BlockSuspiciousLinks = s.BlockSuspiciousLinks;
+                Form.LinkWhitelistMode = s.LinkWhitelistMode;
+                Form.SafeBrowsingEnabled = s.SafeBrowsingEnabled;
+                Form.SafeBrowsingBlockUnsure = s.SafeBrowsingBlockUnsure;
+                Form.IsEnabled = s.IsEnabled;
+                Form.IsDryRun = s.IsDryRun;
+                Form.Action = s.Action;
+                Form.LogChannelId = s.LogChannelId.HasValue ? s.LogChannelId.Value.ToString() : "";
+                Form.MessageDeleteDays = s.MessageDeleteDays;
+                Form.IsAntiRaidEnabled = s.IsAntiRaidEnabled;
+                Form.AntiRaidJoinThreshold = s.AntiRaidJoinThreshold;
+                Form.AntiRaidWindowSeconds = s.AntiRaidWindowSeconds;
+                Form.AntiRaidCooldownMinutes = s.AntiRaidCooldownMinutes;
+                Form.IsAccountScoringEnabled = s.IsAccountScoringEnabled;
+                Form.AutoTimeoutMediumRiskOnJoin = s.AutoTimeoutMediumRiskOnJoin;
+                Form.AutoTimeoutHighRiskOnJoin = s.AutoTimeoutHighRiskOnJoin;
+                Form.AccountScoringTimeoutMinutes = s.AccountScoringTimeoutMinutes;
+                Form.AutoLockdownEnabled = s.AutoLockdownEnabled;
+                Form.RateLimitActionStr = s.RateLimitAction?.ToString() ?? "";
+                Form.RateLimitAutoLockdownStr = s.RateLimitAutoLockdown?.ToString().ToLowerInvariant() ?? "";
+                Form.DuplicateActionStr = s.DuplicateAction?.ToString() ?? "";
+                Form.DuplicateAutoLockdownStr = s.DuplicateAutoLockdown?.ToString().ToLowerInvariant() ?? "";
+                Form.MentionLimitActionStr = s.MentionLimitAction?.ToString() ?? "";
+                Form.MentionLimitAutoLockdownStr = s.MentionLimitAutoLockdown?.ToString().ToLowerInvariant() ?? "";
+                Form.InviteLinkActionStr = s.InviteLinkAction?.ToString() ?? "";
+                Form.InviteLinkAutoLockdownStr = s.InviteLinkAutoLockdown?.ToString().ToLowerInvariant() ?? "";
+                Form.SuspiciousLinkActionStr = s.SuspiciousLinkAction?.ToString() ?? "";
+                Form.SuspiciousLinkAutoLockdownStr = s.SuspiciousLinkAutoLockdown?.ToString().ToLowerInvariant() ?? "";
+                _isLockedDown = s.IsLockedDown;
+            }
+
+            try {
+                _blacklists = await Api.GetBlacklistsAsync(DiscordGuildId);
+                _defaultBlacklists = await Api.GetDefaultBlacklistsAsync();
+                _blacklistDomains = await Api.GetBlacklistDomainsAsync(DiscordGuildId);
+            } catch {
+                _blacklists = [];
+                _defaultBlacklists = [];
+                _blacklistDomains = [];
+                _error = "Failed to load blacklist configuration.";
+            }
+        } catch {
+            _settings = null;
+        } finally {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveAsync() {
+        _saved = false;
+        _error = null;
+
+        try {
+            long? logChannelId = long.TryParse(Form.LogChannelId, out var parsed) ? parsed : null;
+
+            await Api.UpdateGuildSettingsAsync(DiscordGuildId, new UpdateGuildSettingsRequest(
+                Form.MaxMessagesPerWindow,
+                Form.RateLimitWindowSeconds,
+                Form.DuplicateMessageThreshold,
+                Form.DuplicateWindowSeconds,
+                Form.DuplicateCrossChannelEnabled,
+                Form.MentionLimit,
+                Form.BlockInviteLinks,
+                Form.BlockSuspiciousLinks,
+                Form.LinkWhitelistMode,
+                Form.SafeBrowsingEnabled,
+                Form.SafeBrowsingBlockUnsure,
+                Form.IsEnabled,
+                Form.IsDryRun,
+                Form.Action,
+                logChannelId,
+                Math.Clamp(Form.MessageDeleteDays, 0, 7),
+                Form.IsAntiRaidEnabled,
+                Form.AntiRaidJoinThreshold,
+                Form.AntiRaidWindowSeconds,
+                Form.AntiRaidCooldownMinutes,
+                Form.IsAccountScoringEnabled,
+                Form.AutoTimeoutMediumRiskOnJoin,
+                Form.AutoTimeoutHighRiskOnJoin,
+                Form.AccountScoringTimeoutMinutes,
+                _isLockedDown,
+                Form.AutoLockdownEnabled,
+                ParseAction(Form.RateLimitActionStr),
+                ParseBool(Form.RateLimitAutoLockdownStr),
+                ParseAction(Form.DuplicateActionStr),
+                ParseBool(Form.DuplicateAutoLockdownStr),
+                ParseAction(Form.MentionLimitActionStr),
+                ParseBool(Form.MentionLimitAutoLockdownStr),
+                ParseAction(Form.InviteLinkActionStr),
+                ParseBool(Form.InviteLinkAutoLockdownStr),
+                ParseAction(Form.SuspiciousLinkActionStr),
+                ParseBool(Form.SuspiciousLinkAutoLockdownStr)
+            ));
+            _saved = true;
+            _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            _error = $"Failed to save settings: {ex.Message}";
+        }
+    }
+
+    private async Task RemoveBotAsync() {
+        _removing = true;
+        _error = null;
+
+        try {
+            await Api.RemoveBotAsync(DiscordGuildId);
+            Nav.NavigateTo("/dashboard", forceLoad: true);
+        } catch (Exception ex) {
+            _error = $"Failed to remove bot: {ex.Message}";
+            _confirmRemove = false;
+        } finally {
+            _removing = false;
+        }
+    }
+
+    private async Task LockdownAsync() {
+        _lockdownBusy = true;
+        _error = null;
+
+        try {
+            await Api.LockdownAsync(DiscordGuildId);
+            _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
+            if (_settings is not null)
+                _isLockedDown = _settings.SpamConfiguration.IsLockedDown;
+        } catch (Exception ex) {
+            _error = $"Failed to initiate lockdown: {ex.Message}";
+        } finally {
+            _lockdownBusy = false;
+        }
+    }
+
+    private async Task UnlockAsync() {
+        _lockdownBusy = true;
+        _error = null;
+
+        try {
+            await Api.UnlockAsync(DiscordGuildId);
+            _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
+            if (_settings is not null)
+                _isLockedDown = _settings.SpamConfiguration.IsLockedDown;
+        } catch (Exception ex) {
+            _error = $"Failed to lift lockdown: {ex.Message}";
+        } finally {
+            _lockdownBusy = false;
+        }
+    }
+
+    private sealed class SpamConfigForm {
+        public int MaxMessagesPerWindow { get; set; } = 5;
+        public int RateLimitWindowSeconds { get; set; } = 5;
+        public int DuplicateMessageThreshold { get; set; } = 3;
+        public int DuplicateWindowSeconds { get; set; } = 5;
+        public bool DuplicateCrossChannelEnabled { get; set; } = true;
+        public int MentionLimit { get; set; } = 5;
+        public bool BlockInviteLinks { get; set; } = true;
+        public bool BlockSuspiciousLinks { get; set; }
+        public bool LinkWhitelistMode { get; set; }
+        public bool SafeBrowsingEnabled { get; set; }
+        public bool SafeBrowsingBlockUnsure { get; set; }
+        public bool IsEnabled { get; set; } = true;
+        public bool IsDryRun { get; set; }
+        public InfractionAction Action { get; set; } = InfractionAction.DeleteOnly;
+        public string LogChannelId { get; set; } = "";
+        public int MessageDeleteDays { get; set; }
+        public bool IsAntiRaidEnabled { get; set; }
+        public int AntiRaidJoinThreshold { get; set; } = 10;
+        public int AntiRaidWindowSeconds { get; set; } = 30;
+        public int AntiRaidCooldownMinutes { get; set; } = 30;
+        public bool IsAccountScoringEnabled { get; set; }
+        public bool AutoTimeoutMediumRiskOnJoin { get; set; }
+        public bool AutoTimeoutHighRiskOnJoin { get; set; }
+        public int AccountScoringTimeoutMinutes { get; set; } = 10;
+        public bool AutoLockdownEnabled { get; set; }
+        public string RateLimitActionStr { get; set; } = "";
+        public string RateLimitAutoLockdownStr { get; set; } = "";
+        public string DuplicateActionStr { get; set; } = "";
+        public string DuplicateAutoLockdownStr { get; set; } = "";
+        public string MentionLimitActionStr { get; set; } = "";
+        public string MentionLimitAutoLockdownStr { get; set; } = "";
+        public string InviteLinkActionStr { get; set; } = "";
+        public string InviteLinkAutoLockdownStr { get; set; } = "";
+        public string SuspiciousLinkActionStr { get; set; } = "";
+        public string SuspiciousLinkAutoLockdownStr { get; set; } = "";
+    }
+
+    private static InfractionAction? ParseAction(string value) {
+        return Enum.TryParse<InfractionAction>(value, out var action) ? action : null;
+    }
+
+    private static bool? ParseBool(string value) {
+        return bool.TryParse(value, out var result) ? result : null;
+    }
+
+    private async Task AddDefaultBlacklistAsync() {
+        if (string.IsNullOrWhiteSpace(_selectedDefaultBlacklist)) return;
+        _blacklistBusy = true;
+        _error = null;
+        try {
+            await Api.AddBlacklistAsync(DiscordGuildId, _selectedDefaultBlacklist);
+            _blacklists = await Api.GetBlacklistsAsync(DiscordGuildId);
+            _selectedDefaultBlacklist = "";
+        } catch (Exception ex) {
+            _error = $"Failed to add blacklist: {ex.Message}";
+        } finally {
+            _blacklistBusy = false;
+        }
+    }
+
+    private async Task AddCustomBlacklistAsync() {
+        if (string.IsNullOrWhiteSpace(_newBlacklistUrl)) return;
+        _blacklistBusy = true;
+        _error = null;
+        try {
+            await Api.AddBlacklistAsync(DiscordGuildId, _newBlacklistUrl);
+            _blacklists = await Api.GetBlacklistsAsync(DiscordGuildId);
+            _newBlacklistUrl = "";
+        } catch (Exception ex) {
+            _error = $"Failed to add blacklist: {ex.Message}";
+        } finally {
+            _blacklistBusy = false;
+        }
+    }
+
+    private async Task RemoveBlacklistAsync(long blacklistId) {
+        _blacklistBusy = true;
+        _error = null;
+        try {
+            await Api.RemoveBlacklistAsync(DiscordGuildId, blacklistId);
+            _blacklists = await Api.GetBlacklistsAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            _error = $"Failed to remove blacklist: {ex.Message}";
+        } finally {
+            _blacklistBusy = false;
+        }
+    }
+
+    private async Task RefreshBlacklistsAsync() {
+        _blacklistBusy = true;
+        _error = null;
+        try {
+            await Api.RefreshBlacklistsAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            _error = $"Failed to refresh blacklists: {ex.Message}";
+        } finally {
+            _blacklistBusy = false;
+        }
+    }
+
+    private async Task AddBlacklistDomainAsync() {
+        if (string.IsNullOrWhiteSpace(_newDomain)) return;
+        _blacklistBusy = true;
+        _error = null;
+        try {
+            await Api.AddBlacklistDomainAsync(DiscordGuildId, _newDomain);
+            _blacklistDomains = await Api.GetBlacklistDomainsAsync(DiscordGuildId);
+            _newDomain = "";
+        } catch (Exception ex) {
+            _error = $"Failed to add domain: {ex.Message}";
+        } finally {
+            _blacklistBusy = false;
+        }
+    }
+
+    private async Task RemoveBlacklistDomainAsync(long domainId) {
+        _blacklistBusy = true;
+        _error = null;
+        try {
+            await Api.RemoveBlacklistDomainAsync(DiscordGuildId, domainId);
+            _blacklistDomains = await Api.GetBlacklistDomainsAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            _error = $"Failed to remove domain: {ex.Message}";
+        } finally {
+            _blacklistBusy = false;
+        }
+    }
+}

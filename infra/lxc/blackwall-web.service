@@ -1,0 +1,21 @@
+[Unit]
+Description=Blackwall Web
+Documentation=https://github.com/pmcav/Blackwall
+After=network.target blackwall-api.service
+Wants=blackwall-api.service
+
+[Service]
+Type=simple
+User=blackwall
+Group=blackwall
+WorkingDirectory=/opt/blackwall/web
+ExecStart=/usr/bin/dotnet /opt/blackwall/web/Blackwall.Web.dll
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+SyslogIdentifier=blackwall-web
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
+
+[Install]
+WantedBy=multi-user.target

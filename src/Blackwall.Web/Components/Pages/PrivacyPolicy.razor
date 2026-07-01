@@ -1,0 +1,248 @@
+@page "/privacy-policy"
+@inject IConfiguration Config
+@inject DiscordAppInfoService AppInfo
+
+<PageTitle>Privacy Policy — @AppInfo.AppName</PageTitle>
+
+<div class="bw-container" style="max-width:760px;padding-top:3rem;padding-bottom:4rem">
+    <div class="d-inline-flex align-items-center gap-2 px-3 py-1 mb-4 font-mono"
+         style="border:1px solid rgba(34,211,238,0.4);color:var(--bw-primary);font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase">
+        <span class="rounded-circle bw-pulse" style="width:6px;height:6px;background:var(--bw-primary);flex-shrink:0;display:inline-block"></span>
+        Legal // Privacy Policy
+    </div>
+
+    <h1 class="font-display mb-2" style="font-size:clamp(1.8rem,4vw,2.6rem);line-height:1.1">
+        Privacy <span class="neon-text">Policy</span>
+    </h1>
+    <p class="font-mono mb-5" style="font-size:0.78rem;color:var(--bw-muted)">
+        Last updated: June 30, 2026
+    </p>
+
+    <div class="cut-corner border p-4 p-md-5" style="background:var(--bs-card-bg);position:relative">
+        <div style="position:absolute;top:0;left:0;width:3rem;height:1px;background:var(--bw-primary)"></div>
+
+        <div class="bw-legal">
+            <p style="border-left:2px solid var(--bw-primary);padding-left:0.8rem;color:var(--bs-body-color)">
+                This Privacy Policy applies only to the <strong>@WebHost</strong> website and the
+                <strong>@AppInfo.AppName</strong> Discord application (App ID: <code>@AppInfo.ClientId</code>),
+                as both are operated on self-hosted infrastructure.
+            </p>
+
+            <h2>1. Introduction</h2>
+            <p>
+                This Privacy Policy describes how @AppInfo.AppName ("the Service") collects, uses, and protects information
+                when the bot is present in your Discord server and when you use the web dashboard. We are committed
+                to transparency and minimizing data collection.
+            </p>
+
+            <h2>2. Data We Collect</h2>
+            <p>The Service ingests the following categories of data:</p>
+            <h3>2.1 Discord User IDs</h3>
+            <p>
+                When you log in via Discord OAuth2, your Discord User ID and username are stored to authenticate you
+                and display your identity in the dashboard. User IDs are also processed in real time during spam
+                detection (e.g., per-user rate limiting and duplicate tracking).
+            </p>
+            <h3>2.2 Discord Server (Guild) IDs</h3>
+            <p>
+                For each Discord server where the bot is present, the Service stores the Guild ID, guild name, and
+                icon hash. This allows the dashboard to list and identify your servers.
+            </p>
+            <h3>2.3 Discord Channel IDs</h3>
+            <p>
+                Channel IDs are used in two ways: (a) the ID of a configured log channel is stored in the database
+                so the bot knows where to send infraction summaries, and (b) channel IDs are used transiently
+                during duplicate detection to determine whether cross-channel duplicate checking is enabled.
+            </p>
+            <h3>2.4 Message Content</h3>
+            <p>
+                <strong>Message content is read in-memory by the bot in real time</strong> to evaluate it against
+                spam filters (rate limiting, duplicate detection, mention limits, invite link blocking, and
+                suspicious link detection). Message content is <strong>never written to the database</strong>.
+                See Section 3 for a detailed explanation of how message data is processed versus stored.
+            </p>
+            <h3>2.5 Configuration Data</h3>
+            <p>
+                Settings you define through the dashboard (spam thresholds, enforcement actions, log channel,
+                anti-raid parameters, etc.) are stored in the database and associated with the corresponding guild.
+            </p>
+            <h3>2.6 Technical Data</h3>
+            <p>
+                The Service may generate standard application logs including IP addresses (for the web dashboard),
+                request timestamps, and error messages for the purpose of security, debugging, and service stability.
+                These logs do not contain message content.
+            </p>
+
+            <h2>3. Data Processing vs. Data Storage</h2>
+            <p>
+                It is important to distinguish between data that is processed ephemerally (in transit) and data that
+                is persisted (at rest).
+            </p>
+            <h3>3.1 Data in Transit (In-Memory &amp; Redis)</h3>
+            <p>
+                When a message is received, the bot reads its content in-memory to run spam checks. Specifically:
+            </p>
+            <ul>
+                <li><strong>Rate limiting:</strong> a per-user, per-guild message counter is stored in Redis with a
+                    time-to-live (TTL) equal to the configured rate-limit window. This counter contains no message
+                    content and expires automatically.</li>
+                <li><strong>Duplicate detection:</strong> an MD5 <em>hash</em> of the message content (not the content
+                    itself) is stored in Redis with a short TTL. The original message content cannot be reconstructed
+                    from this hash. The hash expires automatically after the configured duplicate window.</li>
+                <li><strong>Mention limits, invite links, suspicious links:</strong> these checks are performed
+                    entirely in-memory. Nothing is stored.</li>
+            </ul>
+            <p>
+                Once the message has been evaluated, the in-memory copy is discarded. No message content is written
+                to Redis or to the database at any point.
+            </p>
+            <h3>3.2 Data at Rest (Database)</h3>
+            <p>
+                The following data is persisted in the database (PostgreSQL):
+            </p>
+            <ul>
+                <li><strong>User accounts:</strong> Discord User ID and username (for dashboard authentication).</li>
+                <li><strong>Guild records:</strong> Discord Guild ID, guild name, icon hash, and owner reference.</li>
+                <li><strong>Guild managers:</strong> Discord Role ID, User ID, and admin flag (for permission management).</li>
+                <li><strong>Spam configuration:</strong> all moderation settings and the configured log Channel ID.</li>
+            </ul>
+            <p>
+                <strong>Message content is never stored in the database.</strong> When a spam violation is detected,
+                the bot sends an infraction summary embed — which includes the message content truncated to 1024
+                characters — to the configured Discord log channel. This embed is delivered through Discord's API
+                and is subject to Discord's own retention. It is <strong>not</strong> stored in @AppInfo.AppName's database.
+            </p>
+
+            <h2>4. Self-Hosted Infrastructure</h2>
+            <p>
+                @AppInfo.AppName is a self-hosted application. The bot, the web dashboard, the API, the PostgreSQL database,
+                and the Redis cache all run on infrastructure controlled by the person or organization that deployed
+                this instance (the "host").
+            </p>
+            <p>
+                <strong>All collected data remains on the host's personal servers or VPS.</strong> No data is
+                transmitted back to the original @AppInfo.AppName developers or to any central database. The original
+                developers do not have access to your instance's database, logs, or Redis cache. Each deployment
+                is an independent, isolated instance.
+            </p>
+            <p>
+                This means that the host of the instance you are using is the data controller for your personal data,
+                not the original @AppInfo.AppName developers. Any data-related requests should be directed to the host of
+                the specific instance (see Section 7).
+            </p>
+
+            <h2>5. How We Use Your Data</h2>
+            <ul>
+                <li>To authenticate users and manage dashboard access.</li>
+                <li>To store and apply per-guild moderation configuration.</li>
+                <li>To detect and respond to spam, raids, and malicious activity in real time.</li>
+                <li>To send infraction summaries to the configured Discord log channel.</li>
+                <li>To monitor and improve the reliability and performance of the Service.</li>
+            </ul>
+            <p>
+                We do not sell or rent your data. We do not use your data for advertising. We do not maintain a
+                permanent archive of messages from your server.
+            </p>
+
+            <h2>6. Data Sharing</h2>
+            <p>
+                Because @AppInfo.AppName is self-hosted, data is not shared with any third party by the Service itself.
+                The only external transmission is infraction summary embeds sent to Discord's API for delivery to
+                your configured log channel, which is subject to Discord's own privacy policy and data practices.
+            </p>
+            <p>
+                The host of the instance may use third-party infrastructure providers (e.g., a VPS provider, a managed
+                database service) that have access to the underlying servers. The host is responsible for ensuring
+                appropriate agreements are in place with such providers.
+            </p>
+
+            <h2>7. Data Retention and Deletion</h2>
+            <h3>7.1 Retention</h3>
+            <ul>
+                <li><strong>Configuration data:</strong> retained for as long as the bot remains in your server.</li>
+                <li><strong>User accounts:</strong> retained for as long as your Discord account is linked. If you
+                    remove the bot from all servers and request deletion, your account data can be removed.</li>
+                <li><strong>Redis ephemeral data:</strong> rate-limit counters and duplicate hashes expire
+                    automatically based on their configured TTL (typically seconds to minutes).</li>
+                <li><strong>Application logs:</strong> retained at the discretion of the host. The Service does not
+                    impose a fixed retention period on application logs.</li>
+                <li><strong>Infraction embeds in Discord:</strong> subject to Discord's own message retention. The
+                    Service has no control over how long Discord retains these messages.</li>
+            </ul>
+            <h3>7.2 Deletion</h3>
+            <p>
+                When the bot is removed from a Discord server, the associated guild record and spam configuration
+                can be deleted. To request deletion of your personal data (e.g., your Discord User ID and username
+                stored in the database), you should contact the <strong>owner of the server hosting this specific
+                instance</strong>, not the original @AppInfo.AppName developers. Since each instance is independent and
+                self-hosted, the original developers cannot access or delete data on instances they do not control.
+            </p>
+            <p>
+                To identify the host of this instance, refer to the server owner or administrator who invited the
+                bot to your Discord server or who provided you with access to the web dashboard.
+            </p>
+
+            <h2>8. Data Security</h2>
+            <p>
+                The Service uses encrypted connections (TLS) for the web dashboard and API. Access to the dashboard
+                is protected by JWT-based authentication. Discord OAuth tokens, where applicable, are encrypted at
+                rest using AES. However, no system is perfectly secure, and the security of the data ultimately
+                depends on the measures implemented by the host of this instance.
+            </p>
+
+            <h2>9. Your Rights</h2>
+            <p>
+                Depending on your jurisdiction (e.g., GDPR, CCPA), you may have the right to:
+            </p>
+            <ul>
+                <li>Access the personal data stored about you.</li>
+                <li>Request correction or deletion of your personal data.</li>
+                <li>Object to or restrict certain processing.</li>
+                <li>Withdraw consent where processing is based on consent.</li>
+            </ul>
+            <p>
+                To exercise these rights, contact the <strong>host of this specific instance</strong> — that is, the
+                server owner or administrator who deployed @AppInfo.AppName on their infrastructure. The original @AppInfo.AppName
+                developers cannot process data requests for instances they do not operate.
+            </p>
+
+            <h2>10. Children's Privacy</h2>
+            <p>
+                The Service is not directed to individuals under the minimum age required to use Discord. We do not
+                knowingly collect data from such individuals. If you believe data has been collected inadvertently,
+                contact the host of this instance.
+            </p>
+
+            <h2>11. Changes to This Policy</h2>
+            <p>
+                This Privacy Policy may be updated by the host of this instance from time to time. The date of the
+                latest revision is shown above. Continued use of the Service after changes constitutes acceptance
+                of the updated policy.
+            </p>
+
+            <h2>12. Contact</h2>
+            <p>
+                Questions or requests regarding this Privacy Policy or your personal data should be directed to the
+                <strong>host of this specific instance</strong> — the person or organization that deployed @AppInfo.AppName
+                on their own infrastructure. They are the data controller for this instance.
+            </p>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-4 font-mono" style="font-size:0.72rem;color:var(--bw-muted)">
+        <a href="/terms-of-service" class="text-decoration-none" style="color:var(--bw-primary)">// Terms of Service →</a>
+        <a href="/" class="text-decoration-none" style="color:var(--bw-muted)">← Back to home</a>
+    </div>
+</div>
+
+@code {
+    private string WebHost {
+        get {
+            var baseUrl = Config["WEB:BASEURL"];
+            if (string.IsNullOrWhiteSpace(baseUrl)) return "N/A";
+            return Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri)
+                ? uri.IsDefaultPort ? uri.Host : $"{uri.Host}:{uri.Port}"
+                : baseUrl;
+        }
+    }
+}
