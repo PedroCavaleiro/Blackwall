@@ -50,7 +50,7 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     public async Task<DuplicateDetectionResult> IsDuplicateAsync(
         long discordGuildId,
         long discordUserId,
-        long channelId,
+        ulong channelId,
         ulong messageId,
         string content,
         int threshold,

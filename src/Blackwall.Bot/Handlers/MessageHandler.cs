@@ -60,7 +60,7 @@ public sealed class MessageHandler(
 
         var dupResult = await spamDetectionService.IsDuplicateAsync(
             discordGuildId, discordUserId,
-            (long)message.Channel.Id,
+            message.Channel.Id,
             message.Id,
             fullContent, config.DuplicateMessageThreshold,
             config.DuplicateWindowSeconds, config.DuplicateCrossChannelEnabled);
