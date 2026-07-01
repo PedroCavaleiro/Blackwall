@@ -40,33 +40,93 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     }
 
     /// <summary>
-    /// Tracks message content hashes per user per guild. Returns true when the same hash
-    /// is seen at least <paramref name="threshold"/> times within <paramref name="windowSeconds"/>.
+    /// Tracks message content hashes per user per guild. Returns a result indicating whether
+    /// the same hash has been seen at least <paramref name="threshold"/> times within
+    /// <paramref name="windowSeconds"/>, along with all the message IDs that share that hash
+    /// so they can be bulk-deleted.
     /// When <paramref name="crossChannelEnabled"/> is true, duplicates are counted across all channels;
     /// when false, only messages within the same <paramref name="channelId"/> are counted.
     /// </summary>
-    public async Task<bool> IsDuplicateAsync(
+    public async Task<DuplicateDetectionResult> IsDuplicateAsync(
         long discordGuildId,
         long discordUserId,
-        long channelId,
+        ulong channelId,
+        ulong messageId,
         string content,
         int threshold,
         int windowSeconds,
         bool crossChannelEnabled
     ) {
         if (string.IsNullOrWhiteSpace(content))
-            return false;
+            return new DuplicateDetectionResult(false, []);
 
         var hash = Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(content.Trim())));
         var key = crossChannelEnabled
             ? $"spam:dupes:{discordGuildId}:{discordUserId}:{hash}"
             : $"spam:dupes:{discordGuildId}:{discordUserId}:{channelId}:{hash}";
-        var count = await _db.StringIncrementAsync(key);
+        var handledKey = $"{key}:handled";
+
+        if (await _db.KeyExistsAsync(handledKey))
+            return new DuplicateDetectionResult(true, []);
+
+        var entry = $"{channelId}:{messageId}";
+        var count = await _db.ListRightPushAsync(key, entry);
 
         if (count == 1)
             await _db.KeyExpireAsync(key, TimeSpan.FromSeconds(windowSeconds));
 
-        return count >= threshold;
+        if (count < threshold)
+            return new DuplicateDetectionResult(false, []);
+
+        var entries = await _db.ListRangeAsync(key);
+        var messagesToDelete = new List<(ulong ChannelId, ulong MessageId)>(entries.Length);
+
+        foreach (var value in entries) {
+            var parts = ((string)value!).Split(':', 2);
+            if (parts.Length == 2
+                && ulong.TryParse(parts[0], out var chId)
+                && ulong.TryParse(parts[1], out var msgId)) {
+                messagesToDelete.Add((chId, msgId));
+            }
+        }
+
+        await _db.KeyDeleteAsync(key);
+        await _db.StringSetAsync(handledKey, "1", TimeSpan.FromSeconds(windowSeconds));
+
+        return new DuplicateDetectionResult(true, messagesToDelete);
+    }
+
+    /// <summary>
+    /// Extracts all textual content from a message, including its raw content and the text
+    /// fields of every embed (title, description, fields, footer, author, url). Used for
+    /// duplicate detection on messages that may have empty content but rich embeds.
+    /// </summary>
+    public static string ExtractFullContent(IMessage message) {
+        var parts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(message.Content))
+            parts.Add(message.Content.Trim());
+
+        foreach (var embed in message.Embeds) {
+            if (!string.IsNullOrWhiteSpace(embed.Title))
+                parts.Add(embed.Title.Trim());
+            if (!string.IsNullOrWhiteSpace(embed.Description))
+                parts.Add(embed.Description.Trim());
+            if (!string.IsNullOrWhiteSpace(embed.Url))
+                parts.Add(embed.Url.Trim());
+            if (embed.Author is { } author && !string.IsNullOrWhiteSpace(author.Name))
+                parts.Add(author.Name.Trim());
+            if (embed.Footer is { } footer && !string.IsNullOrWhiteSpace(footer.Text))
+                parts.Add(footer.Text.Trim());
+            foreach (var field in embed.Fields) {
+                if (!string.IsNullOrWhiteSpace(field.Name))
+                    parts.Add(field.Name.Trim());
+                if (!string.IsNullOrWhiteSpace(field.Value))
+                    parts.Add(field.Value.Trim());
+            }
+        }
+
+        return string.Join('\n', parts);
     }
 
     /// <summary>
@@ -230,3 +290,8 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     [GeneratedRegex(@"(?:https?://)?[a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?)+(?:/[^\s]*)?", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
     private static partial Regex UrlPatternRegex();
 }
+
+public sealed record DuplicateDetectionResult(
+    bool IsDuplicate,
+    IReadOnlyList<(ulong ChannelId, ulong MessageId)> MessagesToDelete
+);
