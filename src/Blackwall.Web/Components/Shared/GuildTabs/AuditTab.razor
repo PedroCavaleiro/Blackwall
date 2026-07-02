@@ -1,0 +1,38 @@
+@inject BlackwallApiService Api
+
+<div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+    <div class="card-header">AUDIT LOG</div>
+    <div class="p-4">
+        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+            Select a channel where Blackwall will post an embed for each infraction: who triggered it, which filter fired, the message content, and the action taken.
+        </p>
+
+        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Log channel</div>
+                <div class="form-text">Leave blank to disable audit logging.</div>
+            </div>
+            <InputSelect class="form-select" style="max-width:260px" @bind-Value="Form.LogChannelId">
+                <option value="">— None —</option>
+                @foreach (var ch in _channels) {
+                    <option value="@ch.Id">#@ch.Name</option>
+                }
+            </InputSelect>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required SpamConfigForm Form { get; set; }
+    [Parameter, EditorRequired] public required long DiscordGuildId { get; set; }
+
+    private IReadOnlyList<DiscordChannelDto> _channels = [];
+
+    protected override async Task OnInitializedAsync() {
+        try {
+            _channels = await Api.GetChannelsAsync(DiscordGuildId);
+        } catch {
+            _channels = [];
+        }
+    }
+}
