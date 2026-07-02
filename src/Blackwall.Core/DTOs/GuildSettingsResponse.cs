@@ -5,5 +5,6 @@ public sealed record GuildSettingsResponse(
     string Name,
     string? IconHash,
     bool IsActive,
+    bool ShareBanList,
     SpamConfigurationDto SpamConfiguration
 );

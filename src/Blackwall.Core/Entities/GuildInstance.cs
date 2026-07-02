@@ -6,11 +6,13 @@ public sealed class GuildInstance: EntityBase {
     public string Name { get; set; } = null!;
     public string? IconHash { get; set; }
     public bool IsActive { get; set; } = true;
+    public bool ShareBanList { get; set; }
     public long? OwnerUserId { get; set; }
     public AppUser? OwnerUser { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 
     public SpamConfiguration SpamConfiguration { get; set; } = null!;
     public ICollection<GuildManager> Managers { get; set; } = [];
+    public ICollection<GuildBan> Bans { get; set; } = [];
 
 }

@@ -12,6 +12,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<SpamConfiguration> SpamConfigurations => Set<SpamConfiguration>();
     public DbSet<GuildBlacklist> GuildBlacklists => Set<GuildBlacklist>();
     public DbSet<GuildBlacklistDomain> GuildBlacklistDomains => Set<GuildBlacklistDomain>();
+    public DbSet<GuildBan> GuildBans => Set<GuildBan>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -70,6 +71,11 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.HasOne(e => e.SpamConfiguration)
                   .WithOne(e => e.GuildInstance)
                   .HasForeignKey<SpamConfiguration>(e => e.GuildInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.Bans)
+                  .WithOne(e => e.GuildInstance)
+                  .HasForeignKey(e => e.GuildInstanceId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -289,6 +295,20 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .HasMaxLength(512);
 
             entity.HasIndex(e => new { e.SpamConfigurationId, e.Domain })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<GuildBan>(entity => {
+            entity.Property(e => e.DiscordUserId)
+                  .IsRequired();
+
+            entity.Property(e => e.Username)
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.Reason)
+                  .HasMaxLength(2000);
+
+            entity.HasIndex(e => new { e.GuildInstanceId, e.DiscordUserId })
                   .IsUnique();
         });
 

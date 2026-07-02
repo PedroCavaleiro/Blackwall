@@ -94,12 +94,14 @@ builder.Services.AddScoped<GuildClaimService>();
 builder.Services.AddScoped<GuildPermissionSyncService>();
 builder.Services.AddSingleton<DiscordGuildCacheService>();
 builder.Services.AddScoped<BlacklistService>();
+builder.Services.AddSingleton<BanSyncService>();
 builder.Services.AddSingleton<SafeBrowsingService>();
 builder.Services.AddScoped<SafeBrowsingSyncService>();
 builder.Services.AddHostedService<SafeBrowsingSyncBackgroundService>();
 builder.Services.AddHostedService<BotWorker>();
 builder.Services.AddHostedService<GuildPermissionSyncBackgroundService>();
 builder.Services.AddHostedService<BlacklistRefreshBackgroundService>();
+builder.Services.AddHostedService<BanSyncBackgroundService>();
 
 builder.Services.AddAuthorization();
 

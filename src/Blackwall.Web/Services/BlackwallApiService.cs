@@ -233,4 +233,52 @@ public sealed class BlackwallApiService(
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task UpdateShareBanListAsync(long discordGuildId, bool shareBanList, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/guilds/{discordGuildId}/bans/share");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new UpdateShareBanListRequest(shareBanList));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<SharedBanListGuildResponse>> GetSharedBanListGuildsAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/bans/shared-guilds");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<SharedBanListGuildResponse>>(ct) ?? [];
+    }
+
+    public async Task<IReadOnlyList<GuildBanResponse>> GetBansAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/bans");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<GuildBanResponse>>(ct) ?? [];
+    }
+
+    public async Task<IReadOnlyList<GuildBanResponse>> GetSourceGuildBansAsync(long discordGuildId, long sourceDiscordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/bans/source/{sourceDiscordGuildId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<GuildBanResponse>>(ct) ?? [];
+    }
+
+    public async Task SyncBansAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/bans/sync");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<ImportBansResultResponse?> ImportBansAsync(long discordGuildId, long sourceDiscordGuildId, IReadOnlyList<long>? discordUserIds = null, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/bans/import");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new ImportBansRequest(sourceDiscordGuildId, discordUserIds));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ImportBansResultResponse>(ct);
+    }
 }
