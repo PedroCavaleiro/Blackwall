@@ -1,29 +1,29 @@
 @inject BlackwallApiService Api
 
-<div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+<div class="cut-corner border mb-4 bw-card">
     <div class="card-header">BAN LIST SHARING</div>
     <div class="p-4">
-        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+        <p class="font-mono mb-4 bw-desc">
             When enabled, your server's ban list becomes visible to other servers managed by Blackwall. Other server admins can import your bans into their server. You control whether your bans are shared &mdash; importing is always available.
         </p>
 
-        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+        <div class="bw-field bw-field-last">
             <div class="bw-field-label">
                 <div class="form-label mb-1">Share ban list</div>
                 <div class="form-text">When on, other Blackwall-managed servers can see and import your bans.</div>
             </div>
             <div class="form-check form-switch">
-                <input type="checkbox" class="form-check-input" id="shareBanList" style="width:2.5em;height:1.3em"
+                <input type="checkbox" class="form-check-input bw-switch" id="shareBanList"
                        checked="@_shareBanList" disabled="@_banBusy" @onchange="ToggleShareBanListAsync" />
             </div>
         </div>
     </div>
 </div>
 
-<div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+<div class="cut-corner border mb-4 bw-card">
     <div class="card-header">YOUR BAN LIST</div>
     <div class="p-4">
-        <p class="font-mono mb-3" style="font-size:0.75rem;color:var(--bw-muted)">
+        <p class="font-mono mb-3 bw-desc">
             @if (_bans.Any()) {
                 <text>@_bans.Count ban(s) synced. Sync now to pull the latest bans from Discord.</text>
             } else {
@@ -31,7 +31,7 @@
             }
         </p>
 
-        <button type="button" class="btn btn-outline-primary cut-corner font-display mb-3" style="font-size:0.7rem;letter-spacing:0.1em"
+        <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-xs mb-3"
                 disabled="@_banBusy" @onclick="SyncBansAsync">
             @(_banBusy ? "SYNCING..." : "SYNC FROM DISCORD")
         </button>
@@ -41,12 +41,12 @@
                 @foreach (var ban in _bans) {
                     <div class="d-flex align-items-start justify-content-between border-bottom py-2">
                         <div>
-                            <div class="font-mono" style="font-size:0.78rem">@(ban.Username ?? "Unknown") <span style="color:var(--bw-muted)">(@ban.DiscordUserId)</span></div>
+                            <div class="font-mono bw-ban-user">@(ban.Username ?? "Unknown") <span class="bw-text-muted">(@ban.DiscordUserId)</span></div>
                             @if (!string.IsNullOrWhiteSpace(ban.Reason)) {
-                                <div class="font-mono" style="font-size:0.7rem;color:var(--bw-muted)">@ban.Reason</div>
+                                <div class="font-mono bw-desc">@ban.Reason</div>
                             }
                             @if (ban.BannedAtUtc.HasValue) {
-                                <div class="font-mono" style="font-size:0.68rem;color:var(--bw-muted)">@ban.BannedAtUtc.Value.ToString("yyyy-MM-dd HH:mm UTC")</div>
+                                <div class="font-mono bw-meta">@ban.BannedAtUtc.Value.ToString("yyyy-MM-dd HH:mm UTC")</div>
                             }
                         </div>
                     </div>
@@ -56,16 +56,16 @@
     </div>
 </div>
 
-<div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+<div class="cut-corner border mb-4 bw-card">
     <div class="card-header">IMPORT BANS</div>
     <div class="p-4">
-        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+        <p class="font-mono mb-4 bw-desc">
             Import bans from other Blackwall-managed servers that have ban list sharing enabled. You can import the entire list or select individual bans. Users already banned in your server are automatically skipped.
         </p>
 
         @if (_sharedBanGuilds.Any()) {
             <div class="mb-3">
-                <label class="form-label font-mono" style="font-size:0.7rem;letter-spacing:0.1em">SELECT SOURCE SERVER</label>
+                <label class="form-label font-mono bw-label">SELECT SOURCE SERVER</label>
                 <select class="form-select mb-2" @bind="_selectedSourceGuildId" disabled="@_banBusy">
                     <option value="0">— Select a server —</option>
                     @foreach (var g in _sharedBanGuilds) {
@@ -77,8 +77,8 @@
             @if (_selectedSourceGuildId > 0) {
                 <div class="mb-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                        <label class="form-label font-mono mb-0" style="font-size:0.7rem;letter-spacing:0.1em">SOURCE BANS</label>
-                        <button type="button" class="btn btn-sm btn-outline-secondary font-display" style="font-size:0.65rem;letter-spacing:0.1em"
+                        <label class="form-label font-mono mb-0 bw-label">SOURCE BANS</label>
+                        <button type="button" class="btn btn-sm btn-outline-secondary font-display bw-btn-xxs"
                                 disabled="@_banBusy" @onclick="LoadSourceBansAsync">
                             LOAD BANS
                         </button>
@@ -99,24 +99,24 @@
                             }
                         </div>
                         <div class="mt-2 d-flex gap-2">
-                            <button type="button" class="btn btn-sm btn-outline-secondary font-display" style="font-size:0.65rem;letter-spacing:0.1em"
+                            <button type="button" class="btn btn-sm btn-outline-secondary font-display bw-btn-xxs"
                                     disabled="@_banBusy" @onclick="SelectAllSourceBans">SELECT ALL</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary font-display" style="font-size:0.65rem;letter-spacing:0.1em"
+                            <button type="button" class="btn btn-sm btn-outline-secondary font-display bw-btn-xxs"
                                     disabled="@_banBusy" @onclick="ClearSelectedImportUsers">CLEAR</button>
                         </div>
                     } else if (_sourceBansLoaded) {
-                        <div class="font-mono" style="font-size:0.72rem;color:var(--bw-muted)">No bans found in source server.</div>
+                        <div class="font-mono bw-desc">No bans found in source server.</div>
                     }
                 </div>
 
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-primary cut-corner font-display" style="font-size:0.72rem;letter-spacing:0.1em"
+                    <button type="button" class="btn btn-primary cut-corner font-display bw-btn-sm"
                             disabled="@(_banBusy || _selectedSourceGuildId == 0)"
                             @onclick="ImportAllBansAsync">
                         @(_banBusy ? "IMPORTING..." : "IMPORT ALL")
                     </button>
                     @if (_selectedImportUserIds.Count > 0) {
-                        <button type="button" class="btn btn-outline-primary cut-corner font-display" style="font-size:0.72rem;letter-spacing:0.1em"
+                        <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-sm"
                                 disabled="@_banBusy" @onclick="ImportSelectedBansAsync">
                             @(_banBusy ? "IMPORTING..." : $"IMPORT SELECTED ({_selectedImportUserIds.Count})")
                         </button>
@@ -124,11 +124,11 @@
                 </div>
             }
         } else {
-            <div class="font-mono" style="font-size:0.75rem;color:var(--bw-muted)">No other servers have ban list sharing enabled.</div>
+            <div class="font-mono bw-desc">No other servers have ban list sharing enabled.</div>
         }
 
         @if (_importResult is not null) {
-            <div class="alert alert-success font-mono my-4" style="font-size:0.8rem">
+            <div class="alert alert-success font-mono my-4 bw-alert-text">
                 // IMPORT COMPLETE: @_importResult.Imported imported, @_importResult.Skipped skipped (already banned), @_importResult.Failed failed.
                 @if (_importResult.Errors.Count > 0) {
                     <br />@string.Join("; ", _importResult.Errors.Take(5))
@@ -138,10 +138,10 @@
     </div>
 </div>
 
-<div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+<div class="cut-corner border mb-4 bw-card">
     <div class="card-header">AUTO-SYNC</div>
     <div class="p-4">
-        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+        <p class="font-mono mb-4 bw-desc">
             Automatically import bans from selected servers on a regular schedule. New bans added by the source server will be imported automatically. Users already banned in your server are skipped.
         </p>
 
@@ -150,11 +150,11 @@
                 @foreach (var rule in _banSyncRules) {
                     <div class="d-flex align-items-center justify-content-between border-bottom py-2">
                         <div>
-                            <div class="font-mono" style="font-size:0.78rem">@rule.SourceGuildName <span style="color:var(--bw-muted)">(@rule.SourceDiscordGuildId)</span></div>
+                            <div class="font-mono bw-ban-user">@rule.SourceGuildName <span class="bw-text-muted">(@rule.SourceDiscordGuildId)</span></div>
                             @if (rule.LastSyncedAtUtc.HasValue) {
-                                <div class="font-mono" style="font-size:0.68rem;color:var(--bw-muted)">Last synced: @rule.LastSyncedAtUtc.Value.ToString("yyyy-MM-dd HH:mm UTC")</div>
+                                <div class="font-mono bw-meta">Last synced: @rule.LastSyncedAtUtc.Value.ToString("yyyy-MM-dd HH:mm UTC")</div>
                             } else {
-                                <div class="font-mono" style="font-size:0.68rem;color:var(--bw-muted)">Not yet synced</div>
+                                <div class="font-mono bw-meta">Not yet synced</div>
                             }
                         </div>
                         <div class="d-flex align-items-center gap-3">
@@ -163,7 +163,7 @@
                                        checked="@rule.IsEnabled" disabled="@_banBusy"
                                        @onchange="@(e => ToggleBanSyncRuleAsync(rule.Id, (bool)e.Value!))" />
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-danger" style="font-size:0.7rem"
+                            <button type="button" class="btn btn-sm btn-outline-danger bw-btn-remove"
                                     disabled="@_banBusy" @onclick="() => RemoveBanSyncRuleAsync(rule.Id)">
                                 REMOVE
                             </button>
@@ -172,12 +172,12 @@
                 }
             </div>
         } else {
-            <div class="font-mono mb-3" style="font-size:0.75rem;color:var(--bw-muted)">No auto-sync rules configured.</div>
+            <div class="font-mono mb-3 bw-desc">No auto-sync rules configured.</div>
         }
 
         @if (_sharedBanGuilds.Any()) {
             <div>
-                <label class="form-label font-mono" style="font-size:0.7rem;letter-spacing:0.1em">ADD AUTO-SYNC SOURCE</label>
+                <label class="form-label font-mono bw-label">ADD AUTO-SYNC SOURCE</label>
                 <div class="d-flex gap-2">
                     <select class="form-select" @bind="_selectedAutoSyncSourceId" disabled="@_banBusy">
                         <option value="0">— Select a server —</option>
@@ -185,14 +185,14 @@
                             <option value="@g.DiscordGuildId">@g.Name (@g.BanCount bans)</option>
                         }
                     </select>
-                    <button type="button" class="btn btn-outline-primary cut-corner font-display" style="font-size:0.7rem;letter-spacing:0.1em;white-space:nowrap"
+                    <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-xs-nowrap"
                             disabled="@(_selectedAutoSyncSourceId == 0 || _banBusy)" @onclick="AddBanSyncRuleAsync">
                         ADD
                     </button>
                 </div>
             </div>
         } else {
-            <div class="font-mono" style="font-size:0.75rem;color:var(--bw-muted)">No shared ban lists available to auto-sync from.</div>
+            <div class="font-mono bw-desc">No shared ban lists available to auto-sync from.</div>
         }
     </div>
 </div>

@@ -7,6 +7,8 @@ Tools provided by the community and improving upon the existing ones.
 
 > **Don't want to self-host?** You can add the bot to your server directly at [blackwall.observer](https://blackwall.observer).
 
+> Full Wiki is available at [pedrocavaleiro.github.io/Blackwall](https://pedrocavaleiro.github.io/Blackwall).
+
 ## Features
 
 - **Real-time spam detection** — rate limiting, duplicate message detection, mention flooding, invite link blocking, and suspicious link filtering.

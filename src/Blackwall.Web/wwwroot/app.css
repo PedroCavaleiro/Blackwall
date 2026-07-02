@@ -404,5 +404,59 @@ h1:focus { outline: none; }
 
 .bw-legal a:hover { text-decoration: underline; }
 
+/* --- Guild settings cards --- */
+.bw-card { background: var(--bs-card-bg); }
+.bw-card-danger { background: var(--bs-card-bg); border-color: var(--bw-danger) !important; }
+.bw-header-danger { color: var(--bw-danger); }
+
+/* --- Section description / empty state text --- */
+.bw-desc { font-size: 0.75rem; color: var(--bw-muted); }
+
+/* --- Toggle switch sizing --- */
+.bw-switch { width: 2.5em; height: 1.3em; }
+
+/* --- Input max widths --- */
+.bw-input-narrow { max-width: 140px; }
+.bw-input-select { max-width: 200px; }
+
+/* --- Last field in a section --- */
+.bw-field-last { border-bottom: none; padding-bottom: 0; }
+
+/* --- Button text sizes --- */
+.bw-btn-xxs { font-size: 0.65rem; letter-spacing: 0.1em; }
+.bw-btn-xs { font-size: 0.7rem; letter-spacing: 0.1em; }
+.bw-btn-xs-nowrap { font-size: 0.7rem; letter-spacing: 0.1em; white-space: nowrap; }
+.bw-btn-sm { font-size: 0.72rem; letter-spacing: 0.1em; }
+.bw-btn-md { font-size: 0.75rem; letter-spacing: 0.1em; }
+.bw-btn-remove { font-size: 0.7rem; }
+
+/* --- Form labels --- */
+.bw-label { font-size: 0.7rem; letter-spacing: 0.1em; }
+
+/* --- Loading / error text --- */
+.bw-loading { color: var(--bw-muted); font-size: 0.85rem; }
+.bw-err { color: var(--bw-danger); font-size: 0.85rem; }
+
+/* --- Alert text size --- */
+.bw-alert-text { font-size: 0.8rem; }
+
+/* --- Meta text (footer, dates, status) --- */
+.bw-meta { font-size: 0.68rem; color: var(--bw-muted); }
+
+/* --- Text color helpers --- */
+.bw-text-muted { color: var(--bw-muted); }
+.bw-text-primary { color: var(--bw-primary); }
+
+/* --- Dashboard --- */
+.bw-section-label { font-size: 0.72rem; letter-spacing: 0.15em; }
+.bw-role { font-size: 0.65rem; color: var(--bw-muted); letter-spacing: 0.1em; }
+.bw-status { font-size: 0.68rem; letter-spacing: 0.12em; }
+.bw-divider { height: 1px; background: rgba(34, 211, 238, 0.15); }
+.bw-empty-box { border: 1px dashed rgba(34, 211, 238, 0.2); padding: 2.5rem; text-align: center; font-size: 0.8rem; color: var(--bw-muted); }
+.bw-guild-name { font-size: 0.95rem; letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* --- Ban list item --- */
+.bw-ban-user { font-size: 0.78rem; }
+
 /* --- Reconnect modal --- */
 #components-reconnect-modal { display: none; }
