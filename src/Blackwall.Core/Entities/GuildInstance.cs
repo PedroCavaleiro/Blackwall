@@ -14,5 +14,6 @@ public sealed class GuildInstance: EntityBase {
     public SpamConfiguration SpamConfiguration { get; set; } = null!;
     public ICollection<GuildManager> Managers { get; set; } = [];
     public ICollection<GuildBan> Bans { get; set; } = [];
+    public ICollection<GuildBanSyncRule> BanSyncRules { get; set; } = [];
 
 }

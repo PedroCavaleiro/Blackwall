@@ -281,4 +281,36 @@ public sealed class BlackwallApiService(
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<ImportBansResultResponse>(ct);
     }
+
+    public async Task<IReadOnlyList<BanSyncRuleResponse>> GetBanSyncRulesAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/bans/auto-sync");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<BanSyncRuleResponse>>(ct) ?? [];
+    }
+
+    public async Task<BanSyncRuleResponse?> AddBanSyncRuleAsync(long discordGuildId, long sourceDiscordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/bans/auto-sync");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddBanSyncRuleRequest(sourceDiscordGuildId));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<BanSyncRuleResponse>(ct);
+    }
+
+    public async Task UpdateBanSyncRuleAsync(long discordGuildId, long ruleId, bool isEnabled, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/guilds/{discordGuildId}/bans/auto-sync/{ruleId}");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new UpdateBanSyncRuleRequest(isEnabled));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteBanSyncRuleAsync(long discordGuildId, long ruleId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/bans/auto-sync/{ruleId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

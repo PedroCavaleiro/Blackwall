@@ -799,6 +799,65 @@
                         }
                     </div>
                 </div>
+
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">AUTO-SYNC</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                            Automatically import bans from selected servers on a regular schedule. New bans added by the source server will be imported automatically. Users already banned in your server are skipped.
+                        </p>
+
+                        @if (_banSyncRules.Any()) {
+                            <div class="mb-3">
+                                @foreach (var rule in _banSyncRules) {
+                                    <div class="d-flex align-items-center justify-content-between border-bottom py-2">
+                                        <div>
+                                            <div class="font-mono" style="font-size:0.78rem">@rule.SourceGuildName <span style="color:var(--bw-muted)">(@rule.SourceDiscordGuildId)</span></div>
+                                            @if (rule.LastSyncedAtUtc.HasValue) {
+                                                <div class="font-mono" style="font-size:0.68rem;color:var(--bw-muted)">Last synced: @rule.LastSyncedAtUtc.Value.ToString("yyyy-MM-dd HH:mm UTC")</div>
+                                            } else {
+                                                <div class="font-mono" style="font-size:0.68rem;color:var(--bw-muted)">Not yet synced</div>
+                                            }
+                                        </div>
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="form-check form-switch">
+                                                <input type="checkbox" class="form-check-input" id="rule-@rule.Id" style="width:2em;height:1.05em"
+                                                       checked="@rule.IsEnabled" disabled="@_banBusy"
+                                                       @onchange="@(e => ToggleBanSyncRuleAsync(rule.Id, (bool)e.Value!))" />
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" style="font-size:0.7rem"
+                                                    disabled="@_banBusy" @onclick="() => RemoveBanSyncRuleAsync(rule.Id)">
+                                                REMOVE
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        } else {
+                            <div class="font-mono mb-3" style="font-size:0.75rem;color:var(--bw-muted)">No auto-sync rules configured.</div>
+                        }
+
+                        @if (_sharedBanGuilds.Any()) {
+                            <div>
+                                <label class="form-label font-mono" style="font-size:0.7rem;letter-spacing:0.1em">ADD AUTO-SYNC SOURCE</label>
+                                <div class="d-flex gap-2">
+                                    <select class="form-select" @bind="_selectedAutoSyncSourceId" disabled="@_banBusy">
+                                        <option value="0">— Select a server —</option>
+                                        @foreach (var g in _sharedBanGuilds) {
+                                            <option value="@g.DiscordGuildId">@g.Name (@g.BanCount bans)</option>
+                                        }
+                                    </select>
+                                    <button type="button" class="btn btn-outline-primary cut-corner font-display" style="font-size:0.7rem;letter-spacing:0.1em;white-space:nowrap"
+                                            disabled="@(_selectedAutoSyncSourceId == 0 || _banBusy)" @onclick="AddBanSyncRuleAsync">
+                                        ADD
+                                    </button>
+                                </div>
+                            </div>
+                        } else {
+                            <div class="font-mono" style="font-size:0.75rem;color:var(--bw-muted)">No shared ban lists available to auto-sync from.</div>
+                        }
+                    </div>
+                </div>
             }
 
             @if (_activeTab == "audit") {
@@ -906,6 +965,8 @@
     private bool _sourceBansLoaded;
     private HashSet<long> _selectedImportUserIds = [];
     private ImportBansResultResponse? _importResult;
+    private IReadOnlyList<BanSyncRuleResponse> _banSyncRules = [];
+    private long _selectedAutoSyncSourceId;
 
     protected override async Task OnInitializedAsync() {
         try {
@@ -963,9 +1024,11 @@
             try {
                 _bans = await Api.GetBansAsync(DiscordGuildId);
                 _sharedBanGuilds = await Api.GetSharedBanListGuildsAsync(DiscordGuildId);
+                _banSyncRules = await Api.GetBanSyncRulesAsync(DiscordGuildId);
             } catch {
                 _bans = [];
                 _sharedBanGuilds = [];
+                _banSyncRules = [];
             }
 
             try {
@@ -1304,6 +1367,47 @@
             _bans = await Api.GetBansAsync(DiscordGuildId);
         } catch (Exception ex) {
             _error = $"Failed to import bans: {ex.Message}";
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task AddBanSyncRuleAsync() {
+        if (_selectedAutoSyncSourceId == 0) return;
+        _banBusy = true;
+        _error = null;
+        try {
+            await Api.AddBanSyncRuleAsync(DiscordGuildId, _selectedAutoSyncSourceId);
+            _banSyncRules = await Api.GetBanSyncRulesAsync(DiscordGuildId);
+            _selectedAutoSyncSourceId = 0;
+        } catch (Exception ex) {
+            _error = $"Failed to add auto-sync rule: {ex.Message}";
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task ToggleBanSyncRuleAsync(long ruleId, bool enabled) {
+        _banBusy = true;
+        _error = null;
+        try {
+            await Api.UpdateBanSyncRuleAsync(DiscordGuildId, ruleId, enabled);
+            _banSyncRules = await Api.GetBanSyncRulesAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            _error = $"Failed to update auto-sync rule: {ex.Message}";
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task RemoveBanSyncRuleAsync(long ruleId) {
+        _banBusy = true;
+        _error = null;
+        try {
+            await Api.DeleteBanSyncRuleAsync(DiscordGuildId, ruleId);
+            _banSyncRules = await Api.GetBanSyncRulesAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            _error = $"Failed to remove auto-sync rule: {ex.Message}";
         } finally {
             _banBusy = false;
         }

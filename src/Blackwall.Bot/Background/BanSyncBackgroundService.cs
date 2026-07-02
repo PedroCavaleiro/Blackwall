@@ -59,5 +59,6 @@ public sealed class BanSyncBackgroundService(
         var banSyncService = scope.ServiceProvider.GetRequiredService<BanSyncService>();
 
         await banSyncService.SyncAllBansAsync(cancellationToken);
+        await banSyncService.ProcessAutoSyncRulesAsync(cancellationToken);
     }
 }

@@ -30,3 +30,19 @@ public sealed record ImportBansResultResponse(
 public sealed record UpdateShareBanListRequest(
     bool ShareBanList
 );
+
+public sealed record BanSyncRuleResponse(
+    long Id,
+    long SourceDiscordGuildId,
+    string SourceGuildName,
+    bool IsEnabled,
+    DateTime? LastSyncedAtUtc
+);
+
+public sealed record AddBanSyncRuleRequest(
+    long SourceDiscordGuildId
+);
+
+public sealed record UpdateBanSyncRuleRequest(
+    bool IsEnabled
+);

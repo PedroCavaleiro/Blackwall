@@ -100,7 +100,7 @@ public sealed class BanSyncService(
             cancellationToken.ThrowIfCancellationRequested();
             try {
                 await SyncBansAsync(guildId, cancellationToken);
-            } catch (OperationCanceledException) when (stoppingTokenIsCancellation(cancellationToken)) {
+            } catch (OperationCanceledException) when (StoppingTokenIsCancellation(cancellationToken)) {
                 throw;
             } catch (Exception ex) {
                 logger.LogWarning(ex, "Failed to sync bans for guild {GuildId}", guildId);
@@ -108,7 +108,60 @@ public sealed class BanSyncService(
         }
     }
 
-    private static bool stoppingTokenIsCancellation(CancellationToken ct) => ct.IsCancellationRequested;
+    private static bool StoppingTokenIsCancellation(CancellationToken ct) => ct.IsCancellationRequested;
+
+    /// <summary>
+    /// Processes all enabled auto-sync rules, importing bans from source guilds into target guilds.
+    /// Errors for individual rules are logged and swallowed.
+    /// </summary>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    public async Task ProcessAutoSyncRulesAsync(CancellationToken cancellationToken = default) {
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BlackwallDbContext>();
+
+        var rules = await dbContext.GuildBanSyncRules
+            .Where(r => r.IsEnabled)
+            .ToListAsync(cancellationToken);
+
+        if (rules.Count == 0)
+            return;
+
+        logger.LogInformation("Processing {Count} ban auto-sync rule(s)", rules.Count);
+
+        foreach (var rule in rules) {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var targetInstance = await dbContext.GuildInstances
+                .FirstOrDefaultAsync(x => x.Id == rule.TargetGuildInstanceId && x.IsActive, cancellationToken);
+
+            if (targetInstance is null) {
+                logger.LogWarning("Auto-sync rule {RuleId}: target guild not found or inactive", rule.Id);
+                continue;
+            }
+
+            var sourceInstance = await dbContext.GuildInstances
+                .FirstOrDefaultAsync(x => x.DiscordGuildId == rule.SourceDiscordGuildId && x.IsActive && x.ShareBanList, cancellationToken);
+
+            if (sourceInstance is null) {
+                logger.LogWarning("Auto-sync rule {RuleId}: source guild {SourceGuildId} not found, inactive, or not sharing", rule.Id, rule.SourceDiscordGuildId);
+                continue;
+            }
+
+            try {
+                var (imported, skipped, failed, _) = await ImportBansAsync(
+                    targetInstance.DiscordGuildId, rule.SourceDiscordGuildId, null, cancellationToken);
+
+                rule.LastSyncedAtUtc = DateTime.UtcNow;
+                await dbContext.SaveChangesAsync(cancellationToken);
+
+                logger.LogInformation("Auto-sync rule {RuleId}: {Imported} imported, {Skipped} skipped, {Failed} failed",
+                    rule.Id, imported, skipped, failed);
+            } catch (Exception ex) {
+                logger.LogWarning(ex, "Auto-sync rule {RuleId} failed for target guild {TargetGuildId} from source guild {SourceGuildId}",
+                    rule.Id, targetInstance.DiscordGuildId, rule.SourceDiscordGuildId);
+            }
+        }
+    }
 
     /// <summary>
     /// Imports bans from a source guild into the target guild. Only imports bans from guilds
