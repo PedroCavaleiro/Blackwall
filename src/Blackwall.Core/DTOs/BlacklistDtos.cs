@@ -21,3 +21,12 @@ public sealed record BlacklistDomainResponse(
 public sealed record AddBlacklistDomainRequest(
     string Domain
 );
+
+public sealed record BannedWordResponse(
+    long Id,
+    string Word
+);
+
+public sealed record AddBannedWordRequest(
+    string Word
+);

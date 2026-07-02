@@ -96,6 +96,7 @@ builder.Services.AddSingleton<DiscordGuildCacheService>();
 builder.Services.AddScoped<BlacklistService>();
 builder.Services.AddSingleton<BanSyncService>();
 builder.Services.AddSingleton<SafeBrowsingService>();
+builder.Services.AddSingleton<ContentGuardService>();
 builder.Services.AddScoped<SafeBrowsingSyncService>();
 builder.Services.AddHostedService<SafeBrowsingSyncBackgroundService>();
 builder.Services.AddHostedService<BotWorker>();

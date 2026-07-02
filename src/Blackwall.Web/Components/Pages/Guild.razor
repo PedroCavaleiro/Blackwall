@@ -54,6 +54,7 @@
                 <button type="button" class="bw-tab-btn @(_activeTab == "general"   ? "active" : "")" @onclick='() => _activeTab = "general"'>GENERAL</button>
                 <button type="button" class="bw-tab-btn @(_activeTab == "detection" ? "active" : "")" @onclick='() => _activeTab = "detection"'>DETECTION</button>
                 <button type="button" class="bw-tab-btn @(_activeTab == "links"     ? "active" : "")" @onclick='() => _activeTab = "links"'>LINKS</button>
+                <button type="button" class="bw-tab-btn @(_activeTab == "contentguard" ? "active" : "")" @onclick='() => _activeTab = "contentguard"'>CONTENT GUARD</button>
                 <button type="button" class="bw-tab-btn @(_activeTab == "antiraid"  ? "active" : "")" @onclick='() => _activeTab = "antiraid"'>ANTI-RAID</button>
                 <button type="button" class="bw-tab-btn @(_activeTab == "scoring"   ? "active" : "")" @onclick='() => _activeTab = "scoring"'>SCORING</button>
                 <button type="button" class="bw-tab-btn @(_activeTab == "bans"      ? "active" : "")" @onclick='() => _activeTab = "bans"'>BANS</button>
@@ -69,6 +70,9 @@
             }
             @if (_activeTab == "links") {
                 <LinksTab Form="Form" DiscordGuildId="DiscordGuildId" OnError="HandleError" />
+            }
+            @if (_activeTab == "contentguard") {
+                <ContentGuardTab Form="Form" DiscordGuildId="DiscordGuildId" OnError="HandleError" />
             }
             @if (_activeTab == "antiraid") {
                 <AntiRaidTab Form="Form" />
@@ -191,6 +195,20 @@
                 Form.SuspiciousLinkAutoLockdown = s.SuspiciousLinkAutoLockdown;
                 Form.SuspiciousLinkTimeoutMinutes = s.SuspiciousLinkTimeoutMinutes;
                 Form.SuspiciousLinkMessageDeleteDays = s.SuspiciousLinkMessageDeleteDays;
+                Form.IsContentGuardEnabled = s.IsContentGuardEnabled;
+                Form.ContentGuardFuzzyMatching = s.ContentGuardFuzzyMatching;
+                Form.ContentGuardInvisibleCharScrubbing = s.ContentGuardInvisibleCharScrubbing;
+                Form.ContentGuardZalgoBlocking = s.ContentGuardZalgoBlocking;
+                Form.ContentGuardCopypastaHashing = s.ContentGuardCopypastaHashing;
+                Form.ContentGuardFuzzyThreshold = s.ContentGuardFuzzyThreshold;
+                Form.ContentGuardZalgoMaxCombining = s.ContentGuardZalgoMaxCombining;
+                Form.ContentGuardCopypastaMinLength = s.ContentGuardCopypastaMinLength;
+                Form.ContentGuardCopypastaThreshold = s.ContentGuardCopypastaThreshold;
+                Form.ContentGuardCopypastaWindowSeconds = s.ContentGuardCopypastaWindowSeconds;
+                Form.ContentGuardAction = s.ContentGuardAction;
+                Form.ContentGuardAutoLockdown = s.ContentGuardAutoLockdown;
+                Form.ContentGuardTimeoutMinutes = s.ContentGuardTimeoutMinutes;
+                Form.ContentGuardMessageDeleteDays = s.ContentGuardMessageDeleteDays;
                 _isLockedDown = s.IsLockedDown;
             }
         } catch {
@@ -254,7 +272,21 @@
                 Form.SuspiciousLinkAction,
                 Form.SuspiciousLinkAutoLockdown,
                 Form.SuspiciousLinkTimeoutMinutes,
-                Form.SuspiciousLinkMessageDeleteDays
+                Form.SuspiciousLinkMessageDeleteDays,
+                Form.IsContentGuardEnabled,
+                Form.ContentGuardFuzzyMatching,
+                Form.ContentGuardInvisibleCharScrubbing,
+                Form.ContentGuardZalgoBlocking,
+                Form.ContentGuardCopypastaHashing,
+                Form.ContentGuardFuzzyThreshold,
+                Form.ContentGuardZalgoMaxCombining,
+                Form.ContentGuardCopypastaMinLength,
+                Form.ContentGuardCopypastaThreshold,
+                Form.ContentGuardCopypastaWindowSeconds,
+                Form.ContentGuardAction,
+                Form.ContentGuardAutoLockdown,
+                Form.ContentGuardTimeoutMinutes,
+                Form.ContentGuardMessageDeleteDays
             ));
             _saved = true;
             _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);

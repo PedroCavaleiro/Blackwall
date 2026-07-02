@@ -45,5 +45,19 @@ public sealed record SpamConfigurationDto(
     InfractionAction SuspiciousLinkAction,
     bool SuspiciousLinkAutoLockdown,
     int SuspiciousLinkTimeoutMinutes,
-    int SuspiciousLinkMessageDeleteDays
+    int SuspiciousLinkMessageDeleteDays,
+    bool IsContentGuardEnabled,
+    bool ContentGuardFuzzyMatching,
+    bool ContentGuardInvisibleCharScrubbing,
+    bool ContentGuardZalgoBlocking,
+    bool ContentGuardCopypastaHashing,
+    int ContentGuardFuzzyThreshold,
+    int ContentGuardZalgoMaxCombining,
+    int ContentGuardCopypastaMinLength,
+    int ContentGuardCopypastaThreshold,
+    int ContentGuardCopypastaWindowSeconds,
+    InfractionAction ContentGuardAction,
+    bool ContentGuardAutoLockdown,
+    int ContentGuardTimeoutMinutes,
+    int ContentGuardMessageDeleteDays
 );

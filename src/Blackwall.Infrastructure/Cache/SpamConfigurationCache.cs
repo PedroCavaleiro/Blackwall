@@ -76,7 +76,21 @@ public sealed class SpamConfigurationCache(
                 x.SpamConfiguration.SuspiciousLinkAction,
                 x.SpamConfiguration.SuspiciousLinkAutoLockdown,
                 x.SpamConfiguration.SuspiciousLinkTimeoutMinutes,
-                x.SpamConfiguration.SuspiciousLinkMessageDeleteDays
+                x.SpamConfiguration.SuspiciousLinkMessageDeleteDays,
+                x.SpamConfiguration.IsContentGuardEnabled,
+                x.SpamConfiguration.ContentGuardFuzzyMatching,
+                x.SpamConfiguration.ContentGuardInvisibleCharScrubbing,
+                x.SpamConfiguration.ContentGuardZalgoBlocking,
+                x.SpamConfiguration.ContentGuardCopypastaHashing,
+                x.SpamConfiguration.ContentGuardFuzzyThreshold,
+                x.SpamConfiguration.ContentGuardZalgoMaxCombining,
+                x.SpamConfiguration.ContentGuardCopypastaMinLength,
+                x.SpamConfiguration.ContentGuardCopypastaThreshold,
+                x.SpamConfiguration.ContentGuardCopypastaWindowSeconds,
+                x.SpamConfiguration.ContentGuardAction,
+                x.SpamConfiguration.ContentGuardAutoLockdown,
+                x.SpamConfiguration.ContentGuardTimeoutMinutes,
+                x.SpamConfiguration.ContentGuardMessageDeleteDays
             ))
             .FirstOrDefaultAsync(cancellationToken);
 

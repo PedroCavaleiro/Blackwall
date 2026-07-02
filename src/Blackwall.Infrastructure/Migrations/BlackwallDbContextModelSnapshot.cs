@@ -132,6 +132,34 @@ namespace Blackwall.Infrastructure.Migrations
                     b.ToTable("GuildBanSyncRules");
                 });
 
+            modelBuilder.Entity("Blackwall.Core.Entities.GuildBannedWord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("SpamConfigurationId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Word")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SpamConfigurationId", "Word")
+                        .IsUnique();
+
+                    b.ToTable("GuildBannedWords");
+                });
+
             modelBuilder.Entity("Blackwall.Core.Entities.GuildBlacklist", b =>
                 {
                     b.Property<long>("Id")
@@ -313,6 +341,71 @@ namespace Blackwall.Infrastructure.Migrations
                     b.Property<bool>("BlockSuspiciousLinks")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("ContentGuardAction")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<bool>("ContentGuardAutoLockdown")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("ContentGuardCopypastaHashing")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("ContentGuardCopypastaMinLength")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(200);
+
+                    b.Property<int>("ContentGuardCopypastaThreshold")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3);
+
+                    b.Property<int>("ContentGuardCopypastaWindowSeconds")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(60);
+
+                    b.Property<bool>("ContentGuardFuzzyMatching")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("ContentGuardFuzzyThreshold")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(2);
+
+                    b.Property<bool>("ContentGuardInvisibleCharScrubbing")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("ContentGuardMessageDeleteDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("ContentGuardTimeoutMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(10);
+
+                    b.Property<bool>("ContentGuardZalgoBlocking")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("ContentGuardZalgoMaxCombining")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3);
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone");
@@ -379,6 +472,11 @@ namespace Blackwall.Infrastructure.Migrations
                         .HasDefaultValue(false);
 
                     b.Property<bool>("IsAntiRaidEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsContentGuardEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
@@ -518,6 +616,17 @@ namespace Blackwall.Infrastructure.Migrations
                     b.Navigation("TargetGuildInstance");
                 });
 
+            modelBuilder.Entity("Blackwall.Core.Entities.GuildBannedWord", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.SpamConfiguration", "SpamConfiguration")
+                        .WithMany("BannedWords")
+                        .HasForeignKey("SpamConfigurationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SpamConfiguration");
+                });
+
             modelBuilder.Entity("Blackwall.Core.Entities.GuildBlacklist", b =>
                 {
                     b.HasOne("Blackwall.Core.Entities.SpamConfiguration", "SpamConfiguration")
@@ -601,6 +710,8 @@ namespace Blackwall.Infrastructure.Migrations
 
             modelBuilder.Entity("Blackwall.Core.Entities.SpamConfiguration", b =>
                 {
+                    b.Navigation("BannedWords");
+
                     b.Navigation("BlacklistDomains");
 
                     b.Navigation("Blacklists");

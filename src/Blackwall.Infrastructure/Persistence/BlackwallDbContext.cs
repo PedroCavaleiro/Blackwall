@@ -14,6 +14,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<GuildBlacklistDomain> GuildBlacklistDomains => Set<GuildBlacklistDomain>();
     public DbSet<GuildBan> GuildBans => Set<GuildBan>();
     public DbSet<GuildBanSyncRule> GuildBanSyncRules => Set<GuildBanSyncRule>();
+    public DbSet<GuildBannedWord> GuildBannedWords => Set<GuildBannedWord>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -284,6 +285,67 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .WithOne(e => e.SpamConfiguration)
                   .HasForeignKey(e => e.SpamConfigurationId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.BannedWords)
+                  .WithOne(e => e.SpamConfiguration)
+                  .HasForeignKey(e => e.SpamConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(e => e.IsContentGuardEnabled)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.ContentGuardFuzzyMatching)
+                  .IsRequired()
+                  .HasDefaultValue(true);
+
+            entity.Property(e => e.ContentGuardInvisibleCharScrubbing)
+                  .IsRequired()
+                  .HasDefaultValue(true);
+
+            entity.Property(e => e.ContentGuardZalgoBlocking)
+                  .IsRequired()
+                  .HasDefaultValue(true);
+
+            entity.Property(e => e.ContentGuardCopypastaHashing)
+                  .IsRequired()
+                  .HasDefaultValue(true);
+
+            entity.Property(e => e.ContentGuardFuzzyThreshold)
+                  .IsRequired()
+                  .HasDefaultValue(2);
+
+            entity.Property(e => e.ContentGuardZalgoMaxCombining)
+                  .IsRequired()
+                  .HasDefaultValue(3);
+
+            entity.Property(e => e.ContentGuardCopypastaMinLength)
+                  .IsRequired()
+                  .HasDefaultValue(200);
+
+            entity.Property(e => e.ContentGuardCopypastaThreshold)
+                  .IsRequired()
+                  .HasDefaultValue(3);
+
+            entity.Property(e => e.ContentGuardCopypastaWindowSeconds)
+                  .IsRequired()
+                  .HasDefaultValue(60);
+
+            entity.Property(e => e.ContentGuardAction)
+                  .IsRequired()
+                  .HasDefaultValue(InfractionAction.DeleteOnly);
+
+            entity.Property(e => e.ContentGuardAutoLockdown)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.ContentGuardTimeoutMinutes)
+                  .IsRequired()
+                  .HasDefaultValue(10);
+
+            entity.Property(e => e.ContentGuardMessageDeleteDays)
+                  .IsRequired()
+                  .HasDefaultValue(0);
         });
 
         modelBuilder.Entity<GuildBlacklist>(entity => {
@@ -326,6 +388,15 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .IsRequired();
 
             entity.HasIndex(e => new { e.TargetGuildInstanceId, e.SourceDiscordGuildId })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<GuildBannedWord>(entity => {
+            entity.Property(e => e.Word)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.HasIndex(e => new { e.SpamConfigurationId, e.Word })
                   .IsUnique();
         });
 
