@@ -117,6 +117,7 @@
       <div class="nav-section">Reference</div>
       <a href="#discord-permissions">Discord Permissions</a>
       <a href="#account-scoring">Account Scoring</a>
+      <a href="#modules">Modules</a>
       <a href="#api-docs">API Documentation</a>
       <a href="#project-structure">Project Structure</a>
     </div>
@@ -578,6 +579,109 @@ dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
         <div class="callout callout-info">
           <strong>Alerts</strong>
           All alerts are sent to the configured <strong>audit log channel</strong> as an embed containing the user, their score, account age, the specific risk factors that contributed, and the action taken.
+        </div>
+      </section>
+
+      <!-- Modules -->
+      <section class="content-section" id="modules">
+        <h2>Modules</h2>
+        <p>Blackwall is organised into independent modules, each configurable per guild through the dashboard. Every module can be toggled on or off, and most support configurable actions (delete only, timeout, kick, or ban) with optional auto-lockdown. Modules stack &mdash; a single message can trigger multiple filters simultaneously.</p>
+
+        <h3>General</h3>
+        <p>Master controls for barrier activation and enforcement mode.</p>
+        <table>
+          <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Enable barrier</strong></td><td>When off, the bot will not process any messages in this server. All other modules are effectively disabled.</td></tr>
+            <tr><td><strong>Dry run</strong></td><td>Detections are logged but no action is taken against the user. Useful for testing configuration changes before enforcing them.</td></tr>
+            <tr><td><strong>Lockdown</strong></td><td>Instantly denies <code>Send Messages</code>, <code>Send Messages in Threads</code>, and <code>Create Public Threads</code> for <code>@everyone</code> in every text channel and category via channel-specific permission overwrites. Higher-tier roles are unaffected. Can be toggled from the dashboard or via the <code>/lockdown</code> and <code>/unlock</code> slash commands in Discord.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Detection Matrix</h3>
+        <p>Controls how the barrier detects and neutralizes spam, duplicate floods, and mass-mention attacks. Each filter runs independently and stacks with the infraction action set in General.</p>
+        <table>
+          <thead><tr><th>Filter</th><th>Settings</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Rate limiting</strong></td><td>Window (seconds), max messages per window</td><td>Counts messages from a single user in a rolling time window. The next message after the limit triggers an infraction. The counter resets once the window expires with no new messages.</td></tr>
+            <tr><td><strong>Duplicate detection</strong></td><td>Threshold, window (seconds), cross-channel toggle</td><td>Tracks identical message hashes per user. When the threshold is reached within the window, the filter trips. Cross-channel mode counts duplicates across different channels; per-channel mode only counts within the same channel. Set threshold to 0 to disable.</td></tr>
+            <tr><td><strong>Mention limit</strong></td><td>Max mentions per message</td><td>Flags messages that exceed the configured combined user, role, and <code>@everyone</code>/<code>@here</code> mention count as mass-ping spam.</td></tr>
+          </tbody>
+        </table>
+        <p>Each detection filter has its own configurable <strong>action</strong> (delete only, timeout, kick, or ban), <strong>timeout duration</strong> (when applicable), <strong>message delete days</strong> (when banning, up to 7 days), and <strong>auto-lockdown</strong> toggle.</p>
+
+        <h3>Link Blocking</h3>
+        <p>Configures which external vectors are neutralized automatically.</p>
+        <table>
+          <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Block Discord invite links</strong></td><td>Deletes messages containing <code>discord.gg</code> invite URLs.</td></tr>
+            <tr><td><strong>Block external links</strong></td><td>Checks message URLs against AdGuard blacklists and custom blocked domains.</td></tr>
+            <tr><td><strong>Whitelist mode</strong></td><td>When on, blacklists are ignored and only domains in the custom domain list below are allowed. Everything else is blocked. Requires <em>Block external links</em> to be enabled.</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Google Safe Browsing</h4>
+        <p>Real-time threat check powered by a locally synchronized Global Cache from Google Safe Browsing. All URL checks are resolved locally against the synced cache &mdash; no URL data or hash prefixes are ever sent to Google. Only available when <code>SAFE_BROWSING__ENABLED=true</code> is set server-side.</p>
+        <table>
+          <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Enable Google Safe Browsing</strong></td><td>Checks URLs that pass the blacklist/whitelist filter against Google's threat lists in real-time. Requires <em>Block external links</em> to be enabled.</td></tr>
+            <tr><td><strong>Block level</strong></td><td><em>Unsafe only</em> blocks confirmed threats. <em>Unsafe and Unsure</em> also blocks URLs where the result is uncertain.</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Blacklist Sources</h4>
+        <p>AdGuard-format blacklist URLs. Domains from these lists are downloaded, merged, and cached in Redis. Refreshed daily. You can add from defaults (Blocklist Project lists), add custom URLs, or trigger a manual refresh. Hidden when whitelist mode is active.</p>
+
+        <h4>Custom Blocked Domains</h4>
+        <p>Individual domains to block in addition to the blacklists above. Subdomains are matched automatically. In whitelist mode, this list becomes the <strong>Allowed Domains</strong> list &mdash; only links to these domains are allowed and all other external links are blocked.</p>
+
+        <h4>Module Actions (Links)</h4>
+        <p>Each link protection module (invite links and external links) has its own configurable action, timeout duration, message delete days (when banning), and auto-lockdown toggle &mdash; same as the detection matrix.</p>
+
+        <h3>Anti-Raid</h3>
+        <p>Automatically deletes all active invite links when an abnormal surge of joins is detected. During the cooldown period the action cannot re-trigger.</p>
+        <table>
+          <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Enable anti-raid</strong></td><td>Monitor join rate and automatically pause invites when a raid is detected.</td></tr>
+            <tr><td><strong>Join threshold</strong></td><td>Number of joins within the detection window that triggers the lockdown.</td></tr>
+            <tr><td><strong>Detection window (seconds)</strong></td><td>Rolling time window used to count joins. Range: 5&ndash;300 seconds.</td></tr>
+            <tr><td><strong>Cooldown (minutes)</strong></td><td>How long invites remain paused before the lockdown lifts automatically.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Account Scoring</h3>
+        <p>Evaluates new members' account metadata on join and assigns a hidden threat score based on account age, profile picture, and username patterns. Works independently of anti-raid. See the <a href="#account-scoring">Account Scoring</a> section above for the full scoring table and threat levels.</p>
+        <table>
+          <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Enable account scoring</strong></td><td>Evaluate joining users' account metadata and alert moderators for suspicious accounts.</td></tr>
+            <tr><td><strong>Auto-timeout medium risk</strong></td><td>Automatically timeout medium-risk accounts on join. If disabled, mods are alerted only.</td></tr>
+            <tr><td><strong>Auto-timeout high risk</strong></td><td>Automatically timeout high-risk accounts on join. If disabled, mods are alerted only.</td></tr>
+            <tr><td><strong>Timeout duration (minutes)</strong></td><td>How long the user is timed out when auto-timeout is triggered. Minimum: 1 minute.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Ban Management</h3>
+        <p>Tools for sharing, syncing, and importing bans across Blackwall-managed servers.</p>
+        <table>
+          <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Ban list sharing</strong></td><td>When enabled, your server's ban list becomes visible to other servers managed by Blackwall. Other server admins can import your bans. You control whether your bans are shared &mdash; importing is always available.</td></tr>
+            <tr><td><strong>Your ban list</strong></td><td>Syncs bans from Discord into Blackwall's database. Click <em>Sync from Discord</em> to pull the latest ban list. Displayed with username, reason, and ban date.</td></tr>
+            <tr><td><strong>Import bans</strong></td><td>Import bans from other Blackwall-managed servers that have ban list sharing enabled. Import the entire list or select individual bans. Users already banned in your server are automatically skipped.</td></tr>
+            <tr><td><strong>Auto-sync</strong></td><td>Automatically import bans from selected servers on a regular schedule. New bans added by the source server are imported automatically. Each auto-sync rule can be toggled on or off independently.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Audit Log</h3>
+        <p>Select a channel where Blackwall will post an embed for each infraction: who triggered it, which filter fired, the message content, and the action taken. Leave blank to disable audit logging.</p>
+
+        <div class="callout callout-info">
+          <strong>Module actions</strong>
+          Most modules support the following action types: <strong>Delete only</strong> (removes the message), <strong>Timeout</strong> (temporarily mutes the user), <strong>Kick</strong> (removes the user from the server), and <strong>Ban</strong> (permanently bans the user, with optional message history purge up to 7 days). Each module can also independently trigger a server <strong>auto-lockdown</strong> when it fires.
         </div>
       </section>
 
