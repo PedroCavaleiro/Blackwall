@@ -143,15 +143,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .IsRequired()
                   .HasDefaultValue(false);
 
-            entity.Property(e => e.Action)
-                  .IsRequired()
-                  .HasDefaultValue(InfractionAction.DeleteOnly);
-
             entity.Property(e => e.LogChannelId);
-
-            entity.Property(e => e.MessageDeleteDays)
-                  .IsRequired()
-                  .HasDefaultValue(0);
 
             entity.Property(e => e.IsAntiRaidEnabled)
                   .IsRequired()
@@ -189,20 +181,85 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .IsRequired()
                   .HasDefaultValue(false);
 
-            entity.Property(e => e.AutoLockdownEnabled)
+            entity.Property(e => e.RateLimitAction)
+                  .IsRequired()
+                  .HasDefaultValue(InfractionAction.Timeout);
+
+            entity.Property(e => e.RateLimitAutoLockdown)
                   .IsRequired()
                   .HasDefaultValue(false);
 
-            entity.Property(e => e.RateLimitAction);
-            entity.Property(e => e.RateLimitAutoLockdown);
-            entity.Property(e => e.DuplicateAction);
-            entity.Property(e => e.DuplicateAutoLockdown);
-            entity.Property(e => e.MentionLimitAction);
-            entity.Property(e => e.MentionLimitAutoLockdown);
-            entity.Property(e => e.InviteLinkAction);
-            entity.Property(e => e.InviteLinkAutoLockdown);
-            entity.Property(e => e.SuspiciousLinkAction);
-            entity.Property(e => e.SuspiciousLinkAutoLockdown);
+            entity.Property(e => e.RateLimitTimeoutMinutes)
+                  .IsRequired()
+                  .HasDefaultValue(10);
+
+            entity.Property(e => e.RateLimitMessageDeleteDays)
+                  .IsRequired()
+                  .HasDefaultValue(0);
+
+            entity.Property(e => e.DuplicateAction)
+                  .IsRequired()
+                  .HasDefaultValue(InfractionAction.Timeout);
+
+            entity.Property(e => e.DuplicateAutoLockdown)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.DuplicateTimeoutMinutes)
+                  .IsRequired()
+                  .HasDefaultValue(10);
+
+            entity.Property(e => e.DuplicateMessageDeleteDays)
+                  .IsRequired()
+                  .HasDefaultValue(0);
+
+            entity.Property(e => e.MentionLimitAction)
+                  .IsRequired()
+                  .HasDefaultValue(InfractionAction.Timeout);
+
+            entity.Property(e => e.MentionLimitAutoLockdown)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.MentionLimitTimeoutMinutes)
+                  .IsRequired()
+                  .HasDefaultValue(10);
+
+            entity.Property(e => e.MentionLimitMessageDeleteDays)
+                  .IsRequired()
+                  .HasDefaultValue(0);
+
+            entity.Property(e => e.InviteLinkAction)
+                  .IsRequired()
+                  .HasDefaultValue(InfractionAction.Timeout);
+
+            entity.Property(e => e.InviteLinkAutoLockdown)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.InviteLinkTimeoutMinutes)
+                  .IsRequired()
+                  .HasDefaultValue(10);
+
+            entity.Property(e => e.InviteLinkMessageDeleteDays)
+                  .IsRequired()
+                  .HasDefaultValue(0);
+
+            entity.Property(e => e.SuspiciousLinkAction)
+                  .IsRequired()
+                  .HasDefaultValue(InfractionAction.Timeout);
+
+            entity.Property(e => e.SuspiciousLinkAutoLockdown)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.SuspiciousLinkTimeoutMinutes)
+                  .IsRequired()
+                  .HasDefaultValue(10);
+
+            entity.Property(e => e.SuspiciousLinkMessageDeleteDays)
+                  .IsRequired()
+                  .HasDefaultValue(0);
 
             entity.Property(e => e.UpdatedAtUtc);
 

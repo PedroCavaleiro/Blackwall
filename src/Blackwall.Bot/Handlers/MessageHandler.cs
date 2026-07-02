@@ -43,7 +43,7 @@ public sealed class MessageHandler(
             return;
 
         var violations = new List<string>(5);
-        var triggeredActions = new List<InfractionAction>(5);
+        var triggeredModules = new List<(InfractionAction Action, int TimeoutMinutes, int DeleteDays)>(5);
         var shouldLockdown = false;
         List<(ulong ChannelId, ulong MessageId)>? duplicateMessagesToDelete = null;
 
@@ -51,8 +51,8 @@ public sealed class MessageHandler(
                 discordGuildId, discordUserId,
                 config.MaxMessagesPerWindow, config.RateLimitWindowSeconds)) {
             violations.Add("rate_limit");
-            triggeredActions.Add(config.RateLimitAction ?? config.Action);
-            if ((config.RateLimitAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
+            triggeredModules.Add((config.RateLimitAction, config.RateLimitTimeoutMinutes, config.RateLimitMessageDeleteDays));
+            if (config is { RateLimitAutoLockdown: true, IsLockedDown: false })
                 shouldLockdown = true;
         }
 
@@ -67,23 +67,23 @@ public sealed class MessageHandler(
 
         if (dupResult.IsDuplicate) {
             violations.Add("duplicate");
-            triggeredActions.Add(config.DuplicateAction ?? config.Action);
-            if ((config.DuplicateAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
+            triggeredModules.Add((config.DuplicateAction, config.DuplicateTimeoutMinutes, config.DuplicateMessageDeleteDays));
+            if (config is { DuplicateAutoLockdown: true, IsLockedDown: false })
                 shouldLockdown = true;
             duplicateMessagesToDelete = dupResult.MessagesToDelete.ToList();
         }
 
         if (SpamDetectionService.ExceedsMentionLimit(message, config.MentionLimit)) {
             violations.Add("mention_limit");
-            triggeredActions.Add(config.MentionLimitAction ?? config.Action);
-            if ((config.MentionLimitAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
+            triggeredModules.Add((config.MentionLimitAction, config.MentionLimitTimeoutMinutes, config.MentionLimitMessageDeleteDays));
+            if (config is { MentionLimitAutoLockdown: true, IsLockedDown: false })
                 shouldLockdown = true;
         }
 
         if (config.BlockInviteLinks && await SpamDetectionService.ContainsInviteLinkWithRedirectAsync(message.Content)) {
             violations.Add("invite_link");
-            triggeredActions.Add(config.InviteLinkAction ?? config.Action);
-            if ((config.InviteLinkAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
+            triggeredModules.Add((config.InviteLinkAction, config.InviteLinkTimeoutMinutes, config.InviteLinkMessageDeleteDays));
+            if (config is { InviteLinkAutoLockdown: true, IsLockedDown: false })
                 shouldLockdown = true;
         }
 
@@ -95,8 +95,8 @@ public sealed class MessageHandler(
 
             if (blockedByBlacklist) {
                 violations.Add("suspicious_link");
-                triggeredActions.Add(config.SuspiciousLinkAction ?? config.Action);
-                if ((config.SuspiciousLinkAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
+                triggeredModules.Add((config.SuspiciousLinkAction, config.SuspiciousLinkTimeoutMinutes, config.SuspiciousLinkMessageDeleteDays));
+                if (config is { SuspiciousLinkAutoLockdown: true, IsLockedDown: false })
                     shouldLockdown = true;
             } else if (config.SafeBrowsingEnabled) {
                 var sbResult = await SpamDetectionService.CheckSafeBrowsingAsync(message.Content, safeBrowsingService);
@@ -104,8 +104,8 @@ public sealed class MessageHandler(
                 if (sbResult == SafeBrowsingResult.Unsafe
                     || (sbResult == SafeBrowsingResult.Unsure && config.SafeBrowsingBlockUnsure)) {
                     violations.Add("safe_browsing");
-                    triggeredActions.Add(config.SuspiciousLinkAction ?? config.Action);
-                    if ((config.SuspiciousLinkAutoLockdown ?? config.AutoLockdownEnabled) && !config.IsLockedDown)
+                    triggeredModules.Add((config.SuspiciousLinkAction, config.SuspiciousLinkTimeoutMinutes, config.SuspiciousLinkMessageDeleteDays));
+                    if (config is { SuspiciousLinkAutoLockdown: true, IsLockedDown: false })
                         shouldLockdown = true;
                 }
             }
@@ -115,7 +115,7 @@ public sealed class MessageHandler(
             return;
 
         var violationSummary = string.Join(", ", violations);
-        var effectiveAction = GetMostSevereAction(triggeredActions);
+        var (effectiveAction, effectiveTimeoutMinutes, effectiveDeleteDays) = GetMostSevereModule(triggeredModules);
 
         logger.LogInformation(
             "Spam detected in guild {GuildId} from user {UserId}: {Violations} (DryRun={DryRun}, Action={Action})",
@@ -136,8 +136,7 @@ public sealed class MessageHandler(
                         continue;
 
                     try {
-                        var channel = guildChannel.Guild.GetChannel(channelId) as IMessageChannel;
-                        if (channel is not null)
+                        if (guildChannel.Guild.GetChannel(channelId) is IMessageChannel channel)
                             await channel.DeleteMessageAsync(msgId);
                     } catch (Exception ex) {
                         logger.LogWarning(ex,
@@ -147,7 +146,7 @@ public sealed class MessageHandler(
                 }
             }
 
-            await ApplyActionAsync(message, guildChannel.Guild, effectiveAction, config.MessageDeleteDays);
+            await ApplyActionAsync(message, guildChannel.Guild, effectiveAction, effectiveTimeoutMinutes, effectiveDeleteDays);
 
             if (shouldLockdown) {
                 logger.LogWarning(
@@ -163,14 +162,15 @@ public sealed class MessageHandler(
     }
 
     /// <summary>
-    /// Returns the most severe action from the list of triggered module actions.
+    /// Returns the most severe module tuple from the list of triggered modules.
     /// Severity order: DeleteOnly &lt; Timeout &lt; Kick &lt; Ban.
     /// </summary>
-    private static InfractionAction GetMostSevereAction(IReadOnlyList<InfractionAction> actions) {
-        var max = InfractionAction.DeleteOnly;
-        foreach (var action in actions) {
-            if (action > max)
-                max = action;
+    private static (InfractionAction Action, int TimeoutMinutes, int DeleteDays) GetMostSevereModule(
+        IReadOnlyList<(InfractionAction Action, int TimeoutMinutes, int DeleteDays)> modules) {
+        (InfractionAction Action, int TimeoutMinutes, int DeleteDays) max = (InfractionAction.DeleteOnly, 10, 0);
+        foreach (var m in modules) {
+            if (m.Action > max.Action)
+                max = m;
         }
         return max;
     }
@@ -182,6 +182,7 @@ public sealed class MessageHandler(
         SocketUserMessage message,
         SocketGuild guild,
         InfractionAction action,
+        int timeoutMinutes,
         int deleteMessageDays
     ) {
         var guildUser = guild.GetUser(message.Author.Id);
@@ -189,11 +190,12 @@ public sealed class MessageHandler(
             return;
 
         var pruneDays = Math.Clamp(deleteMessageDays, 0, 7);
+        var timeout = TimeSpan.FromMinutes(Math.Max(1, timeoutMinutes));
 
         try {
             switch (action) {
                 case InfractionAction.Timeout:
-                    await guildUser.SetTimeOutAsync(TimeSpan.FromMinutes(10));
+                    await guildUser.SetTimeOutAsync(timeout);
                     break;
                 case InfractionAction.Kick:
                     await guildUser.KickAsync("Spam violation detected by Blackwall.");

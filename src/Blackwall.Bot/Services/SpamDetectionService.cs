@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Discord;
 using StackExchange.Redis;
+// ReSharper disable NullableWarningSuppressionIsUsed
 
 namespace Blackwall.Bot.Services;
 
@@ -24,6 +25,12 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     /// Increments a per-user per-guild message counter in Redis. Returns true if the count
     /// exceeds <paramref name="maxMessages"/> within the rolling window.
     /// </summary>
+    /// <param name="discordGuildId">The Discord ID of the guild where the message was sent.</param>
+    /// <param name="discordUserId">The Discord ID of the user who sent the message.</param>
+    /// <param name="maxMessages">The maximum number of messages allowed within the window.</param>
+    /// <param name="windowSeconds">The sliding window in seconds after which the counter resets.</param>
+    /// <returns><see langword="true"/> if the user's message count exceeds <paramref name="maxMessages"/> within the window; otherwise <see langword="false"/>.</returns>
+    /// <exception cref="RedisException">Thrown when a Redis operation fails.</exception>
     public async Task<bool> IsRateLimitedAsync(
         long discordGuildId,
         long discordUserId,
@@ -47,6 +54,16 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     /// When <paramref name="crossChannelEnabled"/> is true, duplicates are counted across all channels;
     /// when false, only messages within the same <paramref name="channelId"/> are counted.
     /// </summary>
+    /// <param name="discordGuildId">The Discord ID of the guild where the message was sent.</param>
+    /// <param name="discordUserId">The Discord ID of the user who sent the message.</param>
+    /// <param name="channelId">The Discord ID of the channel where the message was sent.</param>
+    /// <param name="messageId">The Discord ID of the message being checked.</param>
+    /// <param name="content">The text content of the message to hash for duplicate detection.</param>
+    /// <param name="threshold">The number of repeated messages required to trigger a duplicate detection.</param>
+    /// <param name="windowSeconds">The sliding window in seconds after which the tracking list expires.</param>
+    /// <param name="crossChannelEnabled">Whether duplicates should be counted across all channels or only within the same channel.</param>
+    /// <returns>A <see cref="DuplicateDetectionResult"/> indicating whether a duplicate was detected and the messages to delete.</returns>
+    /// <exception cref="RedisException">Thrown when a Redis operation fails.</exception>
     public async Task<DuplicateDetectionResult> IsDuplicateAsync(
         long discordGuildId,
         long discordUserId,
@@ -101,6 +118,8 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     /// fields of every embed (title, description, fields, footer, author, url). Used for
     /// duplicate detection on messages that may have empty content but rich embeds.
     /// </summary>
+    /// <param name="message">The message to extract text from.</param>
+    /// <returns>A single string joining all textual content found in the message and its embeds.</returns>
     public static string ExtractFullContent(IMessage message) {
         var parts = new List<string>();
 
@@ -133,6 +152,9 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     /// Returns true if the total number of user mentions, role mentions, or @everyone/@here
     /// in the message exceeds the configured limit.
     /// </summary>
+    /// <param name="message">The message to check for mentions.</param>
+    /// <param name="limit">The maximum allowed number of mentions before the limit is exceeded.</param>
+    /// <returns><see langword="true"/> if the total mention count exceeds <paramref name="limit"/>; otherwise <see langword="false"/>.</returns>
     public static bool ExceedsMentionLimit(IMessage message, int limit) {
         var count = message.MentionedUserIds.Count + message.MentionedRoleIds.Count;
 
@@ -143,6 +165,8 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     }
 
     /// <summary>Returns true if the content contains a Discord invite link.</summary>
+    /// <param name="content">The message content to check.</param>
+    /// <returns><see langword="true"/> if an invite link pattern is found; otherwise <see langword="false"/>.</returns>
     private static bool ContainsInviteLink(string content) =>
         InviteLinkPattern.IsMatch(content);
 
@@ -152,6 +176,9 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     /// direct match is found, extracts all URLs and follows redirects to their final destination,
     /// checking each resolved URL against the invite pattern.
     /// </summary>
+    /// <param name="content">The message content to check for invite links.</param>
+    /// <returns><see langword="true"/> if a Discord invite link is found directly or via redirect; otherwise <see langword="false"/>.</returns>
+    /// <exception cref="HttpRequestException">Thrown when an HTTP request to follow a redirect fails.</exception>
     public static async Task<bool> ContainsInviteLinkWithRedirectAsync(string content) {
         if (ContainsInviteLink(content))
             return true;
@@ -179,6 +206,8 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     /// Follows HTTP redirects for the given URL using a HEAD request and returns the final
     /// destination URI, or <c>null</c> if the request fails or times out.
     /// </summary>
+    /// <param name="url">The URL to follow redirects for.</param>
+    /// <returns>The final destination URL as a string, or <see langword="null"/> if the request fails or times out.</returns>
     private static async Task<string?> ResolveRedirectAsync(string url) {
         try {
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -195,6 +224,8 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     }
 
     /// <summary>Returns true if the content contains any non-Discord URL.</summary>
+    /// <param name="content">The message content to check.</param>
+    /// <returns><see langword="true"/> if a non-Discord URL is found; otherwise <see langword="false"/>.</returns>
     public static bool ContainsSuspiciousLink(string content) =>
         SuspiciousLinkPattern.IsMatch(content);
 
@@ -204,6 +235,10 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     /// blacklist or custom domain set. In whitelist mode, blocked if the domain is NOT in the
     /// custom domain set. Follows redirects to check the final destination as well.
     /// </summary>
+    /// <param name="content">The message content to check for blocked links.</param>
+    /// <param name="blacklistService">The blacklist service used to evaluate link domains.</param>
+    /// <param name="discordGuildId">The Discord ID of the guild whose blacklist/whitelist rules apply.</param>
+    /// <returns><see langword="true"/> if a blacklisted or non-whitelisted link is found; otherwise <see langword="false"/>.</returns>
     public static async Task<bool> ContainsBlacklistedLinkAsync(
         string content,
         BlacklistService blacklistService,
@@ -233,6 +268,9 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     /// Returns the worst result found (Unsafe > Unsure > Safe).
     /// Only URLs that are not Discord domains are checked.
     /// </summary>
+    /// <param name="content">The message content to check for unsafe URLs.</param>
+    /// <param name="safeBrowsingService">The Safe Browsing service used to evaluate URLs.</param>
+    /// <returns>The worst <see cref="SafeBrowsingResult"/> found across all checked URLs.</returns>
     public static async Task<SafeBrowsingResult> CheckSafeBrowsingAsync(
         string content,
         SafeBrowsingService safeBrowsingService
@@ -272,6 +310,8 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     /// <summary>
     /// Returns true if the URL points to a Discord-owned domain.
     /// </summary>
+    /// <param name="url">The URL to check.</param>
+    /// <returns><see langword="true"/> if the URL's host is a Discord-owned domain; otherwise <see langword="false"/>.</returns>
     private static bool IsDiscordUrl(string url) {
         if (!url.Contains("://"))
             url = "https://" + url;

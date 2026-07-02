@@ -87,28 +87,6 @@
                                 <InputCheckbox class="form-check-input" id="isDryRun" @bind-Value="Form.IsDryRun" style="width:2.5em;height:1.3em" />
                             </div>
                         </div>
-                        <div class="bw-field" style="@(Form.Action is InfractionAction.Kick or InfractionAction.Ban ? "" : "border-bottom:none;padding-bottom:0")">
-                            <div class="bw-field-label">
-                                <div class="form-label mb-1">Infraction action</div>
-                                <div class="form-text">What the bot does to an offending user when a violation is detected.</div>
-                            </div>
-                            <InputSelect class="form-select" style="max-width:200px" @bind-Value="Form.Action">
-                                <option value="@InfractionAction.DeleteOnly">Delete message only</option>
-                                <option value="@InfractionAction.Timeout">Timeout user</option>
-                                <option value="@InfractionAction.Kick">Kick user</option>
-                                <option value="@InfractionAction.Ban">Ban user</option>
-                            </InputSelect>
-                        </div>
-
-                        @if (Form.Action is InfractionAction.Kick or InfractionAction.Ban) {
-                            <div class="bw-field" style="border-bottom:none;padding-bottom:0">
-                                <div class="bw-field-label">
-                                    <div class="form-label mb-1">Delete messages (days)</div>
-                                    <div class="form-text">Number of days of message history to purge when kicking or banning. Maximum is 7 days.</div>
-                                </div>
-                                <InputNumber class="form-control" style="max-width:140px" min="0" max="7" @bind-Value="Form.MessageDeleteDays" />
-                            </div>
-                        }
                     </div>
                 </div>
 
@@ -118,16 +96,6 @@
                         <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
                             Instantly denies Send Messages, Send Messages in Threads, and Create Public Threads for @@everyone in every text channel and category via channel-specific permission overwrites. Higher-tier roles are unaffected. Use /lockdown or /unlock in Discord to toggle from chat.
                         </p>
-
-                        <div class="bw-field">
-                            <div class="bw-field-label">
-                                <div class="form-label mb-1">Auto-lockdown on infraction</div>
-                                <div class="form-text">When on, any detected infraction automatically triggers a full server lockdown. This is independent of the infraction action above — the user is still punished according to that setting.</div>
-                            </div>
-                            <div class="form-check form-switch">
-                                <InputCheckbox class="form-check-input" id="autoLockdown" @bind-Value="Form.AutoLockdownEnabled" style="width:2.5em;height:1.3em" />
-                            </div>
-                        </div>
 
                         <div class="bw-field" style="border-bottom:none;padding-bottom:0">
                             <div class="bw-field-label">
@@ -215,82 +183,129 @@
                     </div>
                 </div>
 
-                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
-                    <div class="card-header">MODULE OVERRIDES</div>
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg);border-color:var(--bw-danger) !important">
+                    <div class="card-header" style="color:var(--bw-danger)">MODULE ACTIONS</div>
                     <div class="p-4">
-                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Override the global infraction action and auto-lockdown behavior for individual detection modules. Set to "Default" to inherit from the General tab.</p>
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Configure the action and lockdown behavior for each detection module independently.</p>
 
                         <div class="bw-field">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Rate limit &mdash; action</div>
                                 <div class="form-text">Action taken when a user exceeds the message rate limit.</div>
                             </div>
-                            <select class="form-select" style="max-width:200px" @bind="Form.RateLimitActionStr">
-                                <option value="">Default</option>
-                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
-                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
-                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
-                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
-                            </select>
+                            <InputSelect class="form-select" style="max-width:200px" @bind-Value="Form.RateLimitAction">
+                                <option value="@InfractionAction.DeleteOnly">Delete only</option>
+                                <option value="@InfractionAction.Timeout">Timeout</option>
+                                <option value="@InfractionAction.Kick">Kick</option>
+                                <option value="@InfractionAction.Ban">Ban</option>
+                            </InputSelect>
                         </div>
+                        @if (Form.RateLimitAction is InfractionAction.Timeout) {
+                            <div class="bw-field">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">Rate limit &mdash; timeout (minutes)</div>
+                                    <div class="form-text">How long the user is timed out. Minimum: 1 minute.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.RateLimitTimeoutMinutes" />
+                            </div>
+                        }
+                        @if (Form.RateLimitAction is InfractionAction.Ban) {
+                            <div class="bw-field">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">Rate limit &mdash; delete messages (days)</div>
+                                    <div class="form-text">Number of days of message history to purge when banning. Maximum is 7 days.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="0" max="7" @bind-Value="Form.RateLimitMessageDeleteDays" />
+                            </div>
+                        }
                         <div class="bw-field">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Rate limit &mdash; auto-lockdown</div>
                                 <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
                             </div>
-                            <select class="form-select" style="max-width:200px" @bind="Form.RateLimitAutoLockdownStr">
-                                <option value="">Default</option>
-                                <option value="true">Lockdown</option>
-                                <option value="false">No lockdown</option>
-                            </select>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="rateLimitAutoLockdown" @bind-Value="Form.RateLimitAutoLockdown" style="width:2.5em;height:1.3em" />
+                            </div>
                         </div>
+
                         <div class="bw-field">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Duplicate &mdash; action</div>
                                 <div class="form-text">Action taken when a user sends duplicate messages.</div>
                             </div>
-                            <select class="form-select" style="max-width:200px" @bind="Form.DuplicateActionStr">
-                                <option value="">Default</option>
-                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
-                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
-                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
-                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
-                            </select>
+                            <InputSelect class="form-select" style="max-width:200px" @bind-Value="Form.DuplicateAction">
+                                <option value="@InfractionAction.DeleteOnly">Delete only</option>
+                                <option value="@InfractionAction.Timeout">Timeout</option>
+                                <option value="@InfractionAction.Kick">Kick</option>
+                                <option value="@InfractionAction.Ban">Ban</option>
+                            </InputSelect>
                         </div>
+                        @if (Form.DuplicateAction is InfractionAction.Timeout) {
+                            <div class="bw-field">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">Duplicate &mdash; timeout (minutes)</div>
+                                    <div class="form-text">How long the user is timed out. Minimum: 1 minute.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.DuplicateTimeoutMinutes" />
+                            </div>
+                        }
+                        @if (Form.DuplicateAction is InfractionAction.Ban) {
+                            <div class="bw-field">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">Duplicate &mdash; delete messages (days)</div>
+                                    <div class="form-text">Number of days of message history to purge when banning. Maximum is 7 days.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="0" max="7" @bind-Value="Form.DuplicateMessageDeleteDays" />
+                            </div>
+                        }
                         <div class="bw-field">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Duplicate &mdash; auto-lockdown</div>
                                 <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
                             </div>
-                            <select class="form-select" style="max-width:200px" @bind="Form.DuplicateAutoLockdownStr">
-                                <option value="">Default</option>
-                                <option value="true">Lockdown</option>
-                                <option value="false">No lockdown</option>
-                            </select>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="duplicateAutoLockdown" @bind-Value="Form.DuplicateAutoLockdown" style="width:2.5em;height:1.3em" />
+                            </div>
                         </div>
-                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+
+                        <div class="bw-field">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Mention limit &mdash; action</div>
                                 <div class="form-text">Action taken when a user exceeds the mention limit.</div>
                             </div>
-                            <select class="form-select" style="max-width:200px" @bind="Form.MentionLimitActionStr">
-                                <option value="">Default</option>
-                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
-                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
-                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
-                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
-                            </select>
+                            <InputSelect class="form-select" style="max-width:200px" @bind-Value="Form.MentionLimitAction">
+                                <option value="@InfractionAction.DeleteOnly">Delete only</option>
+                                <option value="@InfractionAction.Timeout">Timeout</option>
+                                <option value="@InfractionAction.Kick">Kick</option>
+                                <option value="@InfractionAction.Ban">Ban</option>
+                            </InputSelect>
                         </div>
+                        @if (Form.MentionLimitAction is InfractionAction.Timeout) {
+                            <div class="bw-field">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">Mention limit &mdash; timeout (minutes)</div>
+                                    <div class="form-text">How long the user is timed out. Minimum: 1 minute.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.MentionLimitTimeoutMinutes" />
+                            </div>
+                        }
+                        @if (Form.MentionLimitAction is InfractionAction.Ban) {
+                            <div class="bw-field">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">Mention limit &mdash; delete messages (days)</div>
+                                    <div class="form-text">Number of days of message history to purge when banning. Maximum is 7 days.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="0" max="7" @bind-Value="Form.MentionLimitMessageDeleteDays" />
+                            </div>
+                        }
                         <div class="bw-field" style="border-bottom:none;padding-bottom:0">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Mention limit &mdash; auto-lockdown</div>
                                 <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
                             </div>
-                            <select class="form-select" style="max-width:200px" @bind="Form.MentionLimitAutoLockdownStr">
-                                <option value="">Default</option>
-                                <option value="true">Lockdown</option>
-                                <option value="false">No lockdown</option>
-                            </select>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="mentionLimitAutoLockdown" @bind-Value="Form.MentionLimitAutoLockdown" style="width:2.5em;height:1.3em" />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -464,58 +479,89 @@
                     </div>
                 </div>
 
-                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
-                    <div class="card-header">MODULE OVERRIDES</div>
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg);border-color:var(--bw-danger) !important">
+                    <div class="card-header" style="color:var(--bw-danger)">MODULE ACTIONS</div>
                     <div class="p-4">
-                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Override the global infraction action and auto-lockdown behavior for individual link protection modules. Set to "Default" to inherit from the General tab.</p>
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Configure the action and lockdown behavior for each link protection module independently.</p>
 
                         <div class="bw-field">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Invite link &mdash; action</div>
                                 <div class="form-text">Action taken when a user posts a Discord invite link.</div>
                             </div>
-                            <select class="form-select" style="max-width:200px" @bind="Form.InviteLinkActionStr">
-                                <option value="">Default</option>
-                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
-                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
-                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
-                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
-                            </select>
+                            <InputSelect class="form-select" style="max-width:200px" @bind-Value="Form.InviteLinkAction">
+                                <option value="@InfractionAction.DeleteOnly">Delete only</option>
+                                <option value="@InfractionAction.Timeout">Timeout</option>
+                                <option value="@InfractionAction.Kick">Kick</option>
+                                <option value="@InfractionAction.Ban">Ban</option>
+                            </InputSelect>
                         </div>
+                        @if (Form.InviteLinkAction is InfractionAction.Timeout) {
+                            <div class="bw-field">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">Invite link &mdash; timeout (minutes)</div>
+                                    <div class="form-text">How long the user is timed out. Minimum: 1 minute.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.InviteLinkTimeoutMinutes" />
+                            </div>
+                        }
+                        @if (Form.InviteLinkAction is InfractionAction.Ban) {
+                            <div class="bw-field">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">Invite link &mdash; delete messages (days)</div>
+                                    <div class="form-text">Number of days of message history to purge when banning. Maximum is 7 days.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="0" max="7" @bind-Value="Form.InviteLinkMessageDeleteDays" />
+                            </div>
+                        }
                         <div class="bw-field">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">Invite link &mdash; auto-lockdown</div>
                                 <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
                             </div>
-                            <select class="form-select" style="max-width:200px" @bind="Form.InviteLinkAutoLockdownStr">
-                                <option value="">Default</option>
-                                <option value="true">Lockdown</option>
-                                <option value="false">No lockdown</option>
-                            </select>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="inviteLinkAutoLockdown" @bind-Value="Form.InviteLinkAutoLockdown" style="width:2.5em;height:1.3em" />
+                            </div>
                         </div>
-                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+
+                        <div class="bw-field">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">External link &mdash; action</div>
                                 <div class="form-text">Action taken when a user posts a blocked external link.</div>
                             </div>
-                            <select class="form-select" style="max-width:200px" @bind="Form.SuspiciousLinkActionStr">
-                                <option value="">Default</option>
-                                <option value="@InfractionAction.DeleteOnly.ToString()">Delete only</option>
-                                <option value="@InfractionAction.Timeout.ToString()">Timeout</option>
-                                <option value="@InfractionAction.Kick.ToString()">Kick</option>
-                                <option value="@InfractionAction.Ban.ToString()">Ban</option>
-                            </select>
+                            <InputSelect class="form-select" style="max-width:200px" @bind-Value="Form.SuspiciousLinkAction">
+                                <option value="@InfractionAction.DeleteOnly">Delete only</option>
+                                <option value="@InfractionAction.Timeout">Timeout</option>
+                                <option value="@InfractionAction.Kick">Kick</option>
+                                <option value="@InfractionAction.Ban">Ban</option>
+                            </InputSelect>
                         </div>
+                        @if (Form.SuspiciousLinkAction is InfractionAction.Timeout) {
+                            <div class="bw-field">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">External link &mdash; timeout (minutes)</div>
+                                    <div class="form-text">How long the user is timed out. Minimum: 1 minute.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.SuspiciousLinkTimeoutMinutes" />
+                            </div>
+                        }
+                        @if (Form.SuspiciousLinkAction is InfractionAction.Ban) {
+                            <div class="bw-field">
+                                <div class="bw-field-label">
+                                    <div class="form-label mb-1">External link &mdash; delete messages (days)</div>
+                                    <div class="form-text">Number of days of message history to purge when banning. Maximum is 7 days.</div>
+                                </div>
+                                <InputNumber class="form-control" style="max-width:140px" min="0" max="7" @bind-Value="Form.SuspiciousLinkMessageDeleteDays" />
+                            </div>
+                        }
                         <div class="bw-field" style="border-bottom:none;padding-bottom:0">
                             <div class="bw-field-label">
                                 <div class="form-label mb-1">External link &mdash; auto-lockdown</div>
                                 <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
                             </div>
-                            <select class="form-select" style="max-width:200px" @bind="Form.SuspiciousLinkAutoLockdownStr">
-                                <option value="">Default</option>
-                                <option value="true">Lockdown</option>
-                                <option value="false">No lockdown</option>
-                            </select>
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="suspiciousLinkAutoLockdown" @bind-Value="Form.SuspiciousLinkAutoLockdown" style="width:2.5em;height:1.3em" />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -730,9 +776,7 @@
                 Form.SafeBrowsingBlockUnsure = s.SafeBrowsingBlockUnsure;
                 Form.IsEnabled = s.IsEnabled;
                 Form.IsDryRun = s.IsDryRun;
-                Form.Action = s.Action;
                 Form.LogChannelId = s.LogChannelId.HasValue ? s.LogChannelId.Value.ToString() : "";
-                Form.MessageDeleteDays = s.MessageDeleteDays;
                 Form.IsAntiRaidEnabled = s.IsAntiRaidEnabled;
                 Form.AntiRaidJoinThreshold = s.AntiRaidJoinThreshold;
                 Form.AntiRaidWindowSeconds = s.AntiRaidWindowSeconds;
@@ -741,17 +785,26 @@
                 Form.AutoTimeoutMediumRiskOnJoin = s.AutoTimeoutMediumRiskOnJoin;
                 Form.AutoTimeoutHighRiskOnJoin = s.AutoTimeoutHighRiskOnJoin;
                 Form.AccountScoringTimeoutMinutes = s.AccountScoringTimeoutMinutes;
-                Form.AutoLockdownEnabled = s.AutoLockdownEnabled;
-                Form.RateLimitActionStr = s.RateLimitAction?.ToString() ?? "";
-                Form.RateLimitAutoLockdownStr = s.RateLimitAutoLockdown?.ToString().ToLowerInvariant() ?? "";
-                Form.DuplicateActionStr = s.DuplicateAction?.ToString() ?? "";
-                Form.DuplicateAutoLockdownStr = s.DuplicateAutoLockdown?.ToString().ToLowerInvariant() ?? "";
-                Form.MentionLimitActionStr = s.MentionLimitAction?.ToString() ?? "";
-                Form.MentionLimitAutoLockdownStr = s.MentionLimitAutoLockdown?.ToString().ToLowerInvariant() ?? "";
-                Form.InviteLinkActionStr = s.InviteLinkAction?.ToString() ?? "";
-                Form.InviteLinkAutoLockdownStr = s.InviteLinkAutoLockdown?.ToString().ToLowerInvariant() ?? "";
-                Form.SuspiciousLinkActionStr = s.SuspiciousLinkAction?.ToString() ?? "";
-                Form.SuspiciousLinkAutoLockdownStr = s.SuspiciousLinkAutoLockdown?.ToString().ToLowerInvariant() ?? "";
+                Form.RateLimitAction = s.RateLimitAction;
+                Form.RateLimitAutoLockdown = s.RateLimitAutoLockdown;
+                Form.RateLimitTimeoutMinutes = s.RateLimitTimeoutMinutes;
+                Form.RateLimitMessageDeleteDays = s.RateLimitMessageDeleteDays;
+                Form.DuplicateAction = s.DuplicateAction;
+                Form.DuplicateAutoLockdown = s.DuplicateAutoLockdown;
+                Form.DuplicateTimeoutMinutes = s.DuplicateTimeoutMinutes;
+                Form.DuplicateMessageDeleteDays = s.DuplicateMessageDeleteDays;
+                Form.MentionLimitAction = s.MentionLimitAction;
+                Form.MentionLimitAutoLockdown = s.MentionLimitAutoLockdown;
+                Form.MentionLimitTimeoutMinutes = s.MentionLimitTimeoutMinutes;
+                Form.MentionLimitMessageDeleteDays = s.MentionLimitMessageDeleteDays;
+                Form.InviteLinkAction = s.InviteLinkAction;
+                Form.InviteLinkAutoLockdown = s.InviteLinkAutoLockdown;
+                Form.InviteLinkTimeoutMinutes = s.InviteLinkTimeoutMinutes;
+                Form.InviteLinkMessageDeleteDays = s.InviteLinkMessageDeleteDays;
+                Form.SuspiciousLinkAction = s.SuspiciousLinkAction;
+                Form.SuspiciousLinkAutoLockdown = s.SuspiciousLinkAutoLockdown;
+                Form.SuspiciousLinkTimeoutMinutes = s.SuspiciousLinkTimeoutMinutes;
+                Form.SuspiciousLinkMessageDeleteDays = s.SuspiciousLinkMessageDeleteDays;
                 _isLockedDown = s.IsLockedDown;
             }
 
@@ -793,9 +846,7 @@
                 Form.SafeBrowsingBlockUnsure,
                 Form.IsEnabled,
                 Form.IsDryRun,
-                Form.Action,
                 logChannelId,
-                Math.Clamp(Form.MessageDeleteDays, 0, 7),
                 Form.IsAntiRaidEnabled,
                 Form.AntiRaidJoinThreshold,
                 Form.AntiRaidWindowSeconds,
@@ -805,17 +856,26 @@
                 Form.AutoTimeoutHighRiskOnJoin,
                 Form.AccountScoringTimeoutMinutes,
                 _isLockedDown,
-                Form.AutoLockdownEnabled,
-                ParseAction(Form.RateLimitActionStr),
-                ParseBool(Form.RateLimitAutoLockdownStr),
-                ParseAction(Form.DuplicateActionStr),
-                ParseBool(Form.DuplicateAutoLockdownStr),
-                ParseAction(Form.MentionLimitActionStr),
-                ParseBool(Form.MentionLimitAutoLockdownStr),
-                ParseAction(Form.InviteLinkActionStr),
-                ParseBool(Form.InviteLinkAutoLockdownStr),
-                ParseAction(Form.SuspiciousLinkActionStr),
-                ParseBool(Form.SuspiciousLinkAutoLockdownStr)
+                Form.RateLimitAction,
+                Form.RateLimitAutoLockdown,
+                Form.RateLimitTimeoutMinutes,
+                Form.RateLimitMessageDeleteDays,
+                Form.DuplicateAction,
+                Form.DuplicateAutoLockdown,
+                Form.DuplicateTimeoutMinutes,
+                Form.DuplicateMessageDeleteDays,
+                Form.MentionLimitAction,
+                Form.MentionLimitAutoLockdown,
+                Form.MentionLimitTimeoutMinutes,
+                Form.MentionLimitMessageDeleteDays,
+                Form.InviteLinkAction,
+                Form.InviteLinkAutoLockdown,
+                Form.InviteLinkTimeoutMinutes,
+                Form.InviteLinkMessageDeleteDays,
+                Form.SuspiciousLinkAction,
+                Form.SuspiciousLinkAutoLockdown,
+                Form.SuspiciousLinkTimeoutMinutes,
+                Form.SuspiciousLinkMessageDeleteDays
             ));
             _saved = true;
             _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
@@ -885,9 +945,7 @@
         public bool SafeBrowsingBlockUnsure { get; set; }
         public bool IsEnabled { get; set; } = true;
         public bool IsDryRun { get; set; }
-        public InfractionAction Action { get; set; } = InfractionAction.DeleteOnly;
         public string LogChannelId { get; set; } = "";
-        public int MessageDeleteDays { get; set; }
         public bool IsAntiRaidEnabled { get; set; }
         public int AntiRaidJoinThreshold { get; set; } = 10;
         public int AntiRaidWindowSeconds { get; set; } = 30;
@@ -896,25 +954,26 @@
         public bool AutoTimeoutMediumRiskOnJoin { get; set; }
         public bool AutoTimeoutHighRiskOnJoin { get; set; }
         public int AccountScoringTimeoutMinutes { get; set; } = 10;
-        public bool AutoLockdownEnabled { get; set; }
-        public string RateLimitActionStr { get; set; } = "";
-        public string RateLimitAutoLockdownStr { get; set; } = "";
-        public string DuplicateActionStr { get; set; } = "";
-        public string DuplicateAutoLockdownStr { get; set; } = "";
-        public string MentionLimitActionStr { get; set; } = "";
-        public string MentionLimitAutoLockdownStr { get; set; } = "";
-        public string InviteLinkActionStr { get; set; } = "";
-        public string InviteLinkAutoLockdownStr { get; set; } = "";
-        public string SuspiciousLinkActionStr { get; set; } = "";
-        public string SuspiciousLinkAutoLockdownStr { get; set; } = "";
-    }
-
-    private static InfractionAction? ParseAction(string value) {
-        return Enum.TryParse<InfractionAction>(value, out var action) ? action : null;
-    }
-
-    private static bool? ParseBool(string value) {
-        return bool.TryParse(value, out var result) ? result : null;
+        public InfractionAction RateLimitAction { get; set; } = InfractionAction.Timeout;
+        public bool RateLimitAutoLockdown { get; set; }
+        public int RateLimitTimeoutMinutes { get; set; } = 10;
+        public int RateLimitMessageDeleteDays { get; set; }
+        public InfractionAction DuplicateAction { get; set; } = InfractionAction.Timeout;
+        public bool DuplicateAutoLockdown { get; set; }
+        public int DuplicateTimeoutMinutes { get; set; } = 10;
+        public int DuplicateMessageDeleteDays { get; set; }
+        public InfractionAction MentionLimitAction { get; set; } = InfractionAction.Timeout;
+        public bool MentionLimitAutoLockdown { get; set; }
+        public int MentionLimitTimeoutMinutes { get; set; } = 10;
+        public int MentionLimitMessageDeleteDays { get; set; }
+        public InfractionAction InviteLinkAction { get; set; } = InfractionAction.Timeout;
+        public bool InviteLinkAutoLockdown { get; set; }
+        public int InviteLinkTimeoutMinutes { get; set; } = 10;
+        public int InviteLinkMessageDeleteDays { get; set; }
+        public InfractionAction SuspiciousLinkAction { get; set; } = InfractionAction.Timeout;
+        public bool SuspiciousLinkAutoLockdown { get; set; }
+        public int SuspiciousLinkTimeoutMinutes { get; set; } = 10;
+        public int SuspiciousLinkMessageDeleteDays { get; set; }
     }
 
     private async Task AddDefaultBlacklistAsync() {

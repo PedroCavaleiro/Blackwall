@@ -5,7 +5,6 @@ using Blackwall.Core.Services;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace Blackwall.Api.Controllers;
@@ -213,12 +212,7 @@ public sealed class AuthController(
             var allowedUsers = configuration.GetSection("AllowedUsers").Get<string[]>() ?? [];
             var allowedSet = new HashSet<string>(allowedUsers, StringComparer.OrdinalIgnoreCase);
 
-            if (allowedSet.Contains(discordUserId.ToString())) {
-                errorCode = string.Empty;
-                return true;
-            }
-
-            if (!string.IsNullOrWhiteSpace(config.InstanceOwner) &&
+            if (allowedSet.Contains(discordUserId.ToString()) || !string.IsNullOrWhiteSpace(config.InstanceOwner) &&
                 long.TryParse(config.InstanceOwner, out var ownerId) &&
                 ownerId == discordUserId) {
                 errorCode = string.Empty;

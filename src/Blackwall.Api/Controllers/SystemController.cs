@@ -119,12 +119,11 @@ public sealed class SystemController(
 
         if (guildId.HasValue) {
             var guild = discordClient.GetGuild(guildId.Value);
-            IGuildUser? guildUser = guild?.GetUser(userId);
-            if (guildUser is null)
-                guildUser = await discordClient.Rest.GetGuildUserAsync(guildId.Value, userId);
+            var guildUser = guild?.GetUser(userId) ?? (IGuildUser?)await discordClient.Rest.GetGuildUserAsync(guildId.Value, userId);
             if (guild is not null && guildUser is not null)
                 matchingGuilds.Add((guild, guildUser));
         } else {
+            // ReSharper disable once LoopCanBeConvertedToQuery
             foreach (var guild in discordClient.Guilds) {
                 var guildUser = guild.GetUser(userId);
                 if (guildUser is not null)
@@ -149,7 +148,7 @@ public sealed class SystemController(
         }
 
         var firstUser = matchingGuilds[0].User;
-        var result = accountScoringService.ScoreUser(firstUser);
+        var result = AccountScoringService.ScoreUser(firstUser);
 
         var notifiedGuilds = new List<ThreatLevelTestNotifiedGuild>();
 
@@ -168,8 +167,7 @@ public sealed class SystemController(
             var sent = false;
 
             if (logChannelId.HasValue) {
-                var channel = await guild.GetChannelAsync(logChannelId.Value) as ITextChannel;
-                if (channel is not null) {
+                if (await guild.GetChannelAsync(logChannelId.Value) is ITextChannel channel) {
                     var embed = BuildThreatLevelTestEmbed(user, result);
                     try {
                         await channel.SendMessageAsync(embed: embed);

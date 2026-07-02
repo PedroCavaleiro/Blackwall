@@ -13,6 +13,9 @@ public static class RiceDeltaDecoder {
     /// Decodes a 32-bit Rice-Golomb encoded list into a sorted list of uint values.
     /// Used for 4-byte threat list hash prefixes.
     /// </summary>
+    /// <param name="encoded">The 32-bit Rice-Golomb delta-encoded payload to decode.</param>
+    /// <returns>A sorted list of <see cref="uint"/> hash prefixes reconstructed from the encoded data.</returns>
+    /// <exception cref="EndOfStreamException">Thrown when the encoded bit stream is exhausted before all entries are decoded.</exception>
     public static List<uint> Decode32Bit(RiceDeltaEncoded32Bit encoded) {
         var firstValue = encoded.FirstValue;
         var k = encoded.RiceParameter;
@@ -42,6 +45,9 @@ public static class RiceDeltaDecoder {
     /// Decodes a 256-bit Rice-Golomb encoded list into a sorted list of 32-byte arrays.
     /// Used for Global Cache SHA256 hashes.
     /// </summary>
+    /// <param name="encoded">The 256-bit Rice-Golomb delta-encoded payload to decode.</param>
+    /// <returns>A sorted list of 32-byte arrays representing full SHA256 hashes reconstructed from the encoded data.</returns>
+    /// <exception cref="EndOfStreamException">Thrown when the encoded bit stream is exhausted before all entries are decoded.</exception>
     public static List<byte[]> Decode256Bit(RiceDeltaEncoded256Bit encoded) {
         var firstValue = BuildBigInteger256(
             encoded.FirstValueFirstPart,
@@ -78,6 +84,11 @@ public static class RiceDeltaDecoder {
     /// Combines four 64-bit string parts into a single 256-bit BigInteger,
     /// with the first part occupying the most significant position.
     /// </summary>
+    /// <param name="first">The most significant 64 bits of the 256-bit value.</param>
+    /// <param name="second">The second-most significant 64 bits of the 256-bit value.</param>
+    /// <param name="third">The third-most significant 64 bits of the 256-bit value.</param>
+    /// <param name="fourth">The least significant 64 bits of the 256-bit value.</param>
+    /// <returns>A <see cref="BigInteger"/> representing the combined 256-bit value.</returns>
     private static BigInteger BuildBigInteger256(ulong first, ulong second, ulong third, ulong fourth) {
         return (new BigInteger(first) << 192)
              | (new BigInteger(second) << 128)
@@ -89,6 +100,9 @@ public static class RiceDeltaDecoder {
     /// Converts a BigInteger to a fixed-length big-endian byte array,
     /// padding with leading zeros or trimming overflow as needed.
     /// </summary>
+    /// <param name="value">The BigInteger value to convert.</param>
+    /// <param name="length">The desired length of the output byte array.</param>
+    /// <returns>A big-endian byte array of exactly <paramref name="length"/> bytes representing <paramref name="value"/>.</returns>
     private static byte[] ToBigEndianBytes(BigInteger value, int length) {
         var bytes = value.ToByteArray(isUnsigned: true);
 
@@ -118,8 +132,10 @@ public static class RiceDeltaDecoder {
         private int _bitPos;
 
         /// <summary>
-        /// Reads a unary-coded value by counting one bits until a zero bit is encountered.
+        /// Reads a unary-coded value by counting one bit until a zero bit is encountered.
         /// </summary>
+        /// <returns>The number of consecutive one bits read before a zero bit.</returns>
+        /// <exception cref="EndOfStreamException">Thrown when the bit stream is exhausted before a zero bit is found.</exception>
         public int ReadUnary() {
             var count = 0;
             while (ReadBit())
@@ -130,6 +146,9 @@ public static class RiceDeltaDecoder {
         /// <summary>
         /// Reads the specified number of bits and returns them as a 32-bit unsigned integer.
         /// </summary>
+        /// <param name="count">The number of bits to read.</param>
+        /// <returns>A <see cref="uint"/> composed from the read bits in LSB-first order.</returns>
+        /// <exception cref="EndOfStreamException">Thrown when the bit stream is exhausted before all requested bits are read.</exception>
         public uint ReadBits(int count) {
             uint result = 0;
             for (var i = 0; i < count; i++) {
@@ -142,6 +161,9 @@ public static class RiceDeltaDecoder {
         /// Reads the specified number of bits and returns them as a BigInteger,
         /// supporting widths greater than 32 bits.
         /// </summary>
+        /// <param name="count">The number of bits to read.</param>
+        /// <returns>A <see cref="BigInteger"/> composed from the read bits in LSB-first order.</returns>
+        /// <exception cref="EndOfStreamException">Thrown when the bit stream is exhausted before all requested bits are read.</exception>
         public BigInteger ReadBigBits(int count) {
             var result = BigInteger.Zero;
             for (var i = 0; i < count; i++) {
@@ -156,6 +178,8 @@ public static class RiceDeltaDecoder {
         /// as Rice-Golomb encoded data is packed little-endian within each byte.
         /// Throws when the data is exhausted to prevent infinite loops in callers.
         /// </summary>
+        /// <returns><see langword="true"/> if the bit is set; otherwise <see langword="false"/>.</returns>
+        /// <exception cref="EndOfStreamException">Thrown when the underlying byte array has been fully consumed.</exception>
         private bool ReadBit() {
             if (_bytePos >= data.Length)
                 throw new EndOfStreamException("Rice-Golomb encoded data exhausted before all entries were decoded");
