@@ -1,0 +1,50 @@
+<div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+    <div class="card-header">ACCOUNT SCORING</div>
+    <div class="p-4">
+        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+            Assigns a hidden threat score to users on join based on account age, profile picture, and username patterns. Medium and high risk accounts trigger a mod alert and can optionally be timed out automatically. Works independently of anti-raid.
+        </p>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Enable account scoring</div>
+                <div class="form-text">Evaluate joining users' account metadata and alert moderators for suspicious accounts.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input" id="isAccountScoringEnabled" @bind-Value="Form.IsAccountScoringEnabled" style="width:2.5em;height:1.3em" />
+            </div>
+        </div>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Auto-timeout medium risk</div>
+                <div class="form-text">Automatically timeout medium-risk accounts on join. If disabled, mods are alerted only.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input" id="autoTimeoutMediumRisk" @bind-Value="Form.AutoTimeoutMediumRiskOnJoin" style="width:2.5em;height:1.3em" disabled="@(!Form.IsAccountScoringEnabled)" />
+            </div>
+        </div>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Auto-timeout high risk</div>
+                <div class="form-text">Automatically timeout high-risk accounts on join. If disabled, mods are alerted only.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input" id="autoTimeoutHighRisk" @bind-Value="Form.AutoTimeoutHighRiskOnJoin" style="width:2.5em;height:1.3em" disabled="@(!Form.IsAccountScoringEnabled)" />
+            </div>
+        </div>
+
+        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Timeout duration (minutes)</div>
+                <div class="form-text">How long the user is timed out when auto-timeout is triggered. Minimum: 1 minute.</div>
+            </div>
+            <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.AccountScoringTimeoutMinutes" disabled="@(!Form.IsAccountScoringEnabled)" />
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required SpamConfigForm Form { get; set; }
+}

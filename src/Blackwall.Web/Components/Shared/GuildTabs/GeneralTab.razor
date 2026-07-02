@@ -1,0 +1,72 @@
+<div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+    <div class="card-header">BARRIER CONTROL</div>
+    <div class="p-4">
+        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Master controls for barrier activation and enforcement mode.</p>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Enable barrier</div>
+                <div class="form-text">When off, the bot will not process any messages in this server.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input" id="isEnabled" @bind-Value="Form.IsEnabled" style="width:2.5em;height:1.3em" />
+            </div>
+        </div>
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Dry run</div>
+                <div class="form-text">Detections are logged but no action is taken against the user.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input" id="isDryRun" @bind-Value="Form.IsDryRun" style="width:2.5em;height:1.3em" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="cut-corner border mb-4" style="background:var(--bs-card-bg);border-color:var(--bw-danger) !important">
+    <div class="card-header" style="color:var(--bw-danger)">LOCKDOWN</div>
+    <div class="p-4">
+        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+            Instantly denies Send Messages, Send Messages in Threads, and Create Public Threads for @@everyone in every text channel and category via channel-specific permission overwrites. Higher-tier roles are unaffected. Use /lockdown or /unlock in Discord to toggle from chat.
+        </p>
+
+        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Lockdown status</div>
+                <div class="form-text">
+                    @if (IsLockedDown) {
+                        <text><span style="color:var(--bw-danger);font-weight:600">LOCKDOWN ACTIVE</span> &mdash; @("@everyone") is denied Send Messages in all text channels.</text>
+                    } else {
+                        <text><span style="color:var(--bw-muted)">Inactive</span> &mdash; all channels are operating normally.</text>
+                    }
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                @if (IsLockedDown) {
+                    <button type="button" class="btn btn-outline-success cut-corner font-display"
+                            style="font-size:0.72rem;letter-spacing:0.1em"
+                            disabled="@LockdownBusy"
+                            @onclick="OnUnlock">
+                        @(LockdownBusy ? "LIFTING..." : "LIFT LOCKDOWN")
+                    </button>
+                } else {
+                    <button type="button" class="btn btn-outline-danger cut-corner font-display"
+                            style="font-size:0.72rem;letter-spacing:0.1em"
+                            disabled="@LockdownBusy"
+                            @onclick="OnLockdown">
+                        @(LockdownBusy ? "LOCKING..." : "INITIATE LOCKDOWN")
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required SpamConfigForm Form { get; set; }
+    [Parameter] public bool IsLockedDown { get; set; }
+    [Parameter] public bool LockdownBusy { get; set; }
+    [Parameter] public EventCallback OnLockdown { get; set; }
+    [Parameter] public EventCallback OnUnlock { get; set; }
+}
