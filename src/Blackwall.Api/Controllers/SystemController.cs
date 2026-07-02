@@ -18,7 +18,6 @@ public sealed class SystemController(
     SafeBrowsingService safeBrowsingService,
     SafeBrowsingSyncService safeBrowsingSyncService,
     DiscordSocketClient discordClient,
-    AccountScoringService accountScoringService,
     SpamConfigurationCache spamConfigurationCache
 ): ControllerBase {
 
