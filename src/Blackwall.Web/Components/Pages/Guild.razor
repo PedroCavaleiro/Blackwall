@@ -7,7 +7,7 @@
 
 <PageTitle>@(_settings?.Name ?? "Config") — Blackwall</PageTitle>
 
-<div style="max-width:760px;margin:0 auto;padding:2.5rem 1.5rem">
+<div style="max-width:980px;margin:0 auto;padding:2.5rem 1.5rem">
     @if (_loading) {
         <div class="font-mono bw-loading">&gt; Loading configuration...</div>
     } else if (_settings is null) {
@@ -50,46 +50,55 @@
         <EditForm Model="Form" OnValidSubmit="SaveAsync">
             <DataAnnotationsValidator />
 
-            <div class="bw-tabs">
-                <button type="button" class="bw-tab-btn @(_activeTab == "general"   ? "active" : "")" @onclick='() => _activeTab = "general"'>GENERAL</button>
-                <button type="button" class="bw-tab-btn @(_activeTab == "detection" ? "active" : "")" @onclick='() => _activeTab = "detection"'>DETECTION</button>
-                <button type="button" class="bw-tab-btn @(_activeTab == "links"     ? "active" : "")" @onclick='() => _activeTab = "links"'>LINKS</button>
-                <button type="button" class="bw-tab-btn @(_activeTab == "antiraid"  ? "active" : "")" @onclick='() => _activeTab = "antiraid"'>ANTI-RAID</button>
-                <button type="button" class="bw-tab-btn @(_activeTab == "scoring"   ? "active" : "")" @onclick='() => _activeTab = "scoring"'>SCORING</button>
-                <button type="button" class="bw-tab-btn @(_activeTab == "bans"      ? "active" : "")" @onclick='() => _activeTab = "bans"'>BANS</button>
-                <button type="button" class="bw-tab-btn @(_activeTab == "audit"     ? "active" : "")" @onclick='() => _activeTab = "audit"'>AUDIT</button>
-            </div>
+            <div class="bw-sidebar-layout">
+                <nav class="bw-sidebar-nav">
+                    <div class="bw-sidebar-header font-mono">MODULES</div>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "general" ? "active" : "")" @onclick='() => _activeTab = "general"'>GENERAL</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "detection" ? "active" : "")" @onclick='() => _activeTab = "detection"'>DETECTION</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "links" ? "active" : "")" @onclick='() => _activeTab = "links"'>LINKS</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "contentguard" ? "active" : "")" @onclick='() => _activeTab = "contentguard"'>CONTENT GUARD</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "antiraid" ? "active" : "")" @onclick='() => _activeTab = "antiraid"'>ANTI-RAID</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "scoring" ? "active" : "")" @onclick='() => _activeTab = "scoring"'>SCORING</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "bans" ? "active" : "")" @onclick='() => _activeTab = "bans"'>BANS</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "audit" ? "active" : "")" @onclick='() => _activeTab = "audit"'>AUDIT</button>
+                </nav>
 
-            @if (_activeTab == "general") {
-                <GeneralTab Form="Form" IsLockedDown="_isLockedDown" LockdownBusy="_lockdownBusy"
-                            OnLockdown="LockdownAsync" OnUnlock="UnlockAsync" />
-            }
-            @if (_activeTab == "detection") {
-                <DetectionTab Form="Form" />
-            }
-            @if (_activeTab == "links") {
-                <LinksTab Form="Form" DiscordGuildId="DiscordGuildId" OnError="HandleError" />
-            }
-            @if (_activeTab == "antiraid") {
-                <AntiRaidTab Form="Form" />
-            }
-            @if (_activeTab == "scoring") {
-                <ScoringTab Form="Form" />
-            }
-            @if (_activeTab == "bans") {
-                <BansTab DiscordGuildId="DiscordGuildId" InitialShareBanList="@_settings.ShareBanList" OnError="HandleError" />
-            }
-            @if (_activeTab == "audit") {
-                <AuditTab Form="Form" DiscordGuildId="DiscordGuildId" />
-            }
+                <div class="bw-sidebar-content">
+                    @if (_activeTab == "general") {
+                        <GeneralTab Form="Form" IsLockedDown="_isLockedDown" LockdownBusy="_lockdownBusy"
+                                    OnLockdown="LockdownAsync" OnUnlock="UnlockAsync" />
+                    }
+                    @if (_activeTab == "detection") {
+                        <DetectionTab Form="Form" />
+                    }
+                    @if (_activeTab == "links") {
+                        <LinksTab Form="Form" DiscordGuildId="DiscordGuildId" OnError="HandleError" />
+                    }
+                    @if (_activeTab == "contentguard") {
+                        <ContentGuardTab Form="Form" DiscordGuildId="DiscordGuildId" OnError="HandleError" />
+                    }
+                    @if (_activeTab == "antiraid") {
+                        <AntiRaidTab Form="Form" />
+                    }
+                    @if (_activeTab == "scoring") {
+                        <ScoringTab Form="Form" />
+                    }
+                    @if (_activeTab == "bans") {
+                        <BansTab DiscordGuildId="DiscordGuildId" InitialShareBanList="@_settings.ShareBanList" OnError="HandleError" />
+                    }
+                    @if (_activeTab == "audit") {
+                        <AuditTab Form="Form" DiscordGuildId="DiscordGuildId" />
+                    }
 
-            <div class="d-flex align-items-center gap-3 mt-2">
-                <button type="submit" class="btn btn-primary cut-corner font-display bw-btn-md">
-                    COMMIT CHANGES
-                </button>
-                <a href="/dashboard" class="btn btn-outline-secondary font-display bw-btn-md">
-                    CANCEL
-                </a>
+                    <div class="d-flex align-items-center gap-3 mt-2">
+                        <button type="submit" class="btn btn-primary cut-corner font-display bw-btn-md">
+                            COMMIT CHANGES
+                        </button>
+                        <a href="/dashboard" class="btn btn-outline-secondary font-display bw-btn-md">
+                            CANCEL
+                        </a>
+                    </div>
+                </div>
             </div>
         </EditForm>
 
@@ -191,6 +200,20 @@
                 Form.SuspiciousLinkAutoLockdown = s.SuspiciousLinkAutoLockdown;
                 Form.SuspiciousLinkTimeoutMinutes = s.SuspiciousLinkTimeoutMinutes;
                 Form.SuspiciousLinkMessageDeleteDays = s.SuspiciousLinkMessageDeleteDays;
+                Form.IsContentGuardEnabled = s.IsContentGuardEnabled;
+                Form.ContentGuardFuzzyMatching = s.ContentGuardFuzzyMatching;
+                Form.ContentGuardInvisibleCharScrubbing = s.ContentGuardInvisibleCharScrubbing;
+                Form.ContentGuardZalgoBlocking = s.ContentGuardZalgoBlocking;
+                Form.ContentGuardCopypastaHashing = s.ContentGuardCopypastaHashing;
+                Form.ContentGuardFuzzyThreshold = s.ContentGuardFuzzyThreshold;
+                Form.ContentGuardZalgoMaxCombining = s.ContentGuardZalgoMaxCombining;
+                Form.ContentGuardCopypastaMinLength = s.ContentGuardCopypastaMinLength;
+                Form.ContentGuardCopypastaThreshold = s.ContentGuardCopypastaThreshold;
+                Form.ContentGuardCopypastaWindowSeconds = s.ContentGuardCopypastaWindowSeconds;
+                Form.ContentGuardAction = s.ContentGuardAction;
+                Form.ContentGuardAutoLockdown = s.ContentGuardAutoLockdown;
+                Form.ContentGuardTimeoutMinutes = s.ContentGuardTimeoutMinutes;
+                Form.ContentGuardMessageDeleteDays = s.ContentGuardMessageDeleteDays;
                 _isLockedDown = s.IsLockedDown;
             }
         } catch {
@@ -254,7 +277,21 @@
                 Form.SuspiciousLinkAction,
                 Form.SuspiciousLinkAutoLockdown,
                 Form.SuspiciousLinkTimeoutMinutes,
-                Form.SuspiciousLinkMessageDeleteDays
+                Form.SuspiciousLinkMessageDeleteDays,
+                Form.IsContentGuardEnabled,
+                Form.ContentGuardFuzzyMatching,
+                Form.ContentGuardInvisibleCharScrubbing,
+                Form.ContentGuardZalgoBlocking,
+                Form.ContentGuardCopypastaHashing,
+                Form.ContentGuardFuzzyThreshold,
+                Form.ContentGuardZalgoMaxCombining,
+                Form.ContentGuardCopypastaMinLength,
+                Form.ContentGuardCopypastaThreshold,
+                Form.ContentGuardCopypastaWindowSeconds,
+                Form.ContentGuardAction,
+                Form.ContentGuardAutoLockdown,
+                Form.ContentGuardTimeoutMinutes,
+                Form.ContentGuardMessageDeleteDays
             ));
             _saved = true;
             _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);

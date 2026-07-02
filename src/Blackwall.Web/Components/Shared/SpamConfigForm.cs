@@ -45,4 +45,19 @@ public sealed class SpamConfigForm {
     public bool SuspiciousLinkAutoLockdown { get; set; }
     public int SuspiciousLinkTimeoutMinutes { get; set; } = 10;
     public int SuspiciousLinkMessageDeleteDays { get; set; }
+
+    public bool IsContentGuardEnabled { get; set; }
+    public bool ContentGuardFuzzyMatching { get; set; } = true;
+    public bool ContentGuardInvisibleCharScrubbing { get; set; } = true;
+    public bool ContentGuardZalgoBlocking { get; set; } = true;
+    public bool ContentGuardCopypastaHashing { get; set; } = true;
+    public int ContentGuardFuzzyThreshold { get; set; } = 2;
+    public int ContentGuardZalgoMaxCombining { get; set; } = 3;
+    public int ContentGuardCopypastaMinLength { get; set; } = 200;
+    public int ContentGuardCopypastaThreshold { get; set; } = 3;
+    public int ContentGuardCopypastaWindowSeconds { get; set; } = 60;
+    public InfractionAction ContentGuardAction { get; set; } = InfractionAction.DeleteOnly;
+    public bool ContentGuardAutoLockdown { get; set; }
+    public int ContentGuardTimeoutMinutes { get; set; } = 10;
+    public int ContentGuardMessageDeleteDays { get; set; }
 }

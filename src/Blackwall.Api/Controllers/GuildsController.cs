@@ -161,7 +161,21 @@ public sealed class GuildsController(
                 instance.SpamConfiguration.SuspiciousLinkAction,
                 instance.SpamConfiguration.SuspiciousLinkAutoLockdown,
                 instance.SpamConfiguration.SuspiciousLinkTimeoutMinutes,
-                instance.SpamConfiguration.SuspiciousLinkMessageDeleteDays
+                instance.SpamConfiguration.SuspiciousLinkMessageDeleteDays,
+                instance.SpamConfiguration.IsContentGuardEnabled,
+                instance.SpamConfiguration.ContentGuardFuzzyMatching,
+                instance.SpamConfiguration.ContentGuardInvisibleCharScrubbing,
+                instance.SpamConfiguration.ContentGuardZalgoBlocking,
+                instance.SpamConfiguration.ContentGuardCopypastaHashing,
+                instance.SpamConfiguration.ContentGuardFuzzyThreshold,
+                instance.SpamConfiguration.ContentGuardZalgoMaxCombining,
+                instance.SpamConfiguration.ContentGuardCopypastaMinLength,
+                instance.SpamConfiguration.ContentGuardCopypastaThreshold,
+                instance.SpamConfiguration.ContentGuardCopypastaWindowSeconds,
+                instance.SpamConfiguration.ContentGuardAction,
+                instance.SpamConfiguration.ContentGuardAutoLockdown,
+                instance.SpamConfiguration.ContentGuardTimeoutMinutes,
+                instance.SpamConfiguration.ContentGuardMessageDeleteDays
             )
         ));
     }
@@ -254,6 +268,20 @@ public sealed class GuildsController(
         spam.SuspiciousLinkAutoLockdown = request.SuspiciousLinkAutoLockdown;
         spam.SuspiciousLinkTimeoutMinutes = Math.Max(1, request.SuspiciousLinkTimeoutMinutes);
         spam.SuspiciousLinkMessageDeleteDays = Math.Clamp(request.SuspiciousLinkMessageDeleteDays, 0, 7);
+        spam.IsContentGuardEnabled = request.IsContentGuardEnabled;
+        spam.ContentGuardFuzzyMatching = request.ContentGuardFuzzyMatching;
+        spam.ContentGuardInvisibleCharScrubbing = request.ContentGuardInvisibleCharScrubbing;
+        spam.ContentGuardZalgoBlocking = request.ContentGuardZalgoBlocking;
+        spam.ContentGuardCopypastaHashing = request.ContentGuardCopypastaHashing;
+        spam.ContentGuardFuzzyThreshold = Math.Clamp(request.ContentGuardFuzzyThreshold, 1, 5);
+        spam.ContentGuardZalgoMaxCombining = Math.Clamp(request.ContentGuardZalgoMaxCombining, 1, 10);
+        spam.ContentGuardCopypastaMinLength = Math.Clamp(request.ContentGuardCopypastaMinLength, 50, 5000);
+        spam.ContentGuardCopypastaThreshold = Math.Max(2, request.ContentGuardCopypastaThreshold);
+        spam.ContentGuardCopypastaWindowSeconds = Math.Clamp(request.ContentGuardCopypastaWindowSeconds, 10, 3600);
+        spam.ContentGuardAction = request.ContentGuardAction;
+        spam.ContentGuardAutoLockdown = request.ContentGuardAutoLockdown;
+        spam.ContentGuardTimeoutMinutes = Math.Max(1, request.ContentGuardTimeoutMinutes);
+        spam.ContentGuardMessageDeleteDays = Math.Clamp(request.ContentGuardMessageDeleteDays, 0, 7);
         spam.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -1490,6 +1518,181 @@ public sealed class GuildsController(
 
         dbContext.GuildBanSyncRules.Remove(rule);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Returns all banned words configured for the specified guild.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of banned words.</returns>
+    /// <response code="200">Returns the list of banned words.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    [HttpGet("{discordGuildId:long}/banned-words")]
+    [ProducesResponseType(typeof(IReadOnlyList<BannedWordResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IReadOnlyList<BannedWordResponse>>> GetBannedWords(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var words = await dbContext.GuildBannedWords
+            .Where(x => x.SpamConfiguration.GuildInstance.DiscordGuildId == discordGuildId)
+            .Select(x => new BannedWordResponse(x.Id, x.Word))
+            .ToListAsync(cancellationToken);
+
+        return Ok(words);
+    }
+
+    /// <summary>
+    /// Adds a banned word to the guild's Content Guard configuration.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="request">The word to ban.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Word added successfully.</response>
+    /// <response code="400">The word is invalid.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    /// <response code="409">The word is already configured for this guild.</response>
+    [HttpPost("{discordGuildId:long}/banned-words")]
+    [ProducesResponseType(typeof(BannedWordResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<BannedWordResponse>> AddBannedWord(
+        long discordGuildId,
+        [FromBody] AddBannedWordRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.BannedWords)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var word = request.Word.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(word) || word.Length > 100)
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid word.",
+                Detail = "The word must be between 1 and 100 characters.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        if (instance.SpamConfiguration.BannedWords.Any(w => w.Word.Equals(word, StringComparison.OrdinalIgnoreCase)))
+            return Conflict(new ProblemDetails {
+                Title = "Word already configured.",
+                Detail = "This word is already in the banned words list for this guild.",
+                Status = StatusCodes.Status409Conflict
+            });
+
+        var entry = new GuildBannedWord {
+            SpamConfigurationId = instance.SpamConfiguration.Id,
+            Word = word
+        };
+
+        instance.SpamConfiguration.BannedWords.Add(entry);
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await spamConfigurationCache.InvalidateAsync(discordGuildId);
+
+        return Ok(new BannedWordResponse(entry.Id, entry.Word));
+    }
+
+    /// <summary>
+    /// Removes a banned word from the guild's Content Guard configuration.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="wordId">The ID of the banned word entry to remove.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">Word removed successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance or word does not exist.</response>
+    [HttpDelete("{discordGuildId:long}/banned-words/{wordId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveBannedWord(
+        long discordGuildId,
+        long wordId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.BannedWords)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var entry = instance.SpamConfiguration.BannedWords.FirstOrDefault(w => w.Id == wordId);
+        if (entry is null)
+            return NotFound(new ProblemDetails {
+                Title = "Banned word not found.",
+                Detail = "No banned word with this ID exists for this guild.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        instance.SpamConfiguration.BannedWords.Remove(entry);
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await spamConfigurationCache.InvalidateAsync(discordGuildId);
 
         return NoContent();
     }

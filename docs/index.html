@@ -640,6 +640,24 @@ dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
         <h4>Module Actions (Links)</h4>
         <p>Each link protection module (invite links and external links) has its own configurable action, timeout duration, message delete days (when banning), and auto-lockdown toggle &mdash; same as the detection matrix.</p>
 
+        <h3>Content Guard</h3>
+        <p>Advanced toxicity and evasion filtering. Each algorithm can be toggled independently. If all algorithms are disabled, only the basic banned word list is enforced. Disable Content Guard entirely to turn off all filtering including the banned word list.</p>
+        <table>
+          <thead><tr><th>Algorithm</th><th>Settings</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Levenshtein fuzzy matching</strong></td><td>Edit distance threshold (1&ndash;5)</td><td>Uses fuzzy string matching to catch intentional misspellings and leetspeak (e.g. replacing 'i' with '1' or 'e' with '3'). Tokens within the edit distance threshold of a banned word are flagged. Leetspeak normalisation is always applied before comparison.</td></tr>
+            <tr><td><strong>Invisible character scrubbing</strong></td><td>&mdash;</td><td>Strips zero-width spaces, zero-width joiners, word joiners, BOM, and left/right-to-right marks from messages before evaluating banned words. Prevents bypass via invisible Unicode injection.</td></tr>
+            <tr><td><strong>Zalgo / clutter blocking</strong></td><td>Max consecutive combining marks (1&ndash;10)</td><td>Blocks messages containing excessive Unicode combining characters (Zalgo text) that lag mobile clients and visually destroy the chat window.</td></tr>
+            <tr><td><strong>Copypasta hashing</strong></td><td>Min length (50&ndash;5000), distinct user threshold (&ge;2), time window (10&ndash;3600 s)</td><td>Calculates a SHA-256 hash of incoming large text blocks. If the same block is posted by multiple distinct users within the time window, all matching messages are flagged. Targets coordinated text spam during live streams.</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Banned Words</h4>
+        <p>A per-guild editable list of banned words. Words are matched case-insensitively after leetspeak normalisation. Add individual words or short phrases (spaces are preserved). When fuzzy matching is enabled, close variations of banned words are also caught.</p>
+
+        <h4>Module Actions (Content Guard)</h4>
+        <p>Content Guard has its own configurable action, timeout duration, message delete days (when banning), and auto-lockdown toggle &mdash; same as the detection matrix.</p>
+
         <h3>Anti-Raid</h3>
         <p>Automatically deletes all active invite links when an abnormal surge of joins is detected. During the cooldown period the action cannot re-trigger.</p>
         <table>

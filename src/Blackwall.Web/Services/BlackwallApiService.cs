@@ -313,4 +313,28 @@ public sealed class BlackwallApiService(
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<IReadOnlyList<BannedWordResponse>> GetBannedWordsAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/banned-words");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<BannedWordResponse>>(ct) ?? [];
+    }
+
+    public async Task<BannedWordResponse?> AddBannedWordAsync(long discordGuildId, string word, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/banned-words");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddBannedWordRequest(word));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<BannedWordResponse>(ct);
+    }
+
+    public async Task RemoveBannedWordAsync(long discordGuildId, long wordId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/banned-words/{wordId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

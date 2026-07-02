@@ -13,6 +13,7 @@ public sealed class MessageHandler(
     SpamDetectionService spamDetectionService,
     LockdownService lockdownService,
     SafeBrowsingService safeBrowsingService,
+    ContentGuardService contentGuardService,
     ILogger<MessageHandler> logger
 ) {
     /// <summary>
@@ -85,6 +86,18 @@ public sealed class MessageHandler(
             triggeredModules.Add((config.InviteLinkAction, config.InviteLinkTimeoutMinutes, config.InviteLinkMessageDeleteDays));
             if (config is { InviteLinkAutoLockdown: true, IsLockedDown: false })
                 shouldLockdown = true;
+        }
+
+        if (config.IsContentGuardEnabled) {
+            var cgViolations = await contentGuardService.EvaluateAsync(
+                fullContent, discordGuildId, discordUserId, config);
+
+            if (cgViolations.Count > 0) {
+                violations.AddRange(cgViolations);
+                triggeredModules.Add((config.ContentGuardAction, config.ContentGuardTimeoutMinutes, config.ContentGuardMessageDeleteDays));
+                if (config is { ContentGuardAutoLockdown: true, IsLockedDown: false })
+                    shouldLockdown = true;
+            }
         }
 
         if (config.BlockSuspiciousLinks) {
