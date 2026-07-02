@@ -145,6 +145,8 @@ Edit `.env` and fill in the required values. You can use the **[.env Generator](
 |----------|-------------|
 | `API__BASE_URL` | Base URL of the API (default `http://localhost:7001` — not recommended to change) |
 | `API__PORT` | Port the API listens on (default `7001`) |
+| `API__PROTECTION_ENABLED` | When `true`, all API endpoints require an `X-API-Key` header (default `true`). Exempt endpoints: `/api/auth/discord/callback`, `/api/system/health`, and `/health`. |
+| `API__KEY` | The API key sent via the `X-API-Key` header. Required when `API__PROTECTION_ENABLED` is `true`. Must match between API and Web. Format: `bw_k_` followed by 64 alphanumeric characters (`a-zA-Z0-9`). |
 
 **Web**
 

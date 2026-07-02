@@ -557,6 +557,24 @@ const sections = [
         default: "7001",
         desc: "Port the API listens on.",
         help: "Default <code>7001</code>."
+      },
+      {
+        key: "API__PROTECTION_ENABLED",
+        label: "API__PROTECTION_ENABLED",
+        required: false,
+        type: "bool",
+        default: true,
+        desc: "When true, all API endpoints require an X-API-Key header.",
+        help: "Exempt endpoints: <code>/api/auth/discord/callback</code>, <code>/api/system/health</code>, and <code>/health</code>. The Web project automatically sends the key when enabled."
+      },
+      {
+        key: "API__KEY",
+        label: "API__KEY",
+        required: false,
+        type: "password",
+        placeholder: "bw_k_<64 alphanumeric characters>",
+        desc: "API key sent via the X-API-Key header. Required when protection is enabled.",
+        help: "Must match between API and Web. Format: <code>bw_k_</code> followed by 64 alphanumeric characters (<code>a-zA-Z0-9</code>). <button class='gen-btn' onclick='genApiKey(this)'>Generate</button>"
       }
     ]
   },
@@ -631,6 +649,33 @@ function initValues() {
   sections.forEach(s => s.fields.forEach(f => {
     values[f.key] = f.default !== undefined ? f.default : "";
   }));
+  values["JWT__SECRET"] = genSecretValue();
+  values["APP__ENC_KEY"] = genAesKeyValue(32);
+  values["APP__ENC_IV"] = genAesKeyValue(16);
+  values["API__KEY"] = genApiKeyValue();
+}
+
+function genSecretValue() {
+  const arr = new Uint8Array(48);
+  crypto.getRandomValues(arr);
+  return btoa(String.fromCharCode(...arr)).replace(/=/g, "");
+}
+
+function genAesKeyValue(bytes) {
+  const arr = new Uint8Array(bytes);
+  crypto.getRandomValues(arr);
+  return btoa(String.fromCharCode(...arr));
+}
+
+function genApiKeyValue() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const arr = new Uint32Array(64);
+  crypto.getRandomValues(arr);
+  let key = 'bw_k_';
+  for (let i = 0; i < 64; i++) {
+    key += chars[arr[i] % chars.length];
+  }
+  return key;
 }
 
 function renderForm() {
@@ -714,19 +759,23 @@ function resetField(key, btn) {
 }
 
 function genSecret(btn) {
-  const arr = new Uint8Array(48);
-  crypto.getRandomValues(arr);
-  const secret = btoa(String.fromCharCode(...arr)).replace(/=/g, "");
+  const secret = genSecretValue();
   const input = btn.parentElement.parentElement.querySelector("input");
   input.value = secret;
   values["JWT__SECRET"] = secret;
   updatePreview();
 }
 
+function genApiKey(btn) {
+  const key = genApiKeyValue();
+  const input = btn.parentElement.parentElement.querySelector("input");
+  input.value = key;
+  values["API__KEY"] = key;
+  updatePreview();
+}
+
 function genAesKey(btn, bytes) {
-  const arr = new Uint8Array(bytes);
-  crypto.getRandomValues(arr);
-  const b64 = btoa(String.fromCharCode(...arr));
+  const b64 = genAesKeyValue(bytes);
   const input = btn.parentElement.parentElement.parentElement.querySelector("input");
   input.value = b64;
   values[input.dataset.key] = b64;

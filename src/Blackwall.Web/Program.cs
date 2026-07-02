@@ -45,6 +45,8 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddHttpClient<BlackwallApiService>(client => {
     client.BaseAddress = new Uri(apiOptions.BaseUrl.TrimEnd('/') + '/');
+    if (apiOptions.ProtectionEnabled && !string.IsNullOrEmpty(apiOptions.Key))
+        client.DefaultRequestHeaders.Add("X-API-Key", apiOptions.Key);
 });
 
 builder.Services.AddSingleton<DiscordAppInfoService>();
@@ -77,6 +79,8 @@ app.UseAntiforgery();
 
 app.MapGet("/auth/login", async (HttpContext ctx) => {
     using var client = new HttpClient();
+    if (apiOptions.ProtectionEnabled && !string.IsNullOrEmpty(apiOptions.Key))
+        client.DefaultRequestHeaders.Add("X-API-Key", apiOptions.Key);
     var response = await client.GetFromJsonAsync<LoginResponse>(
         $"{apiOptions.BaseUrl.TrimEnd('/')}/api/auth/discord");
 
@@ -93,6 +97,8 @@ app.MapGet("/auth/callback", async (string? code, string? error, HttpContext ctx
         return Results.Redirect("/?error=auth_failed");
 
     using var client = new HttpClient();
+    if (apiOptions.ProtectionEnabled && !string.IsNullOrEmpty(apiOptions.Key))
+        client.DefaultRequestHeaders.Add("X-API-Key", apiOptions.Key);
     var response = await client.PostAsJsonAsync(
         $"{apiOptions.BaseUrl.TrimEnd('/')}/api/auth/exchange",
         new AuthExchangeRequest(code));

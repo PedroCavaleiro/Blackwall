@@ -318,6 +318,8 @@ cd Blackwall</code></pre>
           <tbody>
             <tr><td><code>API__BASE_URL</code></td><td>No</td><td><code>https://localhost:7001</code></td><td>Base URL of the API. Used by the Web project to call the API. If updating the port also update the URL.</td></tr>
             <tr><td><code>API__PORT</code></td><td>No</td><td><code>7001</code></td><td>Port the API listens on</td></tr>
+            <tr><td><code>API__PROTECTION_ENABLED</code></td><td>No</td><td><code>true</code></td><td>When <code>true</code>, all API endpoints require an <code>X-API-Key</code> header. Exempt endpoints: <code>/api/auth/discord/callback</code>, <code>/api/system/health</code>, and <code>/health</code>.</td></tr>
+            <tr><td><code>API__KEY</code></td><td>Yes*</td><td>&mdash;</td><td>The API key sent via the <code>X-API-Key</code> header. Required when <code>API__PROTECTION_ENABLED</code> is <code>true</code>. Must match between API and Web. Format: <code>bw_k_</code> followed by 64 alphanumeric characters (<code>a-zA-Z0-9</code>).</td></tr>
           </tbody>
         </table>
 
