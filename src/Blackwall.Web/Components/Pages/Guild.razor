@@ -790,8 +790,8 @@
                         }
 
                         @if (_importResult is not null) {
-                            <div class="alert alert-info font-mono mt-3" style="font-size:0.78rem">
-                                IMPORT COMPLETE: @_importResult.Imported imported, @_importResult.Skipped skipped (already banned), @_importResult.Failed failed.
+                            <div class="alert alert-success font-mono my-4" style="font-size:0.8rem">
+                                // IMPORT COMPLETE: @_importResult.Imported imported, @_importResult.Skipped skipped (already banned), @_importResult.Failed failed.
                                 @if (_importResult.Errors.Count > 0) {
                                     <br />@string.Join("; ", _importResult.Errors.Take(5))
                                 }
