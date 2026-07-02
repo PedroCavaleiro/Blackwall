@@ -7,4 +7,10 @@ public sealed class ApiOptions {
 
     [ConfigurationKeyName("BASE_URL")]
     public required string BaseUrl { get; set; }
+
+    [ConfigurationKeyName("PROTECTION_ENABLED")]
+    public bool ProtectionEnabled { get; set; }
+
+    [ConfigurationKeyName("KEY")]
+    public string? Key { get; set; }
 }

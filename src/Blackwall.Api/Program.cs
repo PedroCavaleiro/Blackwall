@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text;
 using Blackwall.Api.Helpers;
+using Blackwall.Api.Middleware;
 using Blackwall.Api.Services;
 using Blackwall.Bot;
 using Blackwall.Bot.Background;
@@ -35,6 +36,9 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.Configure<DiscordOptions>(builder.Configuration.GetSection(DiscordOptions.SectionName));
 builder.Services.AddHttpClient<DiscordOAuthService>();
+
+builder.Services.Configure<ApiOptions>(
+    builder.Configuration.GetSection(ApiOptions.SectionName));
 
 builder.Services.Configure<JwtOptions>(
     builder.Configuration.GetSection(JwtOptions.SectionName));
@@ -136,6 +140,8 @@ using (var scope = app.Services.CreateScope()) {
     var db = scope.ServiceProvider.GetRequiredService<BlackwallDbContext>();
     await db.Database.MigrateAsync();
 }
+
+app.UseMiddleware<ApiKeyMiddleware>();
 
 app.MapGet("/health", () => Results.Redirect("/api/system/health"))
    .WithTags("System")
