@@ -557,6 +557,24 @@ const sections = [
         default: "7001",
         desc: "Port the API listens on.",
         help: "Default <code>7001</code>."
+      },
+      {
+        key: "API__PROTECTION_ENABLED",
+        label: "API__PROTECTION_ENABLED",
+        required: false,
+        type: "bool",
+        default: true,
+        desc: "When true, all API endpoints require an X-API-Key header.",
+        help: "Exempt endpoints: <code>/api/auth/discord/callback</code>, <code>/api/system/health</code>, and <code>/health</code>. The Web project automatically sends the key when enabled."
+      },
+      {
+        key: "API__KEY",
+        label: "API__KEY",
+        required: false,
+        type: "password",
+        placeholder: "bw_k_<64 alphanumeric characters>",
+        desc: "API key sent via the X-API-Key header. Required when protection is enabled.",
+        help: "Must match between API and Web. Format: <code>bw_k_</code> followed by 64 alphanumeric characters (<code>a-zA-Z0-9</code>). <button class='gen-btn' onclick='genApiKey(this)'>Generate</button>"
       }
     ]
   },
@@ -720,6 +738,20 @@ function genSecret(btn) {
   const input = btn.parentElement.parentElement.querySelector("input");
   input.value = secret;
   values["JWT__SECRET"] = secret;
+  updatePreview();
+}
+
+function genApiKey(btn) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const arr = new Uint32Array(64);
+  crypto.getRandomValues(arr);
+  let key = 'bw_k_';
+  for (let i = 0; i < 64; i++) {
+    key += chars[arr[i] % chars.length];
+  }
+  const input = btn.parentElement.parentElement.querySelector("input");
+  input.value = key;
+  values["API__KEY"] = key;
   updatePreview();
 }
 
