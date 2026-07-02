@@ -183,6 +183,21 @@ h1:focus { outline: none; }
 
 .form-control::placeholder { color: rgba(34, 211, 238, 0.25); }
 
+.form-control:disabled, .form-select:disabled,
+.form-control[disabled], .form-select[disabled] {
+    background-color: #0a1015;
+    border-color: rgba(34, 211, 238, 0.1);
+    color: rgba(221, 238, 240, 0.35);
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.form-check-input:disabled,
+.form-check-input[disabled] {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
 .form-check-input {
     background-color: #0f1820;
     border-color: rgba(34, 211, 238, 0.4);
