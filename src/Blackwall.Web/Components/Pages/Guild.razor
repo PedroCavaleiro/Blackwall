@@ -60,6 +60,7 @@
                 <button type="button" class="bw-tab-btn @(_activeTab == "links"     ? "active" : "")" @onclick='() => _activeTab = "links"'>LINKS</button>
                 <button type="button" class="bw-tab-btn @(_activeTab == "antiraid"  ? "active" : "")" @onclick='() => _activeTab = "antiraid"'>ANTI-RAID</button>
                 <button type="button" class="bw-tab-btn @(_activeTab == "scoring"   ? "active" : "")" @onclick='() => _activeTab = "scoring"'>SCORING</button>
+                <button type="button" class="bw-tab-btn @(_activeTab == "bans"      ? "active" : "")" @onclick='() => _activeTab = "bans"'>BANS</button>
                 <button type="button" class="bw-tab-btn @(_activeTab == "audit"     ? "active" : "")" @onclick='() => _activeTab = "audit"'>AUDIT</button>
             </div>
 
@@ -660,6 +661,205 @@
                 </div>
             }
 
+            @if (_activeTab == "bans") {
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">BAN LIST SHARING</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                            When enabled, your server's ban list becomes visible to other servers managed by Blackwall. Other server admins can import your bans into their server. You control whether your bans are shared &mdash; importing is always available.
+                        </p>
+
+                        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+                            <div class="bw-field-label">
+                                <div class="form-label mb-1">Share ban list</div>
+                                <div class="form-text">When on, other Blackwall-managed servers can see and import your bans.</div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input type="checkbox" class="form-check-input" id="shareBanList" style="width:2.5em;height:1.3em"
+                                       checked="@_shareBanList" disabled="@_banBusy" @onchange="ToggleShareBanListAsync" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">YOUR BAN LIST</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-3" style="font-size:0.75rem;color:var(--bw-muted)">
+                            @if (_bans.Any()) {
+                                <text>@_bans.Count ban(s) synced. Sync now to pull the latest bans from Discord.</text>
+                            } else {
+                                <text>No bans synced yet. Click SYNC to pull the current ban list from Discord.</text>
+                            }
+                        </p>
+
+                        <button type="button" class="btn btn-outline-primary cut-corner font-display mb-3" style="font-size:0.7rem;letter-spacing:0.1em"
+                                disabled="@_banBusy" @onclick="SyncBansAsync">
+                            @(_banBusy ? "SYNCING..." : "SYNC FROM DISCORD")
+                        </button>
+
+                        @if (_bans.Any()) {
+                            <div style="max-height:400px;overflow-y:auto">
+                                @foreach (var ban in _bans) {
+                                    <div class="d-flex align-items-start justify-content-between border-bottom py-2">
+                                        <div>
+                                            <div class="font-mono" style="font-size:0.78rem">@(ban.Username ?? "Unknown") <span style="color:var(--bw-muted)">(@ban.DiscordUserId)</span></div>
+                                            @if (!string.IsNullOrWhiteSpace(ban.Reason)) {
+                                                <div class="font-mono" style="font-size:0.7rem;color:var(--bw-muted)">@ban.Reason</div>
+                                            }
+                                            @if (ban.BannedAtUtc.HasValue) {
+                                                <div class="font-mono" style="font-size:0.68rem;color:var(--bw-muted)">@ban.BannedAtUtc.Value.ToString("yyyy-MM-dd HH:mm UTC")</div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">IMPORT BANS</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                            Import bans from other Blackwall-managed servers that have ban list sharing enabled. You can import the entire list or select individual bans. Users already banned in your server are automatically skipped.
+                        </p>
+
+                        @if (_sharedBanGuilds.Any()) {
+                            <div class="mb-3">
+                                <label class="form-label font-mono" style="font-size:0.7rem;letter-spacing:0.1em">SELECT SOURCE SERVER</label>
+                                <select class="form-select mb-2" @bind="_selectedSourceGuildId" disabled="@_banBusy">
+                                    <option value="0">— Select a server —</option>
+                                    @foreach (var g in _sharedBanGuilds) {
+                                        <option value="@g.DiscordGuildId">@g.Name (@g.BanCount bans)</option>
+                                    }
+                                </select>
+                            </div>
+
+                            @if (_selectedSourceGuildId > 0) {
+                                <div class="mb-3">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <label class="form-label font-mono mb-0" style="font-size:0.7rem;letter-spacing:0.1em">SOURCE BANS</label>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary font-display" style="font-size:0.65rem;letter-spacing:0.1em"
+                                                disabled="@_banBusy" @onclick="LoadSourceBansAsync">
+                                            LOAD BANS
+                                        </button>
+                                    </div>
+
+                                    @if (_sourceBans.Any()) {
+                                        <div style="max-height:300px;overflow-y:auto;border:1px solid var(--bs-border-color);border-radius:0.25rem;padding:0.5rem">
+                                            @foreach (var ban in _sourceBans) {
+                                                <div class="d-flex align-items-center justify-content-between border-bottom py-1">
+                                                    <div class="font-mono" style="font-size:0.72rem">
+                                                        <input type="checkbox" class="form-check-input me-2"
+                                                               id="ban-@ban.DiscordUserId"
+                                                               checked="@_selectedImportUserIds.Contains(ban.DiscordUserId)"
+                                                               @onchange="@(e => ToggleImportUser(ban.DiscordUserId, (bool?)e.Value))" />
+                                                        <label for="ban-@ban.DiscordUserId">@(ban.Username ?? "Unknown") (@ban.DiscordUserId)</label>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                        <div class="mt-2 d-flex gap-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary font-display" style="font-size:0.65rem;letter-spacing:0.1em"
+                                                    disabled="@_banBusy" @onclick="SelectAllSourceBans">SELECT ALL</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary font-display" style="font-size:0.65rem;letter-spacing:0.1em"
+                                                    disabled="@_banBusy" @onclick="ClearSelectedImportUsers">CLEAR</button>
+                                        </div>
+                                    } else if (_sourceBansLoaded) {
+                                        <div class="font-mono" style="font-size:0.72rem;color:var(--bw-muted)">No bans found in source server.</div>
+                                    }
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-primary cut-corner font-display" style="font-size:0.72rem;letter-spacing:0.1em"
+                                            disabled="@(_banBusy || _selectedSourceGuildId == 0)"
+                                            @onclick="ImportAllBansAsync">
+                                        @(_banBusy ? "IMPORTING..." : "IMPORT ALL")
+                                    </button>
+                                    @if (_selectedImportUserIds.Count > 0) {
+                                        <button type="button" class="btn btn-outline-primary cut-corner font-display" style="font-size:0.72rem;letter-spacing:0.1em"
+                                                disabled="@_banBusy" @onclick="ImportSelectedBansAsync">
+                                            @(_banBusy ? "IMPORTING..." : $"IMPORT SELECTED ({_selectedImportUserIds.Count})")
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        } else {
+                            <div class="font-mono" style="font-size:0.75rem;color:var(--bw-muted)">No other servers have ban list sharing enabled.</div>
+                        }
+
+                        @if (_importResult is not null) {
+                            <div class="alert alert-success font-mono my-4" style="font-size:0.8rem">
+                                // IMPORT COMPLETE: @_importResult.Imported imported, @_importResult.Skipped skipped (already banned), @_importResult.Failed failed.
+                                @if (_importResult.Errors.Count > 0) {
+                                    <br />@string.Join("; ", _importResult.Errors.Take(5))
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+                    <div class="card-header">AUTO-SYNC</div>
+                    <div class="p-4">
+                        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                            Automatically import bans from selected servers on a regular schedule. New bans added by the source server will be imported automatically. Users already banned in your server are skipped.
+                        </p>
+
+                        @if (_banSyncRules.Any()) {
+                            <div class="mb-3">
+                                @foreach (var rule in _banSyncRules) {
+                                    <div class="d-flex align-items-center justify-content-between border-bottom py-2">
+                                        <div>
+                                            <div class="font-mono" style="font-size:0.78rem">@rule.SourceGuildName <span style="color:var(--bw-muted)">(@rule.SourceDiscordGuildId)</span></div>
+                                            @if (rule.LastSyncedAtUtc.HasValue) {
+                                                <div class="font-mono" style="font-size:0.68rem;color:var(--bw-muted)">Last synced: @rule.LastSyncedAtUtc.Value.ToString("yyyy-MM-dd HH:mm UTC")</div>
+                                            } else {
+                                                <div class="font-mono" style="font-size:0.68rem;color:var(--bw-muted)">Not yet synced</div>
+                                            }
+                                        </div>
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="form-check form-switch">
+                                                <input type="checkbox" class="form-check-input" id="rule-@rule.Id" style="width:2em;height:1.05em"
+                                                       checked="@rule.IsEnabled" disabled="@_banBusy"
+                                                       @onchange="@(e => ToggleBanSyncRuleAsync(rule.Id, (bool)e.Value!))" />
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" style="font-size:0.7rem"
+                                                    disabled="@_banBusy" @onclick="() => RemoveBanSyncRuleAsync(rule.Id)">
+                                                REMOVE
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        } else {
+                            <div class="font-mono mb-3" style="font-size:0.75rem;color:var(--bw-muted)">No auto-sync rules configured.</div>
+                        }
+
+                        @if (_sharedBanGuilds.Any()) {
+                            <div>
+                                <label class="form-label font-mono" style="font-size:0.7rem;letter-spacing:0.1em">ADD AUTO-SYNC SOURCE</label>
+                                <div class="d-flex gap-2">
+                                    <select class="form-select" @bind="_selectedAutoSyncSourceId" disabled="@_banBusy">
+                                        <option value="0">— Select a server —</option>
+                                        @foreach (var g in _sharedBanGuilds) {
+                                            <option value="@g.DiscordGuildId">@g.Name (@g.BanCount bans)</option>
+                                        }
+                                    </select>
+                                    <button type="button" class="btn btn-outline-primary cut-corner font-display" style="font-size:0.7rem;letter-spacing:0.1em;white-space:nowrap"
+                                            disabled="@(_selectedAutoSyncSourceId == 0 || _banBusy)" @onclick="AddBanSyncRuleAsync">
+                                        ADD
+                                    </button>
+                                </div>
+                            </div>
+                        } else {
+                            <div class="font-mono" style="font-size:0.75rem;color:var(--bw-muted)">No shared ban lists available to auto-sync from.</div>
+                        }
+                    </div>
+                </div>
+            }
+
             @if (_activeTab == "audit") {
                 <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
                     <div class="card-header">AUDIT LOG</div>
@@ -756,6 +956,18 @@
     private string _newDomain = "";
     private bool _blacklistBusy;
 
+    private bool _shareBanList;
+    private bool _banBusy;
+    private IReadOnlyList<GuildBanResponse> _bans = [];
+    private IReadOnlyList<SharedBanListGuildResponse> _sharedBanGuilds = [];
+    private long _selectedSourceGuildId;
+    private IReadOnlyList<GuildBanResponse> _sourceBans = [];
+    private bool _sourceBansLoaded;
+    private HashSet<long> _selectedImportUserIds = [];
+    private ImportBansResultResponse? _importResult;
+    private IReadOnlyList<BanSyncRuleResponse> _banSyncRules = [];
+    private long _selectedAutoSyncSourceId;
+
     protected override async Task OnInitializedAsync() {
         try {
             _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
@@ -806,6 +1018,17 @@
                 Form.SuspiciousLinkTimeoutMinutes = s.SuspiciousLinkTimeoutMinutes;
                 Form.SuspiciousLinkMessageDeleteDays = s.SuspiciousLinkMessageDeleteDays;
                 _isLockedDown = s.IsLockedDown;
+                _shareBanList = _settings.ShareBanList;
+            }
+
+            try {
+                _bans = await Api.GetBansAsync(DiscordGuildId);
+                _sharedBanGuilds = await Api.GetSharedBanListGuildsAsync(DiscordGuildId);
+                _banSyncRules = await Api.GetBanSyncRulesAsync(DiscordGuildId);
+            } catch {
+                _bans = [];
+                _sharedBanGuilds = [];
+                _banSyncRules = [];
             }
 
             try {
@@ -1056,6 +1279,137 @@
             _error = $"Failed to remove domain: {ex.Message}";
         } finally {
             _blacklistBusy = false;
+        }
+    }
+
+    private async Task ToggleShareBanListAsync(ChangeEventArgs e) {
+        _banBusy = true;
+        _error = null;
+        try {
+            _shareBanList = (bool)e.Value!;
+            await Api.UpdateShareBanListAsync(DiscordGuildId, _shareBanList);
+            _sharedBanGuilds = await Api.GetSharedBanListGuildsAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            _shareBanList = !_shareBanList;
+            _error = $"Failed to update ban sharing: {ex.Message}";
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task SyncBansAsync() {
+        _banBusy = true;
+        _error = null;
+        try {
+            await Api.SyncBansAsync(DiscordGuildId);
+            _bans = await Api.GetBansAsync(DiscordGuildId);
+            _sharedBanGuilds = await Api.GetSharedBanListGuildsAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            _error = $"Failed to sync bans: {ex.Message}";
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task LoadSourceBansAsync() {
+        if (_selectedSourceGuildId == 0) return;
+        _banBusy = true;
+        _error = null;
+        try {
+            _sourceBans = await Api.GetSourceGuildBansAsync(DiscordGuildId, _selectedSourceGuildId);
+            _sourceBansLoaded = true;
+            _selectedImportUserIds.Clear();
+        } catch (Exception ex) {
+            _error = $"Failed to load source bans: {ex.Message}";
+            _sourceBans = [];
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private void ToggleImportUser(long userId, bool? value) {
+        if (value == true)
+            _selectedImportUserIds.Add(userId);
+        else
+            _selectedImportUserIds.Remove(userId);
+    }
+
+    private void SelectAllSourceBans() {
+        _selectedImportUserIds = _sourceBans.Select(b => b.DiscordUserId).ToHashSet();
+    }
+
+    private void ClearSelectedImportUsers() {
+        _selectedImportUserIds.Clear();
+    }
+
+    private async Task ImportAllBansAsync() {
+        if (_selectedSourceGuildId == 0) return;
+        _banBusy = true;
+        _error = null;
+        _importResult = null;
+        try {
+            _importResult = await Api.ImportBansAsync(DiscordGuildId, _selectedSourceGuildId);
+            _bans = await Api.GetBansAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            _error = $"Failed to import bans: {ex.Message}";
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task ImportSelectedBansAsync() {
+        if (_selectedSourceGuildId == 0 || _selectedImportUserIds.Count == 0) return;
+        _banBusy = true;
+        _error = null;
+        _importResult = null;
+        try {
+            _importResult = await Api.ImportBansAsync(DiscordGuildId, _selectedSourceGuildId, _selectedImportUserIds.ToList());
+            _bans = await Api.GetBansAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            _error = $"Failed to import bans: {ex.Message}";
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task AddBanSyncRuleAsync() {
+        if (_selectedAutoSyncSourceId == 0) return;
+        _banBusy = true;
+        _error = null;
+        try {
+            await Api.AddBanSyncRuleAsync(DiscordGuildId, _selectedAutoSyncSourceId);
+            _banSyncRules = await Api.GetBanSyncRulesAsync(DiscordGuildId);
+            _selectedAutoSyncSourceId = 0;
+        } catch (Exception ex) {
+            _error = $"Failed to add auto-sync rule: {ex.Message}";
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task ToggleBanSyncRuleAsync(long ruleId, bool enabled) {
+        _banBusy = true;
+        _error = null;
+        try {
+            await Api.UpdateBanSyncRuleAsync(DiscordGuildId, ruleId, enabled);
+            _banSyncRules = await Api.GetBanSyncRulesAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            _error = $"Failed to update auto-sync rule: {ex.Message}";
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task RemoveBanSyncRuleAsync(long ruleId) {
+        _banBusy = true;
+        _error = null;
+        try {
+            await Api.DeleteBanSyncRuleAsync(DiscordGuildId, ruleId);
+            _banSyncRules = await Api.GetBanSyncRulesAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            _error = $"Failed to remove auto-sync rule: {ex.Message}";
+        } finally {
+            _banBusy = false;
         }
     }
 }

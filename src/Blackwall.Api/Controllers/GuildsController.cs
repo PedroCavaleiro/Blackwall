@@ -23,7 +23,8 @@ public sealed class GuildsController(
     DiscordGuildCacheService guildCache,
     DiscordSocketClient discordClient,
     LockdownService lockdownService,
-    BlacklistService blacklistService
+    BlacklistService blacklistService,
+    BanSyncService banSyncService
 ) : ControllerBase {
     
     /// <summary>
@@ -116,6 +117,7 @@ public sealed class GuildsController(
             instance.Name,
             instance.IconHash,
             instance.IsActive,
+            instance.ShareBanList,
             new SpamConfigurationDto(
                 instance.SpamConfiguration.MaxMessagesPerWindow,
                 instance.SpamConfiguration.RateLimitWindowSeconds,
@@ -688,7 +690,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None));
+        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None), cancellationToken);
 
         return NoContent();
     }
@@ -863,7 +865,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None));
+        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None), cancellationToken);
 
         return Ok(new BlacklistDomainResponse(entry.Id, entry.Domain));
     }
@@ -927,6 +929,567 @@ public sealed class GuildsController(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None));
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Updates the ban list sharing preference for a guild.
+    /// When enabled, the guild's ban list becomes visible to other guilds managed by the bot.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="request">The share ban list preference.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">Share preference updated successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpPut("{discordGuildId:long}/bans/share")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateShareBanList(
+        long discordGuildId,
+        [FromBody] UpdateShareBanListRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        instance.ShareBanList = request.ShareBanList;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Returns all guilds that have ban list sharing enabled and are active.
+    /// Excludes the guild making the request.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID of the requesting guild.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of guilds with shared ban lists.</returns>
+    /// <response code="200">Returns the list of shared ban list guilds.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    [HttpGet("{discordGuildId:long}/bans/shared-guilds")]
+    [ProducesResponseType(typeof(IReadOnlyList<SharedBanListGuildResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IReadOnlyList<SharedBanListGuildResponse>>> GetSharedBanListGuilds(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var sharedGuilds = await dbContext.GuildInstances
+            .Where(x => x.IsActive && x.ShareBanList && x.DiscordGuildId != discordGuildId)
+            .Select(x => new {
+                x.DiscordGuildId,
+                x.Name,
+                x.IconHash,
+                BanCount = x.Bans.Count
+            })
+            .OrderBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+
+        return Ok(sharedGuilds
+            .Select(x => new SharedBanListGuildResponse(x.DiscordGuildId, x.Name, x.IconHash, x.BanCount))
+            .ToList());
+    }
+
+    /// <summary>
+    /// Returns all bans for a guild the authenticated user can manage.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of bans for the guild.</returns>
+    /// <response code="200">Returns the list of bans.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpGet("{discordGuildId:long}/bans")]
+    [ProducesResponseType(typeof(IReadOnlyList<GuildBanResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<GuildBanResponse>>> GetBans(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.Bans)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        return Ok(instance.Bans
+            .Select(b => new GuildBanResponse(b.Id, b.DiscordUserId, b.Username, b.Reason, b.BannedAtUtc))
+            .OrderByDescending(b => b.BannedAtUtc)
+            .ToList());
+    }
+
+    /// <summary>
+    /// Returns the bans of a shared guild. The source guild must have ban list sharing enabled.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID of the requesting guild.</param>
+    /// <param name="sourceDiscordGuildId">The Discord guild ID whose bans to retrieve.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of bans from the source guild.</returns>
+    /// <response code="200">Returns the list of bans from the source guild.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild, or the source guild does not share its ban list.</response>
+    /// <response code="404">The source guild instance does not exist.</response>
+    [HttpGet("{discordGuildId:long}/bans/source/{sourceDiscordGuildId:long}")]
+    [ProducesResponseType(typeof(IReadOnlyList<GuildBanResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<GuildBanResponse>>> GetSourceGuildBans(
+        long discordGuildId,
+        long sourceDiscordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var sourceInstance = await dbContext.GuildInstances
+            .Include(x => x.Bans)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == sourceDiscordGuildId && x.IsActive, cancellationToken);
+
+        if (sourceInstance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Source guild not found.",
+                Detail = "No guild instance exists for the source Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        if (!sourceInstance.ShareBanList)
+            return Forbid();
+
+        return Ok(sourceInstance.Bans
+            .Select(b => new GuildBanResponse(b.Id, b.DiscordUserId, b.Username, b.Reason, b.BannedAtUtc))
+            .OrderByDescending(b => b.BannedAtUtc)
+            .ToList());
+    }
+
+    /// <summary>
+    /// Synchronizes the ban list for the specified guild from Discord into the database.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Bans synced successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpPost("{discordGuildId:long}/bans/sync")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SyncBans(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var count = await banSyncService.SyncBansAsync(discordGuildId, cancellationToken);
+
+        return Ok(new { Message = $"Synced {count} bans.", Count = count });
+    }
+
+    /// <summary>
+    /// Imports bans from a shared guild into the specified guild. Only imports from guilds
+    /// that have ban list sharing enabled. Users already banned in the target guild are skipped.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID to import bans into.</param>
+    /// <param name="request">The import request specifying the source guild and optional user IDs.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Bans imported successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpPost("{discordGuildId:long}/bans/import")]
+    [ProducesResponseType(typeof(ImportBansResultResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ImportBansResultResponse>> ImportBans(
+        long discordGuildId,
+        [FromBody] ImportBansRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        if (request.SourceDiscordGuildId == discordGuildId)
+            return BadRequest(new ProblemDetails {
+                Title = "Cannot import from self.",
+                Detail = "The source guild cannot be the same as the target guild.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        var (imported, skipped, failed, errors) = await banSyncService.ImportBansAsync(
+            discordGuildId, request.SourceDiscordGuildId, request.DiscordUserIds, cancellationToken);
+
+        return Ok(new ImportBansResultResponse(imported, skipped, failed, errors));
+    }
+
+    /// <summary>
+    /// Returns all auto-sync rules for the specified guild.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Returns the list of auto-sync rules.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    [HttpGet("{discordGuildId:long}/bans/auto-sync")]
+    [ProducesResponseType(typeof(IReadOnlyList<BanSyncRuleResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IReadOnlyList<BanSyncRuleResponse>>> GetBanSyncRules(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.BanSyncRules)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var sourceGuildIds = instance.BanSyncRules.Select(r => r.SourceDiscordGuildId).ToHashSet();
+        var sourceGuilds = await dbContext.GuildInstances
+            .Where(x => sourceGuildIds.Contains(x.DiscordGuildId))
+            .ToDictionaryAsync(x => x.DiscordGuildId, cancellationToken);
+
+        return Ok(instance.BanSyncRules
+            .Select(r => new BanSyncRuleResponse(
+                r.Id,
+                r.SourceDiscordGuildId,
+                sourceGuilds.TryGetValue(r.SourceDiscordGuildId, out var src) ? src.Name : "Unknown",
+                r.IsEnabled,
+                r.LastSyncedAtUtc == DateTime.MinValue ? null : r.LastSyncedAtUtc
+            ))
+            .OrderBy(r => r.SourceGuildName)
+            .ToList());
+    }
+
+    /// <summary>
+    /// Adds a new auto-sync rule for the specified guild.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="request">The auto-sync rule to add.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Auto-sync rule added successfully.</response>
+    /// <response code="400">The source guild does not have ban list sharing enabled or is the same as the target.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpPost("{discordGuildId:long}/bans/auto-sync")]
+    [ProducesResponseType(typeof(BanSyncRuleResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<BanSyncRuleResponse>> AddBanSyncRule(
+        long discordGuildId,
+        [FromBody] AddBanSyncRuleRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        if (request.SourceDiscordGuildId == discordGuildId)
+            return BadRequest(new ProblemDetails {
+                Title = "Cannot auto-sync from self.",
+                Detail = "The source guild cannot be the same as the target guild.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.BanSyncRules)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var sourceGuild = await dbContext.GuildInstances
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == request.SourceDiscordGuildId && x.IsActive, cancellationToken);
+
+        if (sourceGuild is null)
+            return BadRequest(new ProblemDetails {
+                Title = "Source guild not found.",
+                Detail = "The source guild does not exist or is not active.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        if (!sourceGuild.ShareBanList)
+            return BadRequest(new ProblemDetails {
+                Title = "Ban list not shared.",
+                Detail = "The source guild does not have ban list sharing enabled.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        if (instance.BanSyncRules.Any(r => r.SourceDiscordGuildId == request.SourceDiscordGuildId))
+            return BadRequest(new ProblemDetails {
+                Title = "Rule already exists.",
+                Detail = "An auto-sync rule for this source guild already exists.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        var rule = new GuildBanSyncRule {
+            TargetGuildInstanceId = instance.Id,
+            SourceDiscordGuildId = request.SourceDiscordGuildId,
+            IsEnabled = true
+        };
+
+        dbContext.GuildBanSyncRules.Add(rule);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new BanSyncRuleResponse(rule.Id, rule.SourceDiscordGuildId, sourceGuild.Name, rule.IsEnabled, null));
+    }
+
+    /// <summary>
+    /// Updates an existing auto-sync rule (e.g. enable/disable).
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="ruleId">The ID of the auto-sync rule to update.</param>
+    /// <param name="request">The update request.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">Auto-sync rule updated successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The rule does not exist.</response>
+    [HttpPut("{discordGuildId:long}/bans/auto-sync/{ruleId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateBanSyncRule(
+        long discordGuildId,
+        long ruleId,
+        [FromBody] UpdateBanSyncRuleRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var rule = await dbContext.GuildBanSyncRules
+            .FirstOrDefaultAsync(x => x.Id == ruleId && x.TargetGuildInstanceId == instance.Id, cancellationToken);
+
+        if (rule is null)
+            return NotFound(new ProblemDetails {
+                Title = "Auto-sync rule not found.",
+                Detail = "No auto-sync rule exists with the specified ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        rule.IsEnabled = request.IsEnabled;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Deletes an auto-sync rule.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="ruleId">The ID of the auto-sync rule to delete.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">Auto-sync rule deleted successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The rule does not exist.</response>
+    [HttpDelete("{discordGuildId:long}/bans/auto-sync/{ruleId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteBanSyncRule(
+        long discordGuildId,
+        long ruleId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var rule = await dbContext.GuildBanSyncRules
+            .FirstOrDefaultAsync(x => x.Id == ruleId && x.TargetGuildInstanceId == instance.Id, cancellationToken);
+
+        if (rule is null)
+            return NotFound(new ProblemDetails {
+                Title = "Auto-sync rule not found.",
+                Detail = "No auto-sync rule exists with the specified ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        dbContext.GuildBanSyncRules.Remove(rule);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return NoContent();
     }

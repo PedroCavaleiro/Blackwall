@@ -3,6 +3,7 @@ using System;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Blackwall.Infrastructure.Migrations
 {
     [DbContext(typeof(BlackwallDbContext))]
-    partial class BlackwallDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260702093425_AddBanSharing")]
+    partial class AddBanSharing
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -98,38 +101,6 @@ namespace Blackwall.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("GuildBans");
-                });
-
-            modelBuilder.Entity("Blackwall.Core.Entities.GuildBanSyncRule", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("LastSyncedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("SourceDiscordGuildId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("TargetGuildInstanceId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TargetGuildInstanceId", "SourceDiscordGuildId")
-                        .IsUnique();
-
-                    b.ToTable("GuildBanSyncRules");
                 });
 
             modelBuilder.Entity("Blackwall.Core.Entities.GuildBlacklist", b =>
@@ -507,17 +478,6 @@ namespace Blackwall.Infrastructure.Migrations
                     b.Navigation("GuildInstance");
                 });
 
-            modelBuilder.Entity("Blackwall.Core.Entities.GuildBanSyncRule", b =>
-                {
-                    b.HasOne("Blackwall.Core.Entities.GuildInstance", "TargetGuildInstance")
-                        .WithMany("BanSyncRules")
-                        .HasForeignKey("TargetGuildInstanceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("TargetGuildInstance");
-                });
-
             modelBuilder.Entity("Blackwall.Core.Entities.GuildBlacklist", b =>
                 {
                     b.HasOne("Blackwall.Core.Entities.SpamConfiguration", "SpamConfiguration")
@@ -589,8 +549,6 @@ namespace Blackwall.Infrastructure.Migrations
 
             modelBuilder.Entity("Blackwall.Core.Entities.GuildInstance", b =>
                 {
-                    b.Navigation("BanSyncRules");
-
                     b.Navigation("Bans");
 
                     b.Navigation("Managers");
