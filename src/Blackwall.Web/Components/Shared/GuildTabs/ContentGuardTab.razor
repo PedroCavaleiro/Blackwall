@@ -1,0 +1,222 @@
+@using Blackwall.Core.Entities
+@inject BlackwallApiService Api
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">CONTENT GUARD</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">Advanced toxicity and evasion filtering. Each algorithm can be toggled independently. If all algorithms are disabled, only the basic banned word list below is enforced. Disable Content Guard entirely to turn off all filtering including the banned word list.</p>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Enable Content Guard</div>
+                <div class="form-text">Master toggle for the entire Content Guard module. When off, no Content Guard filtering runs.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="cgEnable" @bind-Value="Form.IsContentGuardEnabled" />
+            </div>
+        </div>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Levenshtein fuzzy matching</div>
+                <div class="form-text">Uses fuzzy string matching to catch intentional misspellings and leetspeak (e.g. replacing 'i' with '1' or 'e' with '3'). Tokens within the edit distance threshold of a banned word are flagged.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="cgFuzzy" @bind-Value="Form.ContentGuardFuzzyMatching" disabled="@(!Form.IsContentGuardEnabled)" />
+            </div>
+        </div>
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Fuzzy match threshold (edit distance)</div>
+                <div class="form-text">Maximum Levenshtein edit distance allowed when comparing tokens to banned words. Lower values are stricter, higher values catch more variations but may produce false positives. Range: 1&ndash;5.</div>
+            </div>
+            <InputNumber class="form-control bw-input-narrow" min="1" max="5" @bind-Value="Form.ContentGuardFuzzyThreshold" disabled="@(!Form.IsContentGuardEnabled || !Form.ContentGuardFuzzyMatching)" />
+        </div>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Invisible character scrubbing</div>
+                <div class="form-text">Strips zero-width spaces, zero-width joiners, word joiners, BOM, and left/right-to-right marks from messages before evaluating banned words. Prevents bypass via invisible Unicode injection.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="cgInvisible" @bind-Value="Form.ContentGuardInvisibleCharScrubbing" disabled="@(!Form.IsContentGuardEnabled)" />
+            </div>
+        </div>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Zalgo / clutter blocking</div>
+                <div class="form-text">Blocks messages containing excessive Unicode combining characters (Zalgo text) that lag mobile clients and visually destroy the chat window.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="cgZalgo" @bind-Value="Form.ContentGuardZalgoBlocking" disabled="@(!Form.IsContentGuardEnabled)" />
+            </div>
+        </div>
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Zalgo max combining chars</div>
+                <div class="form-text">Maximum consecutive combining marks allowed on a single base character before the message is flagged. Lower values are stricter. Range: 1&ndash;10.</div>
+            </div>
+            <InputNumber class="form-control bw-input-narrow" min="1" max="10" @bind-Value="Form.ContentGuardZalgoMaxCombining" disabled="@(!Form.IsContentGuardEnabled || !Form.ContentGuardZalgoBlocking)" />
+        </div>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Copypasta hashing</div>
+                <div class="form-text">Calculates a hash of incoming large text blocks. If the same block is posted by multiple distinct users within the time window, all matching messages are flagged. Targets coordinated text spam during live streams.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="cgCopypasta" @bind-Value="Form.ContentGuardCopypastaHashing" disabled="@(!Form.IsContentGuardEnabled)" />
+            </div>
+        </div>
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Copypasta minimum length</div>
+                <div class="form-text">Minimum message length (in characters) to be considered for copypasta hashing. Shorter messages are ignored. Range: 50&ndash;5000.</div>
+            </div>
+            <InputNumber class="form-control bw-input-narrow" min="50" max="5000" @bind-Value="Form.ContentGuardCopypastaMinLength" disabled="@(!Form.IsContentGuardEnabled || !Form.ContentGuardCopypastaHashing)" />
+        </div>
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Copypasta threshold (distinct users)</div>
+                <div class="form-text">Number of distinct users who must post the same text block before it is flagged. Minimum: 2.</div>
+            </div>
+            <InputNumber class="form-control bw-input-narrow" min="2" @bind-Value="Form.ContentGuardCopypastaThreshold" disabled="@(!Form.IsContentGuardEnabled || !Form.ContentGuardCopypastaHashing)" />
+        </div>
+        <div class="bw-field bw-field-last">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Copypasta window (seconds)</div>
+                <div class="form-text">Rolling time window in which distinct user posts are counted. Range: 10&ndash;3600 seconds.</div>
+            </div>
+            <InputNumber class="form-control bw-input-narrow" min="10" max="3600" @bind-Value="Form.ContentGuardCopypastaWindowSeconds" disabled="@(!Form.IsContentGuardEnabled || !Form.ContentGuardCopypastaHashing)" />
+        </div>
+    </div>
+</div>
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">BANNED WORDS</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">Per-guild list of banned words. Words are matched case-insensitively after leetspeak normalisation. Add individual words or short phrases (spaces are preserved).</p>
+
+        @if (_bannedWords.Any()) {
+            <div class="mb-3">
+                @foreach (var word in _bannedWords) {
+                    <div class="d-flex align-items-center justify-content-between border-bottom py-2">
+                        <span class="font-mono bw-ban-user">@word.Word</span>
+                        <button type="button" class="btn btn-outline-danger bw-btn-remove"
+                                disabled="@_wordBusy"
+                                @onclick="() => RemoveBannedWordAsync(word.Id)">
+                            REMOVE
+                        </button>
+                    </div>
+                }
+            </div>
+        } else {
+            <div class="font-mono mb-3 bw-desc">
+                // No banned words configured. Add words below to enable basic blacklist filtering.
+            </div>
+        }
+
+        <div class="d-flex gap-2">
+            <input type="text" class="form-control" placeholder="Enter a word or phrase to ban..."
+                   @bind="_newWord" disabled="@(!Form.IsContentGuardEnabled)" />
+            <button type="button" class="btn btn-primary cut-corner font-display bw-btn-sm"
+                    disabled="@(_wordBusy || string.IsNullOrWhiteSpace(_newWord) || !Form.IsContentGuardEnabled)"
+                    @onclick="AddBannedWordAsync">
+                ADD
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="cut-corner border mb-4 bw-card-danger">
+    <div class="card-header bw-header-danger">MODULE ACTIONS</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">Configure the action and lockdown behavior for Content Guard.</p>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Content Guard &mdash; action</div>
+                <div class="form-text">Action taken when Content Guard flags a message.</div>
+            </div>
+            <InputSelect class="form-select bw-input-select" @bind-Value="Form.ContentGuardAction" disabled="@(!Form.IsContentGuardEnabled)">
+                <option value="@InfractionAction.DeleteOnly">Delete only</option>
+                <option value="@InfractionAction.Timeout">Timeout</option>
+                <option value="@InfractionAction.Kick">Kick</option>
+                <option value="@InfractionAction.Ban">Ban</option>
+            </InputSelect>
+        </div>
+        @if (Form.ContentGuardAction is InfractionAction.Timeout) {
+            <div class="bw-field">
+                <div class="bw-field-label">
+                    <div class="form-label mb-1">Content Guard &mdash; timeout (minutes)</div>
+                    <div class="form-text">How long the user is timed out. Minimum: 1 minute.</div>
+                </div>
+                <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="Form.ContentGuardTimeoutMinutes" disabled="@(!Form.IsContentGuardEnabled)" />
+            </div>
+        }
+        @if (Form.ContentGuardAction is InfractionAction.Ban) {
+            <div class="bw-field">
+                <div class="bw-field-label">
+                    <div class="form-label mb-1">Content Guard &mdash; delete messages (days)</div>
+                    <div class="form-text">Number of days of message history to purge when banning. Maximum is 7 days.</div>
+                </div>
+                <InputNumber class="form-control bw-input-narrow" min="0" max="7" @bind-Value="Form.ContentGuardMessageDeleteDays" disabled="@(!Form.IsContentGuardEnabled)" />
+            </div>
+        }
+        <div class="bw-field bw-field-last">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Content Guard &mdash; auto-lockdown</div>
+                <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="cgAutoLockdown" @bind-Value="Form.ContentGuardAutoLockdown" disabled="@(!Form.IsContentGuardEnabled)" />
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required SpamConfigForm Form { get; set; }
+    [Parameter, EditorRequired] public required long DiscordGuildId { get; set; }
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private IReadOnlyList<BannedWordResponse> _bannedWords = [];
+    private string _newWord = "";
+    private bool _wordBusy;
+
+    protected override async Task OnInitializedAsync() {
+        try {
+            _bannedWords = await Api.GetBannedWordsAsync(DiscordGuildId);
+        } catch {
+            _bannedWords = [];
+            await OnError.InvokeAsync("Failed to load banned words.");
+        }
+    }
+
+    private async Task AddBannedWordAsync() {
+        if (string.IsNullOrWhiteSpace(_newWord)) return;
+        _wordBusy = true;
+        try {
+            await Api.AddBannedWordAsync(DiscordGuildId, _newWord);
+            _bannedWords = await Api.GetBannedWordsAsync(DiscordGuildId);
+            _newWord = "";
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to add banned word: {ex.Message}");
+        } finally {
+            _wordBusy = false;
+        }
+    }
+
+    private async Task RemoveBannedWordAsync(long wordId) {
+        _wordBusy = true;
+        try {
+            await Api.RemoveBannedWordAsync(DiscordGuildId, wordId);
+            _bannedWords = await Api.GetBannedWordsAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to remove banned word: {ex.Message}");
+        } finally {
+            _wordBusy = false;
+        }
+    }
+}
