@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Blackwall.Core.Configuration;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
@@ -11,7 +12,7 @@ namespace Blackwall.Bot.Services;
 
 public sealed partial class BlacklistService(
     IConnectionMultiplexer redis,
-    BlackwallDbContext dbContext,
+    IServiceScopeFactory scopeFactory,
     IOptions<BlacklistOptions> options,
     ILogger<BlacklistService> logger
 ) {
@@ -60,6 +61,9 @@ public sealed partial class BlacklistService(
         long discordGuildId,
         CancellationToken cancellationToken = default
     ) {
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BlackwallDbContext>();
+
         var config = await dbContext.GuildInstances
             .Where(x => x.DiscordGuildId == discordGuildId && x.IsActive)
             .Select(x => new {
@@ -125,6 +129,9 @@ public sealed partial class BlacklistService(
     /// </summary>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     public async Task RefreshAllAsync(CancellationToken cancellationToken = default) {
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BlackwallDbContext>();
+
         var guildIds = await dbContext.GuildInstances
             .Where(x => x.IsActive && (
                 x.SpamConfiguration.Blacklists.Count > 0 ||
