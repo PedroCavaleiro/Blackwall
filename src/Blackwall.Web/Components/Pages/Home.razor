@@ -48,14 +48,28 @@
             </div>
         </section>
 
-        <!-- Feature cards -->
+        <!-- Implemented functionalities -->
         <section style="padding:0 1.5rem 5rem;max-width:1000px;margin:0 auto">
+            <div class="text-center mb-5">
+                <h2 class="font-display mb-2" style="font-size:1.1rem;letter-spacing:0.15em;color:var(--bw-primary)">
+                    ACTIVE SUBROUTINES
+                </h2>
+                <p class="font-mono mb-0" style="font-size:0.78rem;color:var(--bw-muted)">
+                    // Every module below is deployed and operational.
+                </p>
+            </div>
             <div class="row g-3">
                 @foreach (var f in Features) {
                     <div class="col-md-4">
                         <div class="cut-corner border h-100 p-4" style="background:var(--bs-card-bg);position:relative">
                             <div style="position:absolute;top:0;left:0;width:3rem;height:1px;background:var(--bw-primary)"></div>
-                            <div class="mb-3" style="color:var(--bw-primary);font-size:1.4rem">@f.Icon</div>
+                            <div class="d-flex align-items-start justify-content-between mb-3">
+                                <i class="@f.Icon" style="color:var(--bw-primary);font-size:1.4rem"></i>
+                                <span class="font-mono d-inline-flex align-items-center gap-1" style="font-size:0.55rem;letter-spacing:0.1em;color:var(--bw-primary);border:1px solid rgba(34,211,238,0.3);padding:0.1rem 0.4rem">
+                                    <span class="rounded-circle bw-pulse" style="width:5px;height:5px;background:var(--bw-primary);flex-shrink:0;display:inline-block"></span>
+                                    ACTIVE
+                                </span>
+                            </div>
                             <h3 class="font-display mb-2" style="font-size:0.9rem;letter-spacing:0.08em">@f.Title</h3>
                             <p class="font-mono mb-0" style="font-size:0.78rem;color:var(--bw-muted);line-height:1.6">@f.Desc</p>
                         </div>
@@ -84,9 +98,14 @@
     private string? _error;
 
     private static readonly (string Icon, string Title, string Desc)[] Features = [
-        ("⚡", "Quickhack Defense", "Automatic message scoring on every guild event. Spam vectors neutralized before they spread."),
-        ("👁", "Total Netrunner Visibility", "Per-server dashboards and tunable thresholds. You control what trips the barrier."),
-        ("🛡", "Hard-Coded Safeguards", "Smart defaults with zero tolerance for false positives on legitimate users."),
+        ("fa-solid fa-bolt", "Spam Detection", "Rolling-window rate limiting, invite-link blocking, and suspicious-URL detection with redirect following. Tunable per-server thresholds."),
+        ("fa-solid fa-triangle-exclamation", "Raid Detection", "Monitors join velocity in real time. Triggers automatic lockdown when configurable join-rate thresholds are breached."),
+        ("fa-solid fa-globe", "Safe Browsing", "Real-time URL checks against Google Safe Browsing V5 using hash-prefix lookups with Rice-Golomb delta decoding and Redis caching."),
+        ("fa-solid fa-ban", "Domain Blacklist", "Downloads and caches AdGuard-format domain filter lists in Redis. Messages containing blacklisted domains are blocked instantly."),
+        ("fa-solid fa-user-shield", "Account Scoring", "Scores new members on account age, avatar presence, and username patterns (gibberish, numeric-only, consecutive consonants). Flags suspicious accounts."),
+        ("fa-solid fa-lock", "Lockdown Protocol", "Denies SEND_MESSAGES, SEND_MESSAGES_IN_THREADS, and CREATE_PUBLIC_THREADS for @everyone across all text channels when a raid is detected."),
+        ("fa-solid fa-clipboard-list", "Ban Synchronization", "Periodically syncs Discord guild ban lists into the database so enforcement state stays consistent across restarts."),
+        ("fa-solid fa-gears", "Permission Sync", "Tracks guild-level bot permissions and role changes to ensure Blackwall always has the access it needs to enforce."),
     ];
 
     protected override async Task OnInitializedAsync() {
