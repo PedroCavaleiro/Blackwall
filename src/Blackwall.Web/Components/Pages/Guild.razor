@@ -9,36 +9,35 @@
 
 <div style="max-width:760px;margin:0 auto;padding:2.5rem 1.5rem">
     @if (_loading) {
-        <div class="font-mono" style="color:var(--bw-muted);font-size:0.85rem">&gt; Loading configuration...</div>
+        <div class="font-mono bw-loading">&gt; Loading configuration...</div>
     } else if (_settings is null) {
-        <div class="font-mono mb-4" style="color:var(--bw-danger);font-size:0.85rem">&gt; SIGNAL LOST: Guild not found or access denied.</div>
-        <a href="/dashboard" class="btn btn-primary cut-corner font-display" style="font-size:0.72rem">RETURN TO GRID</a>
+        <div class="font-mono mb-4 bw-err">&gt; SIGNAL LOST: Guild not found or access denied.</div>
+        <a href="/dashboard" class="btn btn-primary cut-corner font-display bw-btn-sm">RETURN TO GRID</a>
     } else {
-        <a href="/dashboard" class="d-inline-flex align-items-center gap-2 mb-4 font-mono text-decoration-none"
-           style="font-size:0.68rem;letter-spacing:0.12em;color:var(--bw-muted)">
+        <a href="/dashboard" class="d-inline-flex align-items-center gap-2 mb-4 font-mono text-decoration-none bw-status bw-text-muted">
             &#8592; BACK TO GRID
         </a>
 
         <div class="d-flex align-items-center gap-3 mb-5">
             <GuildAvatar Name="@_settings.Name" Icon="@_settings.IconHash" GuildId="@_settings.DiscordGuildId" />
             <div>
-                <div class="font-mono mb-1" style="font-size:0.65rem;letter-spacing:0.15em;color:var(--bw-primary)">
+                <div class="font-mono mb-1 bw-role bw-text-primary">
                     // GUILD CONFIG &middot; @_settings.DiscordGuildId
                 </div>
                 <h1 class="font-display mb-0" style="font-size:1.8rem;letter-spacing:0.04em">@_settings.Name.ToUpperInvariant()</h1>
-                <div class="font-mono mt-1" style="font-size:0.68rem;color:var(--bw-muted)">
+                <div class="font-mono mt-1 bw-meta">
                     @(_settings.IsActive ? "BARRIER ACTIVE" : "BARRIER OFFLINE")
                 </div>
             </div>
         </div>
 
         @if (_saved) {
-            <div class="alert alert-success font-mono mb-4" style="font-size:0.8rem">
+            <div class="alert alert-success font-mono mb-4 bw-alert-text">
                 // CONFIGURATION UPLOADED SUCCESSFULLY
             </div>
         }
         @if (_error is not null) {
-            <div class="alert alert-danger font-mono mb-4" style="font-size:0.8rem">
+            <div class="alert alert-danger font-mono mb-4 bw-alert-text">
                 // ERROR: @_error
             </div>
         }
@@ -85,10 +84,10 @@
             }
 
             <div class="d-flex align-items-center gap-3 mt-2">
-                <button type="submit" class="btn btn-primary cut-corner font-display" style="font-size:0.75rem;letter-spacing:0.1em">
+                <button type="submit" class="btn btn-primary cut-corner font-display bw-btn-md">
                     COMMIT CHANGES
                 </button>
-                <a href="/dashboard" class="btn btn-outline-secondary font-display" style="font-size:0.75rem;letter-spacing:0.1em">
+                <a href="/dashboard" class="btn btn-outline-secondary font-display bw-btn-md">
                     CANCEL
                 </a>
             </div>
@@ -96,16 +95,15 @@
 
         <hr style="border-color:var(--bw-danger);opacity:0.25;margin:3rem 0 2rem" />
 
-        <div class="cut-corner border mb-4" style="background:var(--bs-card-bg);border-color:var(--bw-danger) !important">
-            <div class="card-header" style="color:var(--bw-danger)">DANGER ZONE</div>
+        <div class="cut-corner border mb-4 bw-card-danger">
+            <div class="card-header bw-header-danger">DANGER ZONE</div>
             <div class="p-4">
-                <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+                <p class="font-mono mb-4 bw-desc">
                     Removing the bot will immediately kick it from your Discord server and deactivate this Blackwall instance. Your configuration will be preserved if you re-add the bot later.
                 </p>
 
                 @if (!_confirmRemove) {
-                    <button type="button" class="btn btn-outline-danger cut-corner font-display"
-                            style="font-size:0.75rem;letter-spacing:0.1em"
+                    <button type="button" class="btn btn-outline-danger cut-corner font-display bw-btn-md"
                             @onclick="() => _confirmRemove = true">
                         REMOVE BOT FROM SERVER
                     </button>
@@ -114,14 +112,12 @@
                         // WARNING: This will kick the bot from @_settings.Name. Are you sure?
                     </div>
                     <div class="d-flex gap-3">
-                        <button type="button" class="btn btn-danger cut-corner font-display"
-                                style="font-size:0.75rem;letter-spacing:0.1em"
+                        <button type="button" class="btn btn-danger cut-corner font-display bw-btn-md"
                                 disabled="@_removing"
                                 @onclick="RemoveBotAsync">
                             @(_removing ? "REMOVING..." : "CONFIRM REMOVAL")
                         </button>
-                        <button type="button" class="btn btn-outline-secondary font-display"
-                                style="font-size:0.75rem;letter-spacing:0.1em"
+                        <button type="button" class="btn btn-outline-secondary font-display bw-btn-md"
                                 @onclick="() => _confirmRemove = false">
                             ABORT
                         </button>

@@ -4,10 +4,10 @@
 @inject BlackwallApiService Api
 @inject IOptions<SafeBrowsingOptions> SafeBrowsingOptions
 
-<div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+<div class="cut-corner border mb-4 bw-card">
     <div class="card-header">LINK BLOCKING</div>
     <div class="p-4">
-        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Configure which external vectors are neutralized automatically.</p>
+        <p class="font-mono mb-4 bw-desc">Configure which external vectors are neutralized automatically.</p>
 
         <div class="bw-field">
             <div class="bw-field-label">
@@ -15,7 +15,7 @@
                 <div class="form-text">Deletes messages containing discord.gg invite URLs.</div>
             </div>
             <div class="form-check form-switch">
-                <InputCheckbox class="form-check-input" id="blockInvites" @bind-Value="Form.BlockInviteLinks" style="width:2.5em;height:1.3em" />
+                <InputCheckbox class="form-check-input bw-switch" id="blockInvites" @bind-Value="Form.BlockInviteLinks" />
             </div>
         </div>
         <div class="bw-field">
@@ -24,26 +24,26 @@
                 <div class="form-text">Checks message URLs against AdGuard blacklists and custom domains.</div>
             </div>
             <div class="form-check form-switch">
-                <InputCheckbox class="form-check-input" id="blockSuspicious" @bind-Value="Form.BlockSuspiciousLinks" style="width:2.5em;height:1.3em" />
+                <InputCheckbox class="form-check-input bw-switch" id="blockSuspicious" @bind-Value="Form.BlockSuspiciousLinks" />
             </div>
         </div>
-        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+        <div class="bw-field bw-field-last">
             <div class="bw-field-label">
                 <div class="form-label mb-1">Whitelist mode</div>
                 <div class="form-text">When on, blacklists are ignored and only domains in the custom domain list below are allowed. Everything else is blocked.</div>
             </div>
             <div class="form-check form-switch">
-                <InputCheckbox class="form-check-input" id="linkWhitelist" @bind-Value="Form.LinkWhitelistMode" style="width:2.5em;height:1.3em" disabled="@(!Form.BlockSuspiciousLinks)" />
+                <InputCheckbox class="form-check-input bw-switch" id="linkWhitelist" @bind-Value="Form.LinkWhitelistMode" disabled="@(!Form.BlockSuspiciousLinks)" />
             </div>
         </div>
     </div>
 </div>
 
 @if (SafeBrowsingOptions.Value.Enabled) {
-<div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+<div class="cut-corner border mb-4 bw-card">
     <div class="card-header">GOOGLE SAFE BROWSING</div>
     <div class="p-4">
-        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Real-Time threat check powered by a locally synchronized Global Cache from Google Safe Browsing. All URL checks are resolved locally against the synced cache &mdash; no URL data or hash prefixes are ever sent to Google.</p>
+        <p class="font-mono mb-4 bw-desc">Real-Time threat check powered by a locally synchronized Global Cache from Google Safe Browsing. All URL checks are resolved locally against the synced cache &mdash; no URL data or hash prefixes are ever sent to Google.</p>
 
         <div class="bw-field">
             <div class="bw-field-label">
@@ -51,10 +51,10 @@
                 <div class="form-text">Checks URLs that pass the blacklist/whitelist filter against Google's threat lists in real-time.</div>
             </div>
             <div class="form-check form-switch">
-                <InputCheckbox class="form-check-input" id="safeBrowsing" @bind-Value="Form.SafeBrowsingEnabled" style="width:2.5em;height:1.3em" disabled="@(!Form.BlockSuspiciousLinks)" />
+                <InputCheckbox class="form-check-input bw-switch" id="safeBrowsing" @bind-Value="Form.SafeBrowsingEnabled" disabled="@(!Form.BlockSuspiciousLinks)" />
             </div>
         </div>
-        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+        <div class="bw-field bw-field-last">
             <div class="bw-field-label">
                 <div class="form-label mb-1">Block level</div>
                 <div class="form-text">Choose which Safe Browsing results to block. <strong>Unsafe only</strong> blocks confirmed threats. <strong>Unsafe and Unsure</strong> also blocks URLs where the result is uncertain.</div>
@@ -69,17 +69,17 @@
 }
 
 @if (!Form.LinkWhitelistMode) {
-    <div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+    <div class="cut-corner border mb-4 bw-card">
         <div class="card-header">BLACKLIST SOURCES</div>
         <div class="p-4">
-            <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">AdGuard-format blacklist URLs. Domains from these lists are downloaded, merged, and cached in Redis. Refreshed daily.</p>
+            <p class="font-mono mb-4 bw-desc">AdGuard-format blacklist URLs. Domains from these lists are downloaded, merged, and cached in Redis. Refreshed daily.</p>
 
             @if (_blacklists.Any()) {
                 <div class="mb-3">
                     @foreach (var bl in _blacklists) {
                         <div class="d-flex align-items-center justify-content-between border-bottom py-2">
-                            <div class="font-mono text-break" style="font-size:0.75rem;color:var(--bw-muted)">@bl.Url</div>
-                            <button type="button" class="btn btn-sm btn-outline-danger ms-2" style="font-size:0.7rem"
+                            <div class="font-mono text-break bw-desc">@bl.Url</div>
+                            <button type="button" class="btn btn-sm btn-outline-danger ms-2 bw-btn-remove"
                                     disabled="@_blacklistBusy"
                                     @onclick="() => RemoveBlacklistAsync(bl.Id)">
                                 REMOVE
@@ -88,18 +88,18 @@
                     }
                 </div>
             } else {
-                <div class="font-mono mb-3" style="font-size:0.75rem;color:var(--bw-muted)">No blacklists configured.</div>
+                <div class="font-mono mb-3 bw-desc">No blacklists configured.</div>
             }
 
             <div class="mb-3">
-                <label class="form-label font-mono" style="font-size:0.7rem;letter-spacing:0.1em">ADD FROM DEFAULTS</label>
+                <label class="form-label font-mono bw-label">ADD FROM DEFAULTS</label>
                 <select class="form-select mb-2" @bind="_selectedDefaultBlacklist">
                     <option value="">— Select a default blacklist —</option>
                     @foreach (var def in _defaultBlacklists) {
                         <option value="@def.Url">@def.Url</option>
                     }
                 </select>
-                <button type="button" class="btn btn-outline-primary cut-corner font-display" style="font-size:0.7rem;letter-spacing:0.1em"
+                <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-xs"
                         disabled="@(string.IsNullOrWhiteSpace(_selectedDefaultBlacklist) || _blacklistBusy)"
                         @onclick="AddDefaultBlacklistAsync">
                     ADD SELECTED
@@ -107,11 +107,11 @@
             </div>
 
             <div>
-                <label class="form-label font-mono" style="font-size:0.7rem;letter-spacing:0.1em">ADD CUSTOM URL</label>
+                <label class="form-label font-mono bw-label">ADD CUSTOM URL</label>
                 <div class="d-flex gap-2">
                     <input type="url" class="form-control" placeholder="https://example.com/blocklist.txt"
                            @bind="_newBlacklistUrl" disabled="@_blacklistBusy" />
-                    <button type="button" class="btn btn-outline-primary cut-corner font-display" style="font-size:0.7rem;letter-spacing:0.1em;white-space:nowrap"
+                    <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-xs-nowrap"
                             disabled="@(string.IsNullOrWhiteSpace(_newBlacklistUrl) || _blacklistBusy)"
                             @onclick="AddCustomBlacklistAsync">
                         ADD
@@ -120,7 +120,7 @@
             </div>
 
             <div class="mt-3">
-                <button type="button" class="btn btn-outline-secondary cut-corner font-display" style="font-size:0.7rem;letter-spacing:0.1em"
+                <button type="button" class="btn btn-outline-secondary cut-corner font-display bw-btn-xs"
                         disabled="@_blacklistBusy"
                         @onclick="RefreshBlacklistsAsync">
                     @(_blacklistBusy ? "REFRESHING..." : "REFRESH NOW")
@@ -130,10 +130,10 @@
     </div>
 }
 
-<div class="cut-corner border mb-4" style="background:var(--bs-card-bg)">
+<div class="cut-corner border mb-4 bw-card">
     <div class="card-header">@(Form.LinkWhitelistMode ? "ALLOWED DOMAINS" : "CUSTOM BLOCKED DOMAINS")</div>
     <div class="p-4">
-        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">
+        <p class="font-mono mb-4 bw-desc">
             @(Form.LinkWhitelistMode
                 ? "Only links to these domains will be allowed. All other external links are blocked."
                 : "Individual domains to block in addition to the blacklists above. Subdomains are matched automatically.")
@@ -144,7 +144,7 @@
                 @foreach (var dom in _blacklistDomains) {
                     <div class="d-flex align-items-center justify-content-between border-bottom py-2">
                         <div class="font-mono" style="font-size:0.75rem">@dom.Domain</div>
-                        <button type="button" class="btn btn-sm btn-outline-danger ms-2" style="font-size:0.7rem"
+                        <button type="button" class="btn btn-sm btn-outline-danger ms-2 bw-btn-remove"
                                 disabled="@_blacklistBusy"
                                 @onclick="() => RemoveBlacklistDomainAsync(dom.Id)">
                             REMOVE
@@ -153,15 +153,15 @@
                 }
             </div>
         } else {
-            <div class="font-mono mb-3" style="font-size:0.75rem;color:var(--bw-muted)">No custom domains configured.</div>
+            <div class="font-mono mb-3 bw-desc">No custom domains configured.</div>
         }
 
         <div>
-            <label class="form-label font-mono" style="font-size:0.7rem;letter-spacing:0.1em">ADD DOMAIN</label>
+            <label class="form-label font-mono bw-label">ADD DOMAIN</label>
             <div class="d-flex gap-2">
                 <input type="text" class="form-control" placeholder="example.com"
                        @bind="_newDomain" disabled="@_blacklistBusy" />
-                <button type="button" class="btn btn-outline-primary cut-corner font-display" style="font-size:0.7rem;letter-spacing:0.1em;white-space:nowrap"
+                <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-xs-nowrap"
                         disabled="@(string.IsNullOrWhiteSpace(_newDomain) || _blacklistBusy)"
                         @onclick="AddBlacklistDomainAsync">
                     ADD
@@ -171,17 +171,17 @@
     </div>
 </div>
 
-<div class="cut-corner border mb-4" style="background:var(--bs-card-bg);border-color:var(--bw-danger) !important">
-    <div class="card-header" style="color:var(--bw-danger)">MODULE ACTIONS</div>
+<div class="cut-corner border mb-4 bw-card-danger">
+    <div class="card-header bw-header-danger">MODULE ACTIONS</div>
     <div class="p-4">
-        <p class="font-mono mb-4" style="font-size:0.75rem;color:var(--bw-muted)">Configure the action and lockdown behavior for each link protection module independently.</p>
+        <p class="font-mono mb-4 bw-desc">Configure the action and lockdown behavior for each link protection module independently.</p>
 
         <div class="bw-field">
             <div class="bw-field-label">
                 <div class="form-label mb-1">Invite link &mdash; action</div>
                 <div class="form-text">Action taken when a user posts a Discord invite link.</div>
             </div>
-            <InputSelect class="form-select" style="max-width:200px" @bind-Value="Form.InviteLinkAction">
+            <InputSelect class="form-select bw-input-select" @bind-Value="Form.InviteLinkAction">
                 <option value="@InfractionAction.DeleteOnly">Delete only</option>
                 <option value="@InfractionAction.Timeout">Timeout</option>
                 <option value="@InfractionAction.Kick">Kick</option>
@@ -194,7 +194,7 @@
                     <div class="form-label mb-1">Invite link &mdash; timeout (minutes)</div>
                     <div class="form-text">How long the user is timed out. Minimum: 1 minute.</div>
                 </div>
-                <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.InviteLinkTimeoutMinutes" />
+                <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="Form.InviteLinkTimeoutMinutes" />
             </div>
         }
         @if (Form.InviteLinkAction is InfractionAction.Ban) {
@@ -203,7 +203,7 @@
                     <div class="form-label mb-1">Invite link &mdash; delete messages (days)</div>
                     <div class="form-text">Number of days of message history to purge when banning. Maximum is 7 days.</div>
                 </div>
-                <InputNumber class="form-control" style="max-width:140px" min="0" max="7" @bind-Value="Form.InviteLinkMessageDeleteDays" />
+                <InputNumber class="form-control bw-input-narrow" min="0" max="7" @bind-Value="Form.InviteLinkMessageDeleteDays" />
             </div>
         }
         <div class="bw-field">
@@ -212,7 +212,7 @@
                 <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
             </div>
             <div class="form-check form-switch">
-                <InputCheckbox class="form-check-input" id="inviteLinkAutoLockdown" @bind-Value="Form.InviteLinkAutoLockdown" style="width:2.5em;height:1.3em" />
+                <InputCheckbox class="form-check-input bw-switch" id="inviteLinkAutoLockdown" @bind-Value="Form.InviteLinkAutoLockdown" />
             </div>
         </div>
 
@@ -221,7 +221,7 @@
                 <div class="form-label mb-1">External link &mdash; action</div>
                 <div class="form-text">Action taken when a user posts a blocked external link.</div>
             </div>
-            <InputSelect class="form-select" style="max-width:200px" @bind-Value="Form.SuspiciousLinkAction">
+            <InputSelect class="form-select bw-input-select" @bind-Value="Form.SuspiciousLinkAction">
                 <option value="@InfractionAction.DeleteOnly">Delete only</option>
                 <option value="@InfractionAction.Timeout">Timeout</option>
                 <option value="@InfractionAction.Kick">Kick</option>
@@ -234,7 +234,7 @@
                     <div class="form-label mb-1">External link &mdash; timeout (minutes)</div>
                     <div class="form-text">How long the user is timed out. Minimum: 1 minute.</div>
                 </div>
-                <InputNumber class="form-control" style="max-width:140px" min="1" @bind-Value="Form.SuspiciousLinkTimeoutMinutes" />
+                <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="Form.SuspiciousLinkTimeoutMinutes" />
             </div>
         }
         @if (Form.SuspiciousLinkAction is InfractionAction.Ban) {
@@ -243,16 +243,16 @@
                     <div class="form-label mb-1">External link &mdash; delete messages (days)</div>
                     <div class="form-text">Number of days of message history to purge when banning. Maximum is 7 days.</div>
                 </div>
-                <InputNumber class="form-control" style="max-width:140px" min="0" max="7" @bind-Value="Form.SuspiciousLinkMessageDeleteDays" />
+                <InputNumber class="form-control bw-input-narrow" min="0" max="7" @bind-Value="Form.SuspiciousLinkMessageDeleteDays" />
             </div>
         }
-        <div class="bw-field" style="border-bottom:none;padding-bottom:0">
+        <div class="bw-field bw-field-last">
             <div class="bw-field-label">
                 <div class="form-label mb-1">External link &mdash; auto-lockdown</div>
                 <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
             </div>
             <div class="form-check form-switch">
-                <InputCheckbox class="form-check-input" id="suspiciousLinkAutoLockdown" @bind-Value="Form.SuspiciousLinkAutoLockdown" style="width:2.5em;height:1.3em" />
+                <InputCheckbox class="form-check-input bw-switch" id="suspiciousLinkAutoLockdown" @bind-Value="Form.SuspiciousLinkAutoLockdown" />
             </div>
         </div>
     </div>
