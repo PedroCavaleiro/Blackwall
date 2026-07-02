@@ -3,6 +3,7 @@ using Blackwall.Core.DTOs;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
+// ReSharper disable NullableWarningSuppressionIsUsed
 
 namespace Blackwall.Infrastructure.Cache;
 
@@ -46,9 +47,7 @@ public sealed class SpamConfigurationCache(
                 x.SpamConfiguration.SafeBrowsingBlockUnsure,
                 x.SpamConfiguration.IsEnabled,
                 x.SpamConfiguration.IsDryRun,
-                x.SpamConfiguration.Action,
                 x.SpamConfiguration.LogChannelId,
-                x.SpamConfiguration.MessageDeleteDays,
                 x.SpamConfiguration.IsAntiRaidEnabled,
                 x.SpamConfiguration.AntiRaidJoinThreshold,
                 x.SpamConfiguration.AntiRaidWindowSeconds,
@@ -58,17 +57,26 @@ public sealed class SpamConfigurationCache(
                 x.SpamConfiguration.AutoTimeoutHighRiskOnJoin,
                 x.SpamConfiguration.AccountScoringTimeoutMinutes,
                 x.SpamConfiguration.IsLockedDown,
-                x.SpamConfiguration.AutoLockdownEnabled,
                 x.SpamConfiguration.RateLimitAction,
                 x.SpamConfiguration.RateLimitAutoLockdown,
+                x.SpamConfiguration.RateLimitTimeoutMinutes,
+                x.SpamConfiguration.RateLimitMessageDeleteDays,
                 x.SpamConfiguration.DuplicateAction,
                 x.SpamConfiguration.DuplicateAutoLockdown,
+                x.SpamConfiguration.DuplicateTimeoutMinutes,
+                x.SpamConfiguration.DuplicateMessageDeleteDays,
                 x.SpamConfiguration.MentionLimitAction,
                 x.SpamConfiguration.MentionLimitAutoLockdown,
+                x.SpamConfiguration.MentionLimitTimeoutMinutes,
+                x.SpamConfiguration.MentionLimitMessageDeleteDays,
                 x.SpamConfiguration.InviteLinkAction,
                 x.SpamConfiguration.InviteLinkAutoLockdown,
+                x.SpamConfiguration.InviteLinkTimeoutMinutes,
+                x.SpamConfiguration.InviteLinkMessageDeleteDays,
                 x.SpamConfiguration.SuspiciousLinkAction,
-                x.SpamConfiguration.SuspiciousLinkAutoLockdown
+                x.SpamConfiguration.SuspiciousLinkAutoLockdown,
+                x.SpamConfiguration.SuspiciousLinkTimeoutMinutes,
+                x.SpamConfiguration.SuspiciousLinkMessageDeleteDays
             ))
             .FirstOrDefaultAsync(cancellationToken);
 

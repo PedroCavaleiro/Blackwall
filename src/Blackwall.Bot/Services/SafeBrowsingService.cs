@@ -5,6 +5,7 @@ using Blackwall.Core.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+// ReSharper disable NullableWarningSuppressionIsUsed
 
 namespace Blackwall.Bot.Services;
 
@@ -41,6 +42,9 @@ public sealed class SafeBrowsingService(
     /// 3. Query hashes.search for remaining prefixes → UNSAFE if match
     /// Returns SAFE, UNSAFE, or UNSURE.
     /// </summary>
+    /// <param name="url">The URL to check against the Safe Browsing threat lists.</param>
+    /// <returns>A <see cref="SafeBrowsingResult"/> indicating whether the URL is <see cref="SafeBrowsingResult.Safe"/>, <see cref="SafeBrowsingResult.Unsafe"/>, or <see cref="SafeBrowsingResult.Unsure"/>.</returns>
+    /// <exception cref="RedisException">Thrown when a Redis cache operation fails unexpectedly.</exception>
     public async Task<SafeBrowsingResult> CheckUrlAsync(string url) {
         if (!options.Value.Enabled) {
             logger.LogDebug("Safe Browsing is disabled, skipping URL check");
@@ -135,6 +139,9 @@ public sealed class SafeBrowsingService(
     /// <summary>
     /// Stores a Safe Browsing result in Redis with the specified TTL, logging a warning on failure.
     /// </summary>
+    /// <param name="key">The Redis cache key to store the result under.</param>
+    /// <param name="value">The value to cache (e.g. a comma-separated list of full hash hex strings, "safe", or "unsure").</param>
+    /// <param name="ttl">The time-to-live for the cached entry.</param>
     private async Task CacheResultAsync(string key, string value, TimeSpan ttl) {
         try {
             await _db.StringSetAsync(key, value, ttl);
@@ -147,6 +154,9 @@ public sealed class SafeBrowsingService(
     /// Queries the Safe Browsing hashes:search endpoint for a given 4-byte prefix,
     /// returning matching full hashes and the cache duration, or null on error.
     /// </summary>
+    /// <param name="prefix">The 4-byte hash prefix to search for.</param>
+    /// <param name="apiKey">The Google Safe Browsing API key used for authentication.</param>
+    /// <returns>A tuple containing the list of matching full hashes and the cache duration, or <see langword="null"/> if the request fails.</returns>
     private async Task<(List<byte[]> fullHashes, TimeSpan cacheDuration)?> QueryHashPrefixAsync(
         byte[] prefix,
         string apiKey
@@ -181,6 +191,8 @@ public sealed class SafeBrowsingService(
     /// Safe Browsing V5 URL processing procedure. Returns the 4-byte prefix and full SHA256
     /// hash for each expression.
     /// </summary>
+    /// <param name="url">The URL to generate hash expressions for.</param>
+    /// <returns>A list of tuples containing the 4-byte prefix and full 32-byte SHA256 hash for each expression, or an empty list if the URL is invalid.</returns>
     private static List<(byte[] prefix, byte[] fullHash)> GenerateHashExpressions(string url) {
         if (!url.Contains("://"))
             url = "https://" + url;
@@ -235,6 +247,8 @@ public sealed class SafeBrowsingService(
     /// Parses a protobuf Duration into a TimeSpan,
     /// falling back to the default TTL when the duration is null.
     /// </summary>
+    /// <param name="duration">The protobuf <see cref="Duration"/> to parse, or <see langword="null"/>.</param>
+    /// <returns>A <see cref="TimeSpan"/> representing the duration, or the default cache TTL if <paramref name="duration"/> is null.</returns>
     private static TimeSpan ParseDuration(Duration? duration) {
         if (duration is null)
             return DefaultCacheTtl;

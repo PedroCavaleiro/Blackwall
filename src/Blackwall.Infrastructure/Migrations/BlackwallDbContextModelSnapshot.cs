@@ -210,11 +210,6 @@ namespace Blackwall.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(10);
 
-                    b.Property<int>("Action")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
                     b.Property<int>("AntiRaidCooldownMinutes")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -229,11 +224,6 @@ namespace Blackwall.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(30);
-
-                    b.Property<bool>("AutoLockdownEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
 
                     b.Property<bool>("AutoTimeoutHighRiskOnJoin")
                         .ValueGeneratedOnAdd()
@@ -255,19 +245,33 @@ namespace Blackwall.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int?>("DuplicateAction")
-                        .HasColumnType("integer");
+                    b.Property<int>("DuplicateAction")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
-                    b.Property<bool?>("DuplicateAutoLockdown")
-                        .HasColumnType("boolean");
+                    b.Property<bool>("DuplicateAutoLockdown")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<bool>("DuplicateCrossChannelEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
+                    b.Property<int>("DuplicateMessageDeleteDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<int>("DuplicateMessageThreshold")
                         .HasColumnType("integer");
+
+                    b.Property<int>("DuplicateTimeoutMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(10);
 
                     b.Property<int>("DuplicateWindowSeconds")
                         .ValueGeneratedOnAdd()
@@ -277,11 +281,25 @@ namespace Blackwall.Infrastructure.Migrations
                     b.Property<long>("GuildInstanceId")
                         .HasColumnType("bigint");
 
-                    b.Property<int?>("InviteLinkAction")
-                        .HasColumnType("integer");
+                    b.Property<int>("InviteLinkAction")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
-                    b.Property<bool?>("InviteLinkAutoLockdown")
-                        .HasColumnType("boolean");
+                    b.Property<bool>("InviteLinkAutoLockdown")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("InviteLinkMessageDeleteDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("InviteLinkTimeoutMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(10);
 
                     b.Property<bool>("IsAccountScoringEnabled")
                         .ValueGeneratedOnAdd()
@@ -322,22 +340,45 @@ namespace Blackwall.Infrastructure.Migrations
                     b.Property<int>("MentionLimit")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("MentionLimitAction")
-                        .HasColumnType("integer");
+                    b.Property<int>("MentionLimitAction")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
-                    b.Property<bool?>("MentionLimitAutoLockdown")
-                        .HasColumnType("boolean");
+                    b.Property<bool>("MentionLimitAutoLockdown")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
-                    b.Property<int>("MessageDeleteDays")
+                    b.Property<int>("MentionLimitMessageDeleteDays")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
 
-                    b.Property<int?>("RateLimitAction")
-                        .HasColumnType("integer");
+                    b.Property<int>("MentionLimitTimeoutMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(10);
 
-                    b.Property<bool?>("RateLimitAutoLockdown")
-                        .HasColumnType("boolean");
+                    b.Property<int>("RateLimitAction")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<bool>("RateLimitAutoLockdown")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("RateLimitMessageDeleteDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("RateLimitTimeoutMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(10);
 
                     b.Property<int>("RateLimitWindowSeconds")
                         .HasColumnType("integer");
@@ -352,11 +393,25 @@ namespace Blackwall.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
-                    b.Property<int?>("SuspiciousLinkAction")
-                        .HasColumnType("integer");
+                    b.Property<int>("SuspiciousLinkAction")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
-                    b.Property<bool?>("SuspiciousLinkAutoLockdown")
-                        .HasColumnType("boolean");
+                    b.Property<bool>("SuspiciousLinkAutoLockdown")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("SuspiciousLinkMessageDeleteDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("SuspiciousLinkTimeoutMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(10);
 
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");

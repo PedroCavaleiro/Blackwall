@@ -1,7 +1,6 @@
 using System.Text.RegularExpressions;
 using Blackwall.Core.Entities;
 using Discord;
-using Discord.WebSocket;
 
 namespace Blackwall.Bot.Services;
 
@@ -19,21 +18,25 @@ public sealed partial class AccountScoringService {
     /// and username patterns. Returns a <see cref="AccountScoreResult"/> containing
     /// the numeric score, threat level, and breakdown of contributing factors.
     /// </summary>
-    public AccountScoreResult ScoreUser(IGuildUser user) {
+    public static AccountScoreResult ScoreUser(IGuildUser user) {
         var factors = new List<string>(4);
         var score = 0;
 
         var accountAgeDays = (DateTimeOffset.UtcNow - user.CreatedAt).TotalDays;
 
-        if (accountAgeDays < MinAccountAgeDays) {
-            score += 3;
-            factors.Add($"Account created < {MinAccountAgeDays} day ago");
-        } else if (accountAgeDays < RecentAccountAgeDays) {
-            score += 2;
-            factors.Add($"Account created < {RecentAccountAgeDays} days ago");
-        } else if (accountAgeDays < SomewhatRecentAccountAgeDays) {
-            score += 1;
-            factors.Add($"Account created < {SomewhatRecentAccountAgeDays} days ago");
+        switch (accountAgeDays) {
+            case < MinAccountAgeDays:
+                score += 3;
+                factors.Add($"Account created < {MinAccountAgeDays} day ago");
+                break;
+            case < RecentAccountAgeDays:
+                score += 2;
+                factors.Add($"Account created < {RecentAccountAgeDays} days ago");
+                break;
+            case < SomewhatRecentAccountAgeDays:
+                score += 1;
+                factors.Add($"Account created < {SomewhatRecentAccountAgeDays} days ago");
+                break;
         }
 
         if (user.GetAvatarUrl(size: 16) is null) {

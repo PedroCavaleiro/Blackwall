@@ -25,6 +25,7 @@ public sealed class LockdownService(
     /// SEND_MESSAGES, SEND_MESSAGES_IN_THREADS, and CREATE_PUBLIC_THREADS for the
     /// @@everyone role via channel-specific permission overwrites.
     /// </summary>
+    /// <param name="guildId">The Discord ID of the guild to lock down.</param>
     /// <returns>The number of channels that were successfully locked down.</returns>
     public async Task<int> LockdownAsync(ulong guildId) {
         var guild = discordClient.GetGuild(guildId);
@@ -63,6 +64,7 @@ public sealed class LockdownService(
     /// Removes the lockdown by resetting the @@everyone permission overwrites that were
     /// applied during lockdown, returning those permissions to their inherited state.
     /// </summary>
+    /// <param name="guildId">The Discord ID of the guild to unlock.</param>
     /// <returns>The number of channels that were successfully unlocked.</returns>
     public async Task<int> UnlockAsync(ulong guildId) {
         var guild = discordClient.GetGuild(guildId);
@@ -113,6 +115,8 @@ public sealed class LockdownService(
     /// <summary>
     /// Returns true if the guild is currently marked as locked down in the database.
     /// </summary>
+    /// <param name="discordGuildId">The Discord ID of the guild to check.</param>
+    /// <returns><see langword="true"/> if the guild is locked down; otherwise <see langword="false"/>.</returns>
     public async Task<bool> IsLockedDownAsync(long discordGuildId) {
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BlackwallDbContext>();
@@ -126,6 +130,8 @@ public sealed class LockdownService(
     /// <summary>
     /// Fetches all text-based channels and categories from the guild.
     /// </summary>
+    /// <param name="guild">The guild whose channels should be retrieved.</param>
+    /// <returns>A list of <see cref="SocketGuildChannel"/> instances targeted for lockdown operations.</returns>
     private static List<SocketGuildChannel> GetTargetChannels(SocketGuild guild) {
         return guild.Channels
             .Where(c => c is SocketTextChannel or SocketCategoryChannel or SocketForumChannel)
@@ -135,6 +141,12 @@ public sealed class LockdownService(
     /// <summary>
     /// Persists the lockdown state to the database and invalidates the cache.
     /// </summary>
+    /// <param name="discordGuildId">The Discord ID of the guild whose lockdown state is being updated.</param>
+    /// <param name="lockedDown">The lockdown state to persist — <see langword="true"/> for locked, <see langword="false"/> for unlocked.</param>
+    /// <exception cref="DbUpdateException">Thrown when the database update fails during <see>
+    ///         <cref>DbContext.SaveChangesAsync</cref>
+    ///     </see>
+    ///</exception>
     private async Task SetLockdownStateAsync(long discordGuildId, bool lockedDown) {
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BlackwallDbContext>();

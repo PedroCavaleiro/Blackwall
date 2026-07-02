@@ -130,9 +130,7 @@ public sealed class GuildsController(
                 instance.SpamConfiguration.SafeBrowsingBlockUnsure,
                 instance.SpamConfiguration.IsEnabled,
                 instance.SpamConfiguration.IsDryRun,
-                instance.SpamConfiguration.Action,
                 instance.SpamConfiguration.LogChannelId,
-                instance.SpamConfiguration.MessageDeleteDays,
                 instance.SpamConfiguration.IsAntiRaidEnabled,
                 instance.SpamConfiguration.AntiRaidJoinThreshold,
                 instance.SpamConfiguration.AntiRaidWindowSeconds,
@@ -142,17 +140,26 @@ public sealed class GuildsController(
                 instance.SpamConfiguration.AutoTimeoutHighRiskOnJoin,
                 instance.SpamConfiguration.AccountScoringTimeoutMinutes,
                 instance.SpamConfiguration.IsLockedDown,
-                instance.SpamConfiguration.AutoLockdownEnabled,
                 instance.SpamConfiguration.RateLimitAction,
                 instance.SpamConfiguration.RateLimitAutoLockdown,
+                instance.SpamConfiguration.RateLimitTimeoutMinutes,
+                instance.SpamConfiguration.RateLimitMessageDeleteDays,
                 instance.SpamConfiguration.DuplicateAction,
                 instance.SpamConfiguration.DuplicateAutoLockdown,
+                instance.SpamConfiguration.DuplicateTimeoutMinutes,
+                instance.SpamConfiguration.DuplicateMessageDeleteDays,
                 instance.SpamConfiguration.MentionLimitAction,
                 instance.SpamConfiguration.MentionLimitAutoLockdown,
+                instance.SpamConfiguration.MentionLimitTimeoutMinutes,
+                instance.SpamConfiguration.MentionLimitMessageDeleteDays,
                 instance.SpamConfiguration.InviteLinkAction,
                 instance.SpamConfiguration.InviteLinkAutoLockdown,
+                instance.SpamConfiguration.InviteLinkTimeoutMinutes,
+                instance.SpamConfiguration.InviteLinkMessageDeleteDays,
                 instance.SpamConfiguration.SuspiciousLinkAction,
-                instance.SpamConfiguration.SuspiciousLinkAutoLockdown
+                instance.SpamConfiguration.SuspiciousLinkAutoLockdown,
+                instance.SpamConfiguration.SuspiciousLinkTimeoutMinutes,
+                instance.SpamConfiguration.SuspiciousLinkMessageDeleteDays
             )
         ));
     }
@@ -216,9 +223,7 @@ public sealed class GuildsController(
         spam.SafeBrowsingBlockUnsure = request.SafeBrowsingBlockUnsure;
         spam.IsEnabled = request.IsEnabled;
         spam.IsDryRun = request.IsDryRun;
-        spam.Action = request.Action;
         spam.LogChannelId = request.LogChannelId;
-        spam.MessageDeleteDays = Math.Clamp(request.MessageDeleteDays, 0, 7);
         spam.IsAntiRaidEnabled = request.IsAntiRaidEnabled;
         spam.AntiRaidJoinThreshold = Math.Max(2, request.AntiRaidJoinThreshold);
         spam.AntiRaidWindowSeconds = Math.Clamp(request.AntiRaidWindowSeconds, 5, 300);
@@ -227,17 +232,26 @@ public sealed class GuildsController(
         spam.AutoTimeoutMediumRiskOnJoin = request.AutoTimeoutMediumRiskOnJoin;
         spam.AutoTimeoutHighRiskOnJoin = request.AutoTimeoutHighRiskOnJoin;
         spam.AccountScoringTimeoutMinutes = Math.Max(1, request.AccountScoringTimeoutMinutes);
-        spam.AutoLockdownEnabled = request.AutoLockdownEnabled;
         spam.RateLimitAction = request.RateLimitAction;
         spam.RateLimitAutoLockdown = request.RateLimitAutoLockdown;
+        spam.RateLimitTimeoutMinutes = Math.Max(1, request.RateLimitTimeoutMinutes);
+        spam.RateLimitMessageDeleteDays = Math.Clamp(request.RateLimitMessageDeleteDays, 0, 7);
         spam.DuplicateAction = request.DuplicateAction;
         spam.DuplicateAutoLockdown = request.DuplicateAutoLockdown;
+        spam.DuplicateTimeoutMinutes = Math.Max(1, request.DuplicateTimeoutMinutes);
+        spam.DuplicateMessageDeleteDays = Math.Clamp(request.DuplicateMessageDeleteDays, 0, 7);
         spam.MentionLimitAction = request.MentionLimitAction;
         spam.MentionLimitAutoLockdown = request.MentionLimitAutoLockdown;
+        spam.MentionLimitTimeoutMinutes = Math.Max(1, request.MentionLimitTimeoutMinutes);
+        spam.MentionLimitMessageDeleteDays = Math.Clamp(request.MentionLimitMessageDeleteDays, 0, 7);
         spam.InviteLinkAction = request.InviteLinkAction;
         spam.InviteLinkAutoLockdown = request.InviteLinkAutoLockdown;
+        spam.InviteLinkTimeoutMinutes = Math.Max(1, request.InviteLinkTimeoutMinutes);
+        spam.InviteLinkMessageDeleteDays = Math.Clamp(request.InviteLinkMessageDeleteDays, 0, 7);
         spam.SuspiciousLinkAction = request.SuspiciousLinkAction;
         spam.SuspiciousLinkAutoLockdown = request.SuspiciousLinkAutoLockdown;
+        spam.SuspiciousLinkTimeoutMinutes = Math.Max(1, request.SuspiciousLinkTimeoutMinutes);
+        spam.SuspiciousLinkMessageDeleteDays = Math.Clamp(request.SuspiciousLinkMessageDeleteDays, 0, 7);
         spam.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -611,7 +625,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None));
+        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None), cancellationToken);
 
         return Ok(new BlacklistResponse(blacklist.Id, blacklist.Url));
     }

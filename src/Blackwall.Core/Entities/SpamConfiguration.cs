@@ -1,4 +1,4 @@
-// ReSharper disable NullableWarningSuppressionIsUsed
+// ReSharper disable PropertyCanBeMadeInitOnly.Global
 namespace Blackwall.Core.Entities;
 
 public class SpamConfiguration: EntityBase {
@@ -20,9 +20,7 @@ public class SpamConfiguration: EntityBase {
 
     public bool IsEnabled { get; set; } = true;
     public bool IsDryRun { get; set; }
-    public InfractionAction Action { get; set; } = InfractionAction.DeleteOnly;
     public long? LogChannelId { get; set; }
-    public int MessageDeleteDays { get; set; }
 
     public bool IsAntiRaidEnabled { get; set; }
     public int AntiRaidJoinThreshold { get; set; } = 10;
@@ -35,22 +33,31 @@ public class SpamConfiguration: EntityBase {
     public int AccountScoringTimeoutMinutes { get; set; } = 10;
 
     public bool IsLockedDown { get; set; }
-    public bool AutoLockdownEnabled { get; set; }
 
-    public InfractionAction? RateLimitAction { get; set; }
-    public bool? RateLimitAutoLockdown { get; set; }
+    public InfractionAction RateLimitAction { get; set; } = InfractionAction.Timeout;
+    public bool RateLimitAutoLockdown { get; set; }
+    public int RateLimitTimeoutMinutes { get; set; } = 10;
+    public int RateLimitMessageDeleteDays { get; set; }
 
-    public InfractionAction? DuplicateAction { get; set; }
-    public bool? DuplicateAutoLockdown { get; set; }
+    public InfractionAction DuplicateAction { get; set; } = InfractionAction.Timeout;
+    public bool DuplicateAutoLockdown { get; set; }
+    public int DuplicateTimeoutMinutes { get; set; } = 10;
+    public int DuplicateMessageDeleteDays { get; set; }
 
-    public InfractionAction? MentionLimitAction { get; set; }
-    public bool? MentionLimitAutoLockdown { get; set; }
+    public InfractionAction MentionLimitAction { get; set; } = InfractionAction.Timeout;
+    public bool MentionLimitAutoLockdown { get; set; }
+    public int MentionLimitTimeoutMinutes { get; set; } = 10;
+    public int MentionLimitMessageDeleteDays { get; set; }
 
-    public InfractionAction? InviteLinkAction { get; set; }
-    public bool? InviteLinkAutoLockdown { get; set; }
+    public InfractionAction InviteLinkAction { get; set; } = InfractionAction.Timeout;
+    public bool InviteLinkAutoLockdown { get; set; }
+    public int InviteLinkTimeoutMinutes { get; set; } = 10;
+    public int InviteLinkMessageDeleteDays { get; set; }
 
-    public InfractionAction? SuspiciousLinkAction { get; set; }
-    public bool? SuspiciousLinkAutoLockdown { get; set; }
+    public InfractionAction SuspiciousLinkAction { get; set; } = InfractionAction.Timeout;
+    public bool SuspiciousLinkAutoLockdown { get; set; }
+    public int SuspiciousLinkTimeoutMinutes { get; set; } = 10;
+    public int SuspiciousLinkMessageDeleteDays { get; set; }
 
     public DateTime? UpdatedAtUtc { get; set; }
 

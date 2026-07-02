@@ -5,13 +5,13 @@ using Discord;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+// ReSharper disable NullableWarningSuppressionIsUsed
 
 namespace Blackwall.Bot.Handlers;
 
 public sealed class GuildMemberHandler(
     IServiceScopeFactory scopeFactory,
     RaidDetectionService raidDetectionService,
-    AccountScoringService accountScoringService,
     ILogger<GuildMemberHandler> logger
 ) {
     /// <summary>
@@ -22,6 +22,7 @@ public sealed class GuildMemberHandler(
     /// Additionally, if account scoring is enabled, the user's metadata is evaluated and
     /// medium/high risk accounts trigger a mod alert with an optional automatic timeout.
     /// </summary>
+    /// <param name="user">The guild member that joined.</param>
     public async Task OnUserJoinedAsync(SocketGuildUser user) {
         var discordGuildId = (long)user.Guild.Id;
 
@@ -53,7 +54,7 @@ public sealed class GuildMemberHandler(
             return;
 
         logger.LogWarning(
-            "Raid detected in guild {GuildId}: {Threshold} joins in {Window}s. Pausing invites.",
+            "Raid detected in guild {GuildId}: {Threshold} joins in {Window}s. Pausing invites",
             discordGuildId, config.AntiRaidJoinThreshold, config.AntiRaidWindowSeconds);
 
         await raidDetectionService.SetLockdownAsync(discordGuildId, config.AntiRaidCooldownMinutes);
@@ -69,8 +70,10 @@ public sealed class GuildMemberHandler(
     /// Scores the joining user's account metadata and alerts moderators if the threat level
     /// is medium or high. Optionally applies a timeout if configured for the risk level.
     /// </summary>
+    /// <param name="user">The guild member whose account is being scored.</param>
+    /// <param name="config">The spam configuration for the guild, containing scoring and timeout settings.</param>
     private async Task EvaluateAccountScoreAsync(SocketGuildUser user, Core.DTOs.SpamConfigurationDto config) {
-        var scoreResult = accountScoringService.ScoreUser(user);
+        var scoreResult = AccountScoringService.ScoreUser(user);
 
         if (scoreResult.ThreatLevel == ThreatLevel.Low)
             return;
@@ -105,6 +108,7 @@ public sealed class GuildMemberHandler(
     /// <summary>
     /// Deletes all active invite links in the guild to prevent further access during a raid.
     /// </summary>
+    /// <param name="guild">The guild whose invites should be deleted.</param>
     private async Task PauseInvitesAsync(SocketGuild guild) {
         try {
             var invites = await guild.GetInvitesAsync();
@@ -117,7 +121,7 @@ public sealed class GuildMemberHandler(
                 }
             }
 
-            logger.LogInformation("Deleted {Count} invite(s) in guild {GuildId} due to raid detection.",
+            logger.LogInformation("Deleted {Count} invite(s) in guild {GuildId} due to raid detection",
                 invites.Count, guild.Id);
         } catch (Exception ex) {
             logger.LogWarning(ex, "Failed to retrieve invite list for guild {GuildId}", guild.Id);
@@ -127,6 +131,9 @@ public sealed class GuildMemberHandler(
     /// <summary>
     /// Sends a raid-alert embed to the configured log channel.
     /// </summary>
+    /// <param name="guild">The guild where the raid was detected.</param>
+    /// <param name="config">The spam configuration containing the log channel and raid settings.</param>
+    /// <param name="triggeringUser">The guild member whose join triggered the raid detection.</param>
     private async Task SendRaidLogAsync(
         SocketGuild guild,
         Core.DTOs.SpamConfigurationDto config,
@@ -145,8 +152,8 @@ public sealed class GuildMemberHandler(
             .WithTitle("🚨 Raid Detected — Invites Paused")
             .AddField("Threshold", $"{config.AntiRaidJoinThreshold} joins in {config.AntiRaidWindowSeconds}s", true)
             .AddField("Cooldown", $"{config.AntiRaidCooldownMinutes} minute(s)", true)
-            .AddField("Triggering user", $"{triggeringUser.Mention} (`{triggeringUser.Id}`)", false)
-            .AddField("Action", actionLine, false)
+            .AddField("Triggering user", $"{triggeringUser.Mention} (`{triggeringUser.Id}`)")
+            .AddField("Action", actionLine)
             .WithTimestamp(DateTimeOffset.UtcNow)
             .Build();
 
@@ -162,6 +169,11 @@ public sealed class GuildMemberHandler(
     /// Sends an account-scoring alert embed to the configured log channel when a medium
     /// or high risk account joins the guild.
     /// </summary>
+    /// <param name="guild">The guild where the suspicious account joined.</param>
+    /// <param name="config">The spam configuration containing the log channel and scoring settings.</param>
+    /// <param name="user">The guild member whose account was flagged.</param>
+    /// <param name="scoreResult">The scoring result containing the threat level, score, and risk factors.</param>
+    /// <param name="wasTimedOut">Whether a timeout was applied to the user.</param>
     private async Task SendScoringLogAsync(
         SocketGuild guild,
         Core.DTOs.SpamConfigurationDto config,
@@ -187,8 +199,8 @@ public sealed class GuildMemberHandler(
             .AddField("User", $"{user.Mention} (`{user.Id}`)", true)
             .AddField("Score", scoreResult.Score.ToString(), true)
             .AddField("Account age", $"{(int)(DateTimeOffset.UtcNow - user.CreatedAt).TotalDays} day(s)", true)
-            .AddField("Risk factors", string.Join("\n", scoreResult.Factors), false)
-            .AddField("Action", actionLine, false)
+            .AddField("Risk factors", string.Join("\n", scoreResult.Factors))
+            .AddField("Action", actionLine)
             .WithTimestamp(DateTimeOffset.UtcNow)
             .Build();
 
