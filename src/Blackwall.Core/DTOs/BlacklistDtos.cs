@@ -30,3 +30,14 @@ public sealed record BannedWordResponse(
 public sealed record AddBannedWordRequest(
     string Word
 );
+
+public sealed record AllowedBotResponse(
+    long Id,
+    long DiscordBotId,
+    string BotUsername
+);
+
+public sealed record AddAllowedBotRequest(
+    long DiscordBotId,
+    string BotUsername
+);

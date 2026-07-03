@@ -3,6 +3,7 @@ using System;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Blackwall.Infrastructure.Migrations
 {
     [DbContext(typeof(BlackwallDbContext))]
-    partial class BlackwallDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260703085612_AddTestMode")]
+    partial class AddTestMode
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -61,37 +64,6 @@ namespace Blackwall.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("AppUsers");
-                });
-
-            modelBuilder.Entity("Blackwall.Core.Entities.GuildAllowedBot", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("BotUsername")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("DiscordBotId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("SpamConfigurationId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SpamConfigurationId", "DiscordBotId")
-                        .IsUnique();
-
-                    b.ToTable("GuildAllowedBots");
                 });
 
             modelBuilder.Entity("Blackwall.Core.Entities.GuildBan", b =>
@@ -628,17 +600,6 @@ namespace Blackwall.Infrastructure.Migrations
                     b.ToTable("SpamConfigurations");
                 });
 
-            modelBuilder.Entity("Blackwall.Core.Entities.GuildAllowedBot", b =>
-                {
-                    b.HasOne("Blackwall.Core.Entities.SpamConfiguration", "SpamConfiguration")
-                        .WithMany("AllowedBots")
-                        .HasForeignKey("SpamConfigurationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("SpamConfiguration");
-                });
-
             modelBuilder.Entity("Blackwall.Core.Entities.GuildBan", b =>
                 {
                     b.HasOne("Blackwall.Core.Entities.GuildInstance", "GuildInstance")
@@ -755,8 +716,6 @@ namespace Blackwall.Infrastructure.Migrations
 
             modelBuilder.Entity("Blackwall.Core.Entities.SpamConfiguration", b =>
                 {
-                    b.Navigation("AllowedBots");
-
                     b.Navigation("BannedWords");
 
                     b.Navigation("BlacklistDomains");

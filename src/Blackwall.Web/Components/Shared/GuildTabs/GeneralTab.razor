@@ -1,3 +1,5 @@
+@inject BlackwallApiService Api
+
 <div class="cut-corner border mb-4 bw-card">
     <div class="card-header">BARRIER CONTROL</div>
     <div class="p-4">
@@ -19,6 +21,50 @@
             </div>
             <div class="form-check form-switch">
                 <InputCheckbox class="form-check-input bw-switch" id="isDryRun" @bind-Value="Form.IsDryRun" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">ALLOWED BOTS</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">
+            Bots on this list are skipped by the spam detection pipeline. All other bot-flagged accounts are processed normally &mdash; this catches automated attacks that disguise themselves as bots. Add only bots you trust (moderation bots, logging bots, etc.).
+        </p>
+
+        @if (_allowedBots.Any()) {
+            <div class="mb-3">
+                @foreach (var bot in _allowedBots) {
+                    <div class="d-flex align-items-center justify-content-between border-bottom py-2">
+                        <div class="font-mono" style="font-size:0.75rem">
+                            <span class="bw-text-primary">@bot.BotUsername</span>
+                            <span class="bw-text-muted"> (@bot.DiscordBotId)</span>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger ms-2 bw-btn-remove"
+                                disabled="@_botBusy"
+                                @onclick="() => RemoveAllowedBotAsync(bot.Id)">
+                            REMOVE
+                        </button>
+                    </div>
+                }
+            </div>
+        } else {
+            <div class="font-mono mb-3 bw-desc">No allowed bots configured. All bot-flagged accounts will be processed by the spam filter.</div>
+        }
+
+        <div>
+            <label class="form-label font-mono bw-label">ADD BOT</label>
+            <div class="d-flex gap-2 mb-2">
+                <input type="text" class="form-control" placeholder="Bot ID (e.g. 123456789012345678)"
+                       @bind="_newBotId" disabled="@_botBusy" />
+                <input type="text" class="form-control" placeholder="Bot name (optional)"
+                       @bind="_newBotName" disabled="@_botBusy" />
+                <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-xs-nowrap"
+                        disabled="@(string.IsNullOrWhiteSpace(_newBotId) || _botBusy)"
+                        @onclick="AddAllowedBotAsync">
+                    ADD
+                </button>
             </div>
         </div>
     </div>
@@ -63,8 +109,55 @@
 
 @code {
     [Parameter, EditorRequired] public required SpamConfigForm Form { get; set; }
+    [Parameter, EditorRequired] public required long DiscordGuildId { get; set; }
     [Parameter] public bool IsLockedDown { get; set; }
     [Parameter] public bool LockdownBusy { get; set; }
     [Parameter] public EventCallback OnLockdown { get; set; }
     [Parameter] public EventCallback OnUnlock { get; set; }
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private IReadOnlyList<AllowedBotResponse> _allowedBots = [];
+    private string _newBotId = "";
+    private string _newBotName = "";
+    private bool _botBusy;
+
+    protected override async Task OnInitializedAsync() {
+        try {
+            _allowedBots = await Api.GetAllowedBotsAsync(DiscordGuildId);
+        } catch {
+            _allowedBots = [];
+            await OnError.InvokeAsync("Failed to load allowed bots.");
+        }
+    }
+
+    private async Task AddAllowedBotAsync() {
+        if (string.IsNullOrWhiteSpace(_newBotId) || !long.TryParse(_newBotId.Trim(), out var botId) || botId <= 0) {
+            await OnError.InvokeAsync("Invalid bot ID. Must be a numeric Discord snowflake.");
+            return;
+        }
+
+        _botBusy = true;
+        try {
+            await Api.AddAllowedBotAsync(DiscordGuildId, botId, _newBotName.Trim());
+            _allowedBots = await Api.GetAllowedBotsAsync(DiscordGuildId);
+            _newBotId = "";
+            _newBotName = "";
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to add bot: {ex.Message}");
+        } finally {
+            _botBusy = false;
+        }
+    }
+
+    private async Task RemoveAllowedBotAsync(long botId) {
+        _botBusy = true;
+        try {
+            await Api.RemoveAllowedBotAsync(DiscordGuildId, botId);
+            _allowedBots = await Api.GetAllowedBotsAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to remove bot: {ex.Message}");
+        } finally {
+            _botBusy = false;
+        }
+    }
 }

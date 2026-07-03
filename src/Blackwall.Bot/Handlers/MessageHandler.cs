@@ -14,6 +14,8 @@ public sealed class MessageHandler(
     LockdownService lockdownService,
     SafeBrowsingService safeBrowsingService,
     ContentGuardService contentGuardService,
+    AllowedBotService allowedBotService,
+    DiscordSocketClient discordClient,
     ILogger<MessageHandler> logger
 ) {
     /// <summary>
@@ -22,9 +24,6 @@ public sealed class MessageHandler(
     /// </summary>
     public async Task OnMessageReceivedAsync(SocketMessage rawMessage) {
         if (rawMessage is not SocketUserMessage message)
-            return;
-
-        if (message.Author.IsBot || message.Author.IsWebhook)
             return;
 
         if (message.Channel is not SocketGuildChannel guildChannel)
@@ -41,6 +40,22 @@ public sealed class MessageHandler(
         }
 
         if (config is null || !config.IsEnabled)
+            return;
+
+        /*
+         For later retest spam detection if needed
+        logger.LogInformation(
+            "Message from {UserId} (IsBot={IsBot}) in guild {GuildId}: TestMode={TestMode}, MaxMsgs={MaxMsgs}, Window={Window}s",
+            discordUserId, message.Author.IsBot, discordGuildId, config.IsTestMode, config.MaxMessagesPerWindow, config.RateLimitWindowSeconds);
+        */
+
+        if (message.Author.IsWebhook)
+            return;
+
+        if (message.Author.Id == discordClient.CurrentUser.Id)
+            return;
+
+        if (message.Author.IsBot && await allowedBotService.IsBotAllowedAsync(discordGuildId, discordUserId))
             return;
 
         var violations = new List<string>(5);

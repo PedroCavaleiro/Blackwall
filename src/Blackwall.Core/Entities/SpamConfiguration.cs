@@ -20,6 +20,7 @@ public class SpamConfiguration: EntityBase {
 
     public bool IsEnabled { get; set; } = true;
     public bool IsDryRun { get; set; }
+    public bool IsTestMode { get; set; }
     public long? LogChannelId { get; set; }
 
     public bool IsAntiRaidEnabled { get; set; }
@@ -79,4 +80,5 @@ public class SpamConfiguration: EntityBase {
     public ICollection<GuildBlacklist> Blacklists { get; set; } = [];
     public ICollection<GuildBlacklistDomain> BlacklistDomains { get; set; } = [];
     public ICollection<GuildBannedWord> BannedWords { get; set; } = [];
+    public ICollection<GuildAllowedBot> AllowedBots { get; set; } = [];
 }

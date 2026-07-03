@@ -47,6 +47,7 @@ public sealed class SpamConfigurationCache(
                 x.SpamConfiguration.SafeBrowsingBlockUnsure,
                 x.SpamConfiguration.IsEnabled,
                 x.SpamConfiguration.IsDryRun,
+                x.SpamConfiguration.IsTestMode,
                 x.SpamConfiguration.LogChannelId,
                 x.SpamConfiguration.IsAntiRaidEnabled,
                 x.SpamConfiguration.AntiRaidJoinThreshold,
