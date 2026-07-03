@@ -133,7 +133,7 @@
       <!-- Hero -->
       <div class="hero" id="overview">
         <h1>Blackwall <span>Wiki</span></h1>
-        <p>A self-hosted Discord anti-spam system combining a real-time bot for spam detection with a web dashboard for guild configuration &mdash; all backed by Discord OAuth2 authentication.</p>
+        <p>A self-hosted Discord anti-spam system combining a real-time bot for spam detection with a web dashboard for guild configuration &mdash; all backed by Discord OAuth2 authentication. Includes bot allowlist protection against automated attacks that disguise themselves as bot accounts.</p>
         <div class="hero-badges">
           <span class="hero-badge">.NET 10</span>
           <span class="hero-badge">PostgreSQL 17</span>
@@ -158,6 +158,7 @@
           <div class="card"><h4><span class="card-icon">&#128260;</span> Guild Permission Sync</h4><p>A background service periodically synchronises guild manager permissions from Discord.</p></div>
           <div class="card"><h4><span class="card-icon">&#128187;</span> Web Dashboard</h4><p>Blazor Server UI for guild owners and managers to configure spam rules visually.</p></div>
           <div class="card"><h4><span class="card-icon">&#129302;</span> Account Scoring</h4><p>Evaluates new members on join and assigns a threat score based on account metadata.</p></div>
+          <div class="card"><h4><span class="card-icon">&#9989;</span> Bot Allowlist</h4><p>Only trusted bots bypass spam detection. All other bot-flagged accounts &mdash; including attack tools disguised as bots &mdash; are scanned.</p></div>
         </div>
       </section>
 
@@ -590,15 +591,20 @@ dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
         <p>Blackwall is organised into independent modules, each configurable per guild through the dashboard. Every module can be toggled on or off, and most support configurable actions (delete only, timeout, kick, or ban) with optional auto-lockdown. Modules stack &mdash; a single message can trigger multiple filters simultaneously.</p>
 
         <h3>General</h3>
-        <p>Master controls for barrier activation and enforcement mode.</p>
+        <p>Master controls for barrier activation, enforcement mode, and bot allowlist.</p>
         <table>
           <thead><tr><th>Setting</th><th>Description</th></tr></thead>
           <tbody>
             <tr><td><strong>Enable barrier</strong></td><td>When off, the bot will not process any messages in this server. All other modules are effectively disabled.</td></tr>
             <tr><td><strong>Dry run</strong></td><td>Detections are logged but no action is taken against the user. Useful for testing configuration changes before enforcing them.</td></tr>
             <tr><td><strong>Lockdown</strong></td><td>Instantly denies <code>Send Messages</code>, <code>Send Messages in Threads</code>, and <code>Create Public Threads</code> for <code>@everyone</code> in every text channel and category via channel-specific permission overwrites. Higher-tier roles are unaffected. Can be toggled from the dashboard or via the <code>/lockdown</code> and <code>/unlock</code> slash commands in Discord.</td></tr>
+            <tr><td><strong>Allowed bots</strong></td><td>A per-guild list of bot accounts that are skipped by the spam detection pipeline. The Blackwall bot itself is always exempt automatically. All other bot-flagged accounts &mdash; including automated attacks that disguise themselves as bots &mdash; are processed through the full spam detection pipeline. Add only bots you trust (moderation bots, logging bots, music bots, etc.) by entering their Discord ID and an optional name. Webhooks are always skipped regardless of this list.</td></tr>
           </tbody>
         </table>
+        <div class="callout callout-warning">
+          <strong>Why allowlist bots?</strong>
+          Some attack tools send messages through gateways that cause Discord to flag the account as a bot (<code>IsBot=true</code>). Without an allowlist, these attacks would bypass spam detection entirely. The allowlist inverts this: only explicitly trusted bots are skipped, and everything else flagged as a bot is still scanned.
+        </div>
 
         <h3>Detection Matrix</h3>
         <p>Controls how the barrier detects and neutralizes spam, duplicate floods, and mass-mention attacks. Each filter runs independently and stacks with the infraction action set in General.</p>
