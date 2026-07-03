@@ -52,6 +52,10 @@ public sealed class NetWatchSnareService(
                 case InfractionAction.Ban:
                     await guild.AddBanAsync(guildUser, pruneDays, "NetWatch Snare trap triggered — Blackwall.");
                     break;
+                case InfractionAction.SoftBan:
+                    await guild.AddBanAsync(guildUser, pruneDays, "NetWatch Snare trap triggered — Blackwall.");
+                    await guild.RemoveBanAsync(guildUser);
+                    break;
                 case InfractionAction.DeleteOnly:
                 default:
                     break;
@@ -87,6 +91,7 @@ public sealed class NetWatchSnareService(
             InfractionAction.Timeout => $"Timeout ({netWatchSnare.TimeoutMinutes}m)",
             InfractionAction.Kick => "Kick",
             InfractionAction.Ban => "Ban",
+            InfractionAction.SoftBan => "Soft Ban",
             _ => netWatchSnare.Action.ToString()
         };
 

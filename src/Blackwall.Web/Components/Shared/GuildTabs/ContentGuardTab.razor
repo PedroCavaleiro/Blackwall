@@ -144,6 +144,7 @@
                 <option value="@InfractionAction.Timeout">Timeout</option>
                 <option value="@InfractionAction.Kick">Kick</option>
                 <option value="@InfractionAction.Ban">Ban</option>
+                <option value="@InfractionAction.SoftBan">Soft ban (ban + unban)</option>
             </InputSelect>
         </div>
         @if (Form.ContentGuardAction is InfractionAction.Timeout) {
@@ -155,7 +156,7 @@
                 <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="Form.ContentGuardTimeoutMinutes" disabled="@(!Form.IsContentGuardEnabled)" />
             </div>
         }
-        @if (Form.ContentGuardAction is InfractionAction.Ban) {
+        @if (Form.ContentGuardAction is InfractionAction.Ban or InfractionAction.SoftBan) {
             <div class="bw-field">
                 <div class="bw-field-label">
                     <div class="form-label mb-1">Content Guard &mdash; delete messages (days)</div>

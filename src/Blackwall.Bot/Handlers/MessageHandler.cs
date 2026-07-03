@@ -282,6 +282,10 @@ public sealed class MessageHandler(
                 case InfractionAction.Ban:
                     await guild.AddBanAsync(guildUser, pruneDays, "Spam violation detected by Blackwall.");
                     break;
+                case InfractionAction.SoftBan:
+                    await guild.AddBanAsync(guildUser, pruneDays, "Spam violation detected by Blackwall.");
+                    await guild.RemoveBanAsync(guildUser);
+                    break;
                 case InfractionAction.DeleteOnly:
                 default:
                     break;

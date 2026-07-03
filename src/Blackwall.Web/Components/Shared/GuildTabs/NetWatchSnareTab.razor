@@ -61,6 +61,7 @@
                     <option value="@InfractionAction.Timeout">Timeout</option>
                     <option value="@InfractionAction.Kick">Kick</option>
                     <option value="@InfractionAction.Ban">Ban</option>
+                    <option value="@InfractionAction.SoftBan">Soft ban (ban + unban)</option>
                 </InputSelect>
             </div>
             @if (_newAction is InfractionAction.Timeout) {
@@ -69,7 +70,7 @@
                     <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="_newTimeoutMinutes" />
                 </div>
             }
-            @if (_newAction is InfractionAction.Ban) {
+            @if (_newAction is InfractionAction.Ban or InfractionAction.SoftBan) {
                 <div class="mb-2">
                     <label class="form-label font-mono bw-label" style="font-size:0.7rem">DELETE MESSAGE HISTORY (DAYS, 0&ndash;7)</label>
                     <InputNumber class="form-control bw-input-narrow" min="0" max="7" @bind-Value="_newDeleteDays" />

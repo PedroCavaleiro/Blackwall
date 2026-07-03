@@ -186,6 +186,7 @@
                 <option value="@InfractionAction.Timeout">Timeout</option>
                 <option value="@InfractionAction.Kick">Kick</option>
                 <option value="@InfractionAction.Ban">Ban</option>
+                <option value="@InfractionAction.SoftBan">Soft ban (ban + unban)</option>
             </InputSelect>
         </div>
         @if (Form.InviteLinkAction is InfractionAction.Timeout) {
@@ -197,7 +198,7 @@
                 <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="Form.InviteLinkTimeoutMinutes" />
             </div>
         }
-        @if (Form.InviteLinkAction is InfractionAction.Ban) {
+        @if (Form.InviteLinkAction is InfractionAction.Ban or InfractionAction.SoftBan) {
             <div class="bw-field">
                 <div class="bw-field-label">
                     <div class="form-label mb-1">Invite link &mdash; delete messages (days)</div>
@@ -226,6 +227,7 @@
                 <option value="@InfractionAction.Timeout">Timeout</option>
                 <option value="@InfractionAction.Kick">Kick</option>
                 <option value="@InfractionAction.Ban">Ban</option>
+                <option value="@InfractionAction.SoftBan">Soft ban (ban + unban)</option>
             </InputSelect>
         </div>
         @if (Form.SuspiciousLinkAction is InfractionAction.Timeout) {
@@ -237,7 +239,7 @@
                 <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="Form.SuspiciousLinkTimeoutMinutes" />
             </div>
         }
-        @if (Form.SuspiciousLinkAction is InfractionAction.Ban) {
+        @if (Form.SuspiciousLinkAction is InfractionAction.Ban or InfractionAction.SoftBan) {
             <div class="bw-field">
                 <div class="bw-field-label">
                     <div class="form-label mb-1">External link &mdash; delete messages (days)</div>
