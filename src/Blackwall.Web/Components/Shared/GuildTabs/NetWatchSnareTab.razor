@@ -60,8 +60,8 @@
                 <InputSelect class="form-select" @bind-Value="_newAction">
                     <option value="@InfractionAction.Timeout">Timeout</option>
                     <option value="@InfractionAction.Kick">Kick</option>
-                    <option value="@InfractionAction.Ban">Ban</option>
                     <option value="@InfractionAction.SoftBan">Soft ban (ban + unban)</option>
+                    <option value="@InfractionAction.Ban">Ban</option>
                 </InputSelect>
             </div>
             @if (_newAction is InfractionAction.Timeout) {
