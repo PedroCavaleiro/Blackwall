@@ -75,6 +75,9 @@ public class SpamConfiguration: EntityBase {
     public int ContentGuardTimeoutMinutes { get; set; } = 10;
     public int ContentGuardMessageDeleteDays { get; set; }
 
+    public bool IsMessageAuditEnabled { get; set; }
+    public int MessageAuditRetentionDays { get; set; } = 30;
+
     public DateTime? UpdatedAtUtc { get; set; }
 
     public ICollection<GuildBlacklist> Blacklists { get; set; } = [];

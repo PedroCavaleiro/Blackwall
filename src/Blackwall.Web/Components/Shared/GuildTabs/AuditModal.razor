@@ -1,0 +1,230 @@
+@inject BlackwallApiService Api
+
+<div class="bw-modal-overlay" @onclick="OnClose">
+    <div class="bw-modal cut-corner" @onclick:stopPropagation="true">
+        <div class="bw-modal-header">
+            <span class="font-mono bw-text-primary">// AUDIT EVENT VIEWER</span>
+            <button type="button" class="bw-modal-close" @onclick="OnClose">&times;</button>
+        </div>
+        <div class="bw-modal-body">
+            <div class="bw-audit-layout">
+                <div class="bw-audit-event-list">
+                    @if (_loadingEvents) {
+                        <div class="font-mono bw-loading p-3">&gt; Loading events...</div>
+                    } else if (_events.Count == 0) {
+                        <div class="font-mono bw-desc p-3">// No audit events recorded.</div>
+                    } else {
+                        @foreach (var evt in _events) {
+                            <div class="bw-audit-event-item @(_selectedEventId == evt.Id ? "active" : "")"
+                                 @onclick="() => SelectEventAsync(evt.Id)">
+                                <div class="bw-audit-event-user font-mono">
+                                    <span class="bw-text-primary">@evt.Username</span>
+                                    <span class="bw-text-muted"> in #@evt.ChannelName</span>
+                                </div>
+                                <div class="bw-audit-event-meta font-mono">
+                                    <span class="bw-audit-viol">@evt.Violations</span>
+                                    @if (evt.IsDryRun) {
+                                        <span class="bw-audit-dryrun">[DRY RUN]</span>
+                                    }
+                                    <span class="bw-text-muted">@evt.Action</span>
+                                </div>
+                                <div class="bw-audit-event-time font-mono bw-text-muted">
+                                    @evt.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm:ss UTC")
+                                    &middot; @evt.MessageCount msg(s)
+                                </div>
+                            </div>
+                        }
+                        @if (_hasMore) {
+                            <button type="button" class="btn btn-outline-secondary bw-btn-xs w-100 mt-2"
+                                    disabled="@_loadingEvents"
+                                    @onclick="LoadMoreEventsAsync">
+                                LOAD MORE
+                            </button>
+                        }
+                    }
+                </div>
+
+                <div class="bw-audit-detail">
+                    @if (_selectedEventDetail is null) {
+                        <div class="font-mono bw-desc p-4">
+                            // Select an event to view its messages.
+                        </div>
+                    } else {
+                        <div class="bw-audit-detail-header">
+                            <div class="font-mono bw-audit-detail-info">
+                                <span class="bw-text-primary">@_selectedEventDetail.Username</span>
+                                <span class="bw-text-muted"> in #@_selectedEventDetail.ChannelName</span>
+                                <br />
+                                <span class="bw-audit-viol">@_selectedEventDetail.Violations</span>
+                                @if (_selectedEventDetail.IsDryRun) {
+                                    <span class="bw-audit-dryrun">[DRY RUN]</span>
+                                }
+                                <span class="bw-text-muted">@_selectedEventDetail.Action</span>
+                                <br />
+                                <span class="bw-text-muted">@_selectedEventDetail.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm:ss UTC")</span>
+                            </div>
+                            <button type="button" class="btn btn-outline-danger bw-btn-xs-nowrap"
+                                    disabled="@_deletingEvent"
+                                    @onclick="DeleteEventAsync">
+                                @(_deletingEvent ? "DELETING..." : "DELETE EVENT")
+                            </button>
+                        </div>
+
+                        <div class="bw-audit-messages">
+                            @foreach (var msg in _selectedEventDetail.Messages) {
+                                <div class="bw-discord-msg">
+                                    <div class="bw-discord-msg-header">
+                                        <span class="bw-discord-msg-author bw-text-primary">@msg.Username</span>
+                                        <span class="bw-discord-msg-channel bw-text-muted">in #@msg.ChannelName</span>
+                                        <span class="bw-discord-msg-time bw-text-muted">@msg.MessageTimestampUtc.ToString("yyyy-MM-dd HH:mm:ss UTC")</span>
+                                        <button type="button" class="btn btn-outline-danger bw-btn-xxs ms-auto"
+                                                disabled="@_deletingRecordId.HasValue && _deletingRecordId == msg.Id"
+                                                @onclick="() => DeleteRecordAsync(msg.Id)">
+                                            @(_deletingRecordId.HasValue && _deletingRecordId == msg.Id ? "..." : "DELETE")
+                                        </button>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(msg.Content)) {
+                                        <div class="bw-discord-msg-content font-mono">@msg.Content</div>
+                                    }
+                                    @if (msg.Embeds.Count > 0) {
+                                        <div class="bw-discord-embeds">
+                                            @foreach (var embed in msg.Embeds) {
+                                                <div class="bw-discord-embed" style="@GetEmbedBorderColor(embed.Color)">
+                                                    @if (!string.IsNullOrWhiteSpace(embed.Title)) {
+                                                        <div class="bw-discord-embed-title">@embed.Title</div>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(embed.Description)) {
+                                                        <div class="bw-discord-embed-desc font-mono">@embed.Description</div>
+                                                    }
+                                                    @if (embed.Fields.Count > 0) {
+                                                        <div class="bw-discord-embed-fields">
+                                                            @foreach (var field in embed.Fields) {
+                                                                <div class="bw-discord-embed-field @(field.Inline ? "inline" : "")">
+                                                                    <div class="bw-discord-embed-field-name">@field.Name</div>
+                                                                    <div class="bw-discord-embed-field-value font-mono">@field.Value</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(embed.FooterText)) {
+                                                        <div class="bw-discord-embed-footer font-mono">@embed.FooterText</div>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(embed.ImageUrl)) {
+                                                        <img src="@embed.ImageUrl" class="bw-discord-embed-image" alt="embed image" />
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(embed.ThumbnailUrl)) {
+                                                        <img src="@embed.ThumbnailUrl" class="bw-discord-embed-thumb" alt="thumbnail" />
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required long DiscordGuildId { get; set; }
+    [Parameter, EditorRequired] public required EventCallback OnClose { get; set; }
+
+    private List<MessageAuditEventSummaryDto> _events = [];
+    private MessageAuditEventDetailDto? _selectedEventDetail;
+    private long? _selectedEventId;
+    private bool _loadingEvents;
+    private bool _hasMore;
+    private bool _deletingEvent;
+    private long? _deletingRecordId;
+    private int _currentPage = 1;
+    private const int PageSize = 20;
+
+    protected override async Task OnInitializedAsync() {
+        await LoadEventsAsync(isFirstLoad: true);
+    }
+
+    private async Task LoadEventsAsync(bool isFirstLoad) {
+        _loadingEvents = true;
+        try {
+            var batch = await Api.GetAuditEventsAsync(DiscordGuildId, _currentPage, PageSize);
+            if (isFirstLoad) {
+                _events = batch.ToList();
+            } else {
+                _events.AddRange(batch);
+            }
+            _hasMore = batch.Count == PageSize;
+        } catch {
+            _events = [];
+            _hasMore = false;
+        } finally {
+            _loadingEvents = false;
+        }
+    }
+
+    private async Task LoadMoreEventsAsync() {
+        _currentPage++;
+        await LoadEventsAsync(isFirstLoad: false);
+    }
+
+    private async Task SelectEventAsync(long eventId) {
+        _selectedEventId = eventId;
+        _selectedEventDetail = null;
+        try {
+            _selectedEventDetail = await Api.GetAuditEventDetailAsync(DiscordGuildId, eventId);
+        } catch {
+            _selectedEventDetail = null;
+        }
+    }
+
+    private async Task DeleteEventAsync() {
+        if (_selectedEventId is not { } eventId)
+            return;
+
+        _deletingEvent = true;
+        try {
+            await Api.DeleteAuditEventAsync(DiscordGuildId, eventId);
+            _events.RemoveAll(e => e.Id == eventId);
+            _selectedEventDetail = null;
+            _selectedEventId = null;
+        } catch {
+            // ignore - user can retry
+        } finally {
+            _deletingEvent = false;
+        }
+    }
+
+    private async Task DeleteRecordAsync(long recordId) {
+        if (_selectedEventId is not { } eventId)
+            return;
+
+        _deletingRecordId = recordId;
+        try {
+            await Api.DeleteAuditRecordAsync(DiscordGuildId, eventId, recordId);
+            if (_selectedEventDetail is not null) {
+                _selectedEventDetail = _selectedEventDetail with {
+                    Messages = _selectedEventDetail.Messages.Where(m => m.Id != recordId).ToList()
+                };
+            }
+            var evtIdx = _events.FindIndex(e => e.Id == eventId);
+            if (evtIdx >= 0) {
+                var e = _events[evtIdx];
+                _events[evtIdx] = e with { MessageCount = Math.Max(0, e.MessageCount - 1) };
+            }
+        } catch {
+            // ignore
+        } finally {
+            _deletingRecordId = null;
+        }
+    }
+
+    private static string GetEmbedBorderColor(int? color) {
+        if (color is null)
+            return "border-left-color: var(--bw-primary);";
+        var hex = $"#{color.Value:X6}";
+        return $"border-left-color: {hex};";
+    }
+}

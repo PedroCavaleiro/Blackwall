@@ -16,6 +16,8 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<GuildBanSyncRule> GuildBanSyncRules => Set<GuildBanSyncRule>();
     public DbSet<GuildBannedWord> GuildBannedWords => Set<GuildBannedWord>();
     public DbSet<GuildAllowedBot> GuildAllowedBots => Set<GuildAllowedBot>();
+    public DbSet<MessageAuditEvent> MessageAuditEvents => Set<MessageAuditEvent>();
+    public DbSet<MessageAuditRecord> MessageAuditRecords => Set<MessageAuditRecord>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -297,6 +299,14 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .HasForeignKey(e => e.SpamConfigurationId)
                   .OnDelete(DeleteBehavior.Cascade);
 
+            entity.Property(e => e.IsMessageAuditEnabled)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.MessageAuditRetentionDays)
+                  .IsRequired()
+                  .HasDefaultValue(30);
+
             entity.Property(e => e.IsContentGuardEnabled)
                   .IsRequired()
                   .HasDefaultValue(false);
@@ -416,6 +426,72 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
 
             entity.HasIndex(e => new { e.SpamConfigurationId, e.DiscordBotId })
                   .IsUnique();
+        });
+
+        modelBuilder.Entity<MessageAuditEvent>(entity => {
+            entity.Property(e => e.DiscordUserId)
+                  .IsRequired();
+
+            entity.Property(e => e.Username)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.ChannelName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.Violations)
+                  .IsRequired()
+                  .HasMaxLength(500);
+
+            entity.Property(e => e.Action)
+                  .IsRequired();
+
+            entity.Property(e => e.IsDryRun)
+                  .IsRequired();
+
+            entity.HasOne(e => e.GuildInstance)
+                  .WithMany()
+                  .HasForeignKey(e => e.GuildInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.Records)
+                  .WithOne(e => e.Event)
+                  .HasForeignKey(e => e.EventId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.GuildInstanceId, e.CreatedAtUtc });
+        });
+
+        modelBuilder.Entity<MessageAuditRecord>(entity => {
+            entity.Property(e => e.DiscordMessageId)
+                  .IsRequired();
+
+            entity.Property(e => e.DiscordUserId)
+                  .IsRequired();
+
+            entity.Property(e => e.Username)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.ChannelName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.Content)
+                  .IsRequired();
+
+            entity.Property(e => e.EmbedsJson)
+                  .IsRequired();
+
+            entity.Property(e => e.MessageTimestampUtc)
+                  .IsRequired();
+
+            entity.Property(e => e.ExpiresAtUtc)
+                  .IsRequired();
+
+            entity.HasIndex(e => e.EventId);
+            entity.HasIndex(e => e.ExpiresAtUtc);
         });
 
     }

@@ -177,7 +177,9 @@ public sealed class GuildsController(
                 instance.SpamConfiguration.ContentGuardAction,
                 instance.SpamConfiguration.ContentGuardAutoLockdown,
                 instance.SpamConfiguration.ContentGuardTimeoutMinutes,
-                instance.SpamConfiguration.ContentGuardMessageDeleteDays
+                instance.SpamConfiguration.ContentGuardMessageDeleteDays,
+                instance.SpamConfiguration.IsMessageAuditEnabled,
+                instance.SpamConfiguration.MessageAuditRetentionDays
             )
         ));
     }
@@ -285,6 +287,8 @@ public sealed class GuildsController(
         spam.ContentGuardAutoLockdown = request.ContentGuardAutoLockdown;
         spam.ContentGuardTimeoutMinutes = Math.Max(1, request.ContentGuardTimeoutMinutes);
         spam.ContentGuardMessageDeleteDays = Math.Clamp(request.ContentGuardMessageDeleteDays, 0, 7);
+        spam.IsMessageAuditEnabled = request.IsMessageAuditEnabled;
+        spam.MessageAuditRetentionDays = Math.Clamp(request.MessageAuditRetentionDays, 7, 90);
         spam.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -1887,6 +1891,257 @@ public sealed class GuildsController(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         _ = Task.Run(() => allowedBotService.RefreshGuildAsync(discordGuildId, CancellationToken.None), cancellationToken);
+
+        return NoContent();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    //  MESSAGE AUDIT
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns a paginated list of message audit events for a guild.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="page">The page number (1-based).</param>
+    /// <param name="pageSize">The page size (max 100).</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Returns the list of audit event summaries.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    [HttpGet("{discordGuildId:long}/audit/events")]
+    [ProducesResponseType(typeof(IReadOnlyList<MessageAuditEventSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IReadOnlyList<MessageAuditEventSummaryDto>>> GetAuditEvents(
+        long discordGuildId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var instance = await dbContext.GuildInstances
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var events = await dbContext.MessageAuditEvents
+            .Where(e => e.GuildInstanceId == instance.Id)
+            .OrderByDescending(e => e.CreatedAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(e => new MessageAuditEventSummaryDto(
+                e.Id,
+                e.DiscordUserId,
+                e.Username,
+                e.DiscordChannelId,
+                e.ChannelName,
+                e.Violations,
+                e.Action,
+                e.IsDryRun,
+                e.CreatedAtUtc,
+                e.Records.Count
+            ))
+            .ToListAsync(cancellationToken);
+
+        return Ok(events);
+    }
+
+    /// <summary>
+    /// Returns the full detail of a single audit event, including all associated messages.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="eventId">The audit event ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Returns the audit event detail with messages.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The audit event does not exist.</response>
+    [HttpGet("{discordGuildId:long}/audit/events/{eventId:long}")]
+    [ProducesResponseType(typeof(MessageAuditEventDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<MessageAuditEventDetailDto>> GetAuditEventDetail(
+        long discordGuildId,
+        long eventId,
+        CancellationToken cancellationToken = default
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var evt = await dbContext.MessageAuditEvents
+            .Where(e => e.Id == eventId && e.GuildInstance.DiscordGuildId == discordGuildId)
+            .Select(e => new {
+                e.Id,
+                e.DiscordUserId,
+                e.Username,
+                e.AvatarHash,
+                e.DiscordChannelId,
+                e.ChannelName,
+                e.Violations,
+                e.Action,
+                e.IsDryRun,
+                e.CreatedAtUtc,
+                Records = e.Records.Select(r => new MessageAuditMessageDto(
+                    r.Id,
+                    r.DiscordMessageId,
+                    r.DiscordUserId,
+                    r.Username,
+                    r.DiscordChannelId,
+                    r.ChannelName,
+                    r.Content,
+                    System.Text.Json.JsonSerializer.Deserialize<List<EmbedDataDto>>(r.EmbedsJson) ?? new List<EmbedDataDto>(),
+                    r.MessageTimestampUtc
+                )).ToList()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (evt is null)
+            return NotFound(new ProblemDetails {
+                Title = "Audit event not found.",
+                Detail = "No audit event with this ID exists for this guild.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        return Ok(new MessageAuditEventDetailDto(
+            evt.Id,
+            evt.DiscordUserId,
+            evt.Username,
+            evt.AvatarHash,
+            evt.DiscordChannelId,
+            evt.ChannelName,
+            evt.Violations,
+            evt.Action,
+            evt.IsDryRun,
+            evt.CreatedAtUtc,
+            evt.Records
+        ));
+    }
+
+    /// <summary>
+    /// Deletes an entire audit event and all its associated message records.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="eventId">The audit event ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">Audit event deleted successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The audit event does not exist.</response>
+    [HttpDelete("{discordGuildId:long}/audit/events/{eventId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteAuditEvent(
+        long discordGuildId,
+        long eventId,
+        CancellationToken cancellationToken = default
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var evt = await dbContext.MessageAuditEvents
+            .FirstOrDefaultAsync(e => e.Id == eventId && e.GuildInstance.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (evt is null)
+            return NotFound(new ProblemDetails {
+                Title = "Audit event not found.",
+                Detail = "No audit event with this ID exists for this guild.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        dbContext.MessageAuditEvents.Remove(evt);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Deletes a single message audit record from an event.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="eventId">The audit event ID.</param>
+    /// <param name="recordId">The audit record ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">Audit record deleted successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The audit record does not exist.</response>
+    [HttpDelete("{discordGuildId:long}/audit/events/{eventId:long}/records/{recordId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteAuditRecord(
+        long discordGuildId,
+        long eventId,
+        long recordId,
+        CancellationToken cancellationToken = default
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var record = await dbContext.MessageAuditRecords
+            .FirstOrDefaultAsync(r => r.Id == recordId && r.EventId == eventId
+                && r.Event.GuildInstance.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (record is null)
+            return NotFound(new ProblemDetails {
+                Title = "Audit record not found.",
+                Detail = "No audit record with this ID exists for this event.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        dbContext.MessageAuditRecords.Remove(record);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return NoContent();
     }

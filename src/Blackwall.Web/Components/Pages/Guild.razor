@@ -215,6 +215,8 @@
                 Form.ContentGuardAutoLockdown = s.ContentGuardAutoLockdown;
                 Form.ContentGuardTimeoutMinutes = s.ContentGuardTimeoutMinutes;
                 Form.ContentGuardMessageDeleteDays = s.ContentGuardMessageDeleteDays;
+                Form.IsMessageAuditEnabled = s.IsMessageAuditEnabled;
+                Form.MessageAuditRetentionDays = s.MessageAuditRetentionDays;
                 _isLockedDown = s.IsLockedDown;
             }
         } catch {
@@ -293,7 +295,9 @@
                 Form.ContentGuardAction,
                 Form.ContentGuardAutoLockdown,
                 Form.ContentGuardTimeoutMinutes,
-                Form.ContentGuardMessageDeleteDays
+                Form.ContentGuardMessageDeleteDays,
+                Form.IsMessageAuditEnabled,
+                Form.MessageAuditRetentionDays
             ));
             _saved = true;
             _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
