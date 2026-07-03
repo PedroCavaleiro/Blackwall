@@ -103,6 +103,7 @@
         ("fa-solid fa-globe", "Safe Browsing", "Real-time URL checks against Google Safe Browsing V5 using hash-prefix lookups with Rice-Golomb delta decoding and Redis caching."),
         ("fa-solid fa-ban", "Domain Blacklist", "Downloads and caches AdGuard-format domain filter lists in Redis. Messages containing blacklisted domains are blocked instantly."),
         ("fa-solid fa-user-shield", "Account Scoring", "Scores new members on account age, avatar presence, and username patterns (gibberish, numeric-only, consecutive consonants). Flags suspicious accounts."),
+        ("fa-solid fa-robot", "Bot Allowlist", "Only explicitly trusted bots bypass spam detection. Automated attacks disguised as bot accounts are caught and processed through the full filter pipeline."),
         ("fa-solid fa-lock", "Lockdown Protocol", "Denies SEND_MESSAGES, SEND_MESSAGES_IN_THREADS, and CREATE_PUBLIC_THREADS for @everyone across all text channels when a raid is detected."),
         ("fa-solid fa-clipboard-list", "Ban Synchronization", "Periodically syncs Discord guild ban lists into the database so enforcement state stays consistent across restarts."),
         ("fa-solid fa-gears", "Permission Sync", "Tracks guild-level bot permissions and role changes to ensure Blackwall always has the access it needs to enforce."),
