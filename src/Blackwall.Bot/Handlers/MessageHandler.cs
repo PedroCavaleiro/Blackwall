@@ -24,9 +24,6 @@ public sealed class MessageHandler(
         if (rawMessage is not SocketUserMessage message)
             return;
 
-        if (message.Author.IsBot || message.Author.IsWebhook)
-            return;
-
         if (message.Channel is not SocketGuildChannel guildChannel)
             return;
 
@@ -41,6 +38,16 @@ public sealed class MessageHandler(
         }
 
         if (config is null || !config.IsEnabled)
+            return;
+
+        /*
+         For later retest spam detection if needed
+        logger.LogInformation(
+            "Message from {UserId} (IsBot={IsBot}) in guild {GuildId}: TestMode={TestMode}, MaxMsgs={MaxMsgs}, Window={Window}s",
+            discordUserId, message.Author.IsBot, discordGuildId, config.IsTestMode, config.MaxMessagesPerWindow, config.RateLimitWindowSeconds);
+        */
+
+        if ((message.Author.IsBot || message.Author.IsWebhook) && !config.IsTestMode)
             return;
 
         var violations = new List<string>(5);

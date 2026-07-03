@@ -16,6 +16,7 @@ public sealed record SpamConfigurationDto(
     bool SafeBrowsingBlockUnsure,
     bool IsEnabled,
     bool IsDryRun,
+    bool IsTestMode,
     long? LogChannelId,
     bool IsAntiRaidEnabled,
     int AntiRaidJoinThreshold,

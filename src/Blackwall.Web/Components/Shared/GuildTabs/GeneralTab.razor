@@ -21,6 +21,15 @@
                 <InputCheckbox class="form-check-input bw-switch" id="isDryRun" @bind-Value="Form.IsDryRun" />
             </div>
         </div>
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Test mode</div>
+                <div class="form-text">When on, messages from bots are evaluated by the spam filter. For testing only — disable in production.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="isTestMode" @bind-Value="Form.IsTestMode" />
+            </div>
+        </div>
     </div>
 </div>
 

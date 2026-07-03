@@ -16,6 +16,7 @@ public sealed class SpamConfigForm {
     public bool SafeBrowsingBlockUnsure { get; set; }
     public bool IsEnabled { get; set; } = true;
     public bool IsDryRun { get; set; }
+    public bool IsTestMode { get; set; }
     public string LogChannelId { get; set; } = "";
     public bool IsAntiRaidEnabled { get; set; }
     public int AntiRaidJoinThreshold { get; set; } = 10;

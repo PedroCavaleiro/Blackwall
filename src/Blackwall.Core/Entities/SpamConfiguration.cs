@@ -20,6 +20,7 @@ public class SpamConfiguration: EntityBase {
 
     public bool IsEnabled { get; set; } = true;
     public bool IsDryRun { get; set; }
+    public bool IsTestMode { get; set; }
     public long? LogChannelId { get; set; }
 
     public bool IsAntiRaidEnabled { get; set; }

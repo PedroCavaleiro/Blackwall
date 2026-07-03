@@ -132,6 +132,7 @@ public sealed class GuildsController(
                 instance.SpamConfiguration.SafeBrowsingBlockUnsure,
                 instance.SpamConfiguration.IsEnabled,
                 instance.SpamConfiguration.IsDryRun,
+                instance.SpamConfiguration.IsTestMode,
                 instance.SpamConfiguration.LogChannelId,
                 instance.SpamConfiguration.IsAntiRaidEnabled,
                 instance.SpamConfiguration.AntiRaidJoinThreshold,
@@ -239,6 +240,7 @@ public sealed class GuildsController(
         spam.SafeBrowsingBlockUnsure = request.SafeBrowsingBlockUnsure;
         spam.IsEnabled = request.IsEnabled;
         spam.IsDryRun = request.IsDryRun;
+        spam.IsTestMode = request.IsTestMode;
         spam.LogChannelId = request.LogChannelId;
         spam.IsAntiRaidEnabled = request.IsAntiRaidEnabled;
         spam.AntiRaidJoinThreshold = Math.Max(2, request.AntiRaidJoinThreshold);
