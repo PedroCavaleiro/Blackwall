@@ -58,29 +58,21 @@
             <div class="mb-2">
                 <label class="form-label font-mono bw-label" style="font-size:0.7rem">ACTION</label>
                 <InputSelect class="form-select" @bind-Value="_newAction">
-                    <option value="@NetWatchSnareAction.SoftBan">Soft ban (ban + unban)</option>
-                    <option value="@NetWatchSnareAction.Ban">Ban</option>
-                    <option value="@NetWatchSnareAction.Timeout">Timeout</option>
-                    <option value="@NetWatchSnareAction.AssignRole">Assign role</option>
+                    <option value="@InfractionAction.Timeout">Timeout</option>
+                    <option value="@InfractionAction.Kick">Kick</option>
+                    <option value="@InfractionAction.Ban">Ban</option>
                 </InputSelect>
             </div>
-            @if (_newAction is NetWatchSnareAction.Timeout) {
+            @if (_newAction is InfractionAction.Timeout) {
                 <div class="mb-2">
                     <label class="form-label font-mono bw-label" style="font-size:0.7rem">TIMEOUT (MINUTES)</label>
                     <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="_newTimeoutMinutes" />
                 </div>
             }
-            @if (_newAction is NetWatchSnareAction.SoftBan or NetWatchSnareAction.Ban) {
+            @if (_newAction is InfractionAction.Ban) {
                 <div class="mb-2">
                     <label class="form-label font-mono bw-label" style="font-size:0.7rem">DELETE MESSAGE HISTORY (DAYS, 0&ndash;7)</label>
                     <InputNumber class="form-control bw-input-narrow" min="0" max="7" @bind-Value="_newDeleteDays" />
-                </div>
-            }
-            @if (_newAction is NetWatchSnareAction.AssignRole) {
-                <div class="mb-2">
-                    <label class="form-label font-mono bw-label" style="font-size:0.7rem">ROLE ID</label>
-                    <input type="text" class="form-control" placeholder="Discord role ID (e.g. 123456789012345678)"
-                           @bind="_newRoleId" disabled="@_busy" />
                 </div>
             }
             <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-xs-nowrap mt-1"
@@ -99,10 +91,9 @@
     private IReadOnlyList<DiscordChannelDto> _channels = [];
     private IReadOnlyList<NetWatchSnareChannelDto> _netWatchSnares = [];
     private long? _newChannelId;
-    private NetWatchSnareAction _newAction = NetWatchSnareAction.SoftBan;
+    private InfractionAction _newAction = InfractionAction.Timeout;
     private int _newTimeoutMinutes = 60;
     private int _newDeleteDays = 1;
-    private string _newRoleId = "";
     private bool _busy;
 
     protected override async Task OnInitializedAsync() {
@@ -127,15 +118,6 @@
         if (_newChannelId is null || _newChannelId <= 0)
             return;
 
-        long? roleId = null;
-        if (_newAction is NetWatchSnareAction.AssignRole) {
-            if (!long.TryParse(_newRoleId.Trim(), out var parsedRoleId) || parsedRoleId <= 0) {
-                await OnError.InvokeAsync("Invalid role ID. Must be a numeric Discord snowflake.");
-                return;
-            }
-            roleId = parsedRoleId;
-        }
-
         var channelName = _channels.FirstOrDefault(c => c.Id == _newChannelId)?.Name ?? "unknown";
 
         _busy = true;
@@ -145,12 +127,10 @@
                 channelName,
                 _newAction,
                 _newTimeoutMinutes,
-                _newDeleteDays,
-                roleId
+                _newDeleteDays
             ));
             await ReloadNetWatchSnaresAsync();
             _newChannelId = null;
-            _newRoleId = "";
         } catch (Exception ex) {
             await OnError.InvokeAsync($"Failed to add trap channel: {ex.Message}");
         } finally {
@@ -165,7 +145,6 @@
                 s.Action,
                 s.TimeoutMinutes,
                 s.MessageDeleteDays,
-                s.AssignRoleId,
                 !s.IsEnabled
             ));
             await ReloadNetWatchSnaresAsync();

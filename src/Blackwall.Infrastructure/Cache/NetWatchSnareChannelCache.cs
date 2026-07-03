@@ -35,7 +35,6 @@ public sealed class NetWatchSnareChannelCache(
                 s.Action,
                 s.TimeoutMinutes,
                 s.MessageDeleteDays,
-                s.AssignRoleId,
                 s.IsEnabled
             ))
             .ToListAsync(cancellationToken);

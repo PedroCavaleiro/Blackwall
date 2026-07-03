@@ -2201,7 +2201,6 @@ public sealed class GuildsController(
                 s.Action,
                 s.TimeoutMinutes,
                 s.MessageDeleteDays,
-                s.AssignRoleId,
                 s.IsEnabled
             ))
             .ToList());
@@ -2289,7 +2288,6 @@ public sealed class GuildsController(
             Action = request.Action,
             TimeoutMinutes = Math.Max(1, request.TimeoutMinutes),
             MessageDeleteDays = Math.Clamp(request.MessageDeleteDays, 0, 7),
-            AssignRoleId = request.AssignRoleId,
             IsEnabled = true
         };
 
@@ -2307,7 +2305,6 @@ public sealed class GuildsController(
             netWatchSnare.Action,
             netWatchSnare.TimeoutMinutes,
             netWatchSnare.MessageDeleteDays,
-            netWatchSnare.AssignRoleId,
             netWatchSnare.IsEnabled
         ));
     }
@@ -2368,7 +2365,6 @@ public sealed class GuildsController(
         netWatchSnare.Action = request.Action;
         netWatchSnare.TimeoutMinutes = Math.Max(1, request.TimeoutMinutes);
         netWatchSnare.MessageDeleteDays = Math.Clamp(request.MessageDeleteDays, 0, 7);
-        netWatchSnare.AssignRoleId = request.AssignRoleId;
         netWatchSnare.IsEnabled = request.IsEnabled;
         netWatchSnare.UpdatedAtUtc = DateTime.UtcNow;
         instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
@@ -2384,7 +2380,6 @@ public sealed class GuildsController(
             netWatchSnare.Action,
             netWatchSnare.TimeoutMinutes,
             netWatchSnare.MessageDeleteDays,
-            netWatchSnare.AssignRoleId,
             netWatchSnare.IsEnabled
         ));
     }

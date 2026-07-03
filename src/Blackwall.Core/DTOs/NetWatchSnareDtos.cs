@@ -6,26 +6,23 @@ public sealed record NetWatchSnareChannelDto(
     long Id,
     long DiscordChannelId,
     string ChannelName,
-    NetWatchSnareAction Action,
+    InfractionAction Action,
     int TimeoutMinutes,
     int MessageDeleteDays,
-    long? AssignRoleId,
     bool IsEnabled
 );
 
 public sealed record CreateNetWatchSnareChannelRequest(
     long DiscordChannelId,
     string ChannelName,
-    NetWatchSnareAction Action,
+    InfractionAction Action,
     int TimeoutMinutes,
-    int MessageDeleteDays,
-    long? AssignRoleId
+    int MessageDeleteDays
 );
 
 public sealed record UpdateNetWatchSnareChannelRequest(
-    NetWatchSnareAction Action,
+    InfractionAction Action,
     int TimeoutMinutes,
     int MessageDeleteDays,
-    long? AssignRoleId,
     bool IsEnabled
 );

@@ -43,24 +43,17 @@ public sealed class NetWatchSnareService(
 
         try {
             switch (netWatchSnare.Action) {
-                case NetWatchSnareAction.SoftBan:
-                    await guild.AddBanAsync(guildUser, pruneDays, "NetWatchSnare trap triggered — Blackwall.");
-                    await guild.RemoveBanAsync(guildUser);
-                    break;
-                case NetWatchSnareAction.Ban:
-                    await guild.AddBanAsync(guildUser, pruneDays, "NetWatchSnare trap triggered — Blackwall.");
-                    break;
-                case NetWatchSnareAction.Timeout:
+                case InfractionAction.Timeout:
                     await guildUser.SetTimeOutAsync(timeout);
                     break;
-                case NetWatchSnareAction.AssignRole:
-                    if (netWatchSnare.AssignRoleId.HasValue) {
-                        var role = guild.GetRole((ulong)netWatchSnare.AssignRoleId.Value);
-                        if (role is not null)
-                            await guildUser.AddRoleAsync(role);
-                        else
-                            logger.LogWarning("NetWatchSnare role {RoleId} not found in guild {GuildId}", netWatchSnare.AssignRoleId.Value, guild.Id);
-                    }
+                case InfractionAction.Kick:
+                    await guildUser.KickAsync("NetWatch Snare trap triggered — Blackwall.");
+                    break;
+                case InfractionAction.Ban:
+                    await guild.AddBanAsync(guildUser, pruneDays, "NetWatch Snare trap triggered — Blackwall.");
+                    break;
+                case InfractionAction.DeleteOnly:
+                default:
                     break;
             }
 
@@ -91,10 +84,9 @@ public sealed class NetWatchSnareService(
             return;
 
         var actionLabel = netWatchSnare.Action switch {
-            NetWatchSnareAction.SoftBan => "Soft Ban",
-            NetWatchSnareAction.Ban => "Ban",
-            NetWatchSnareAction.Timeout => $"Timeout ({netWatchSnare.TimeoutMinutes}m)",
-            NetWatchSnareAction.AssignRole => "Assign Role",
+            InfractionAction.Timeout => $"Timeout ({netWatchSnare.TimeoutMinutes}m)",
+            InfractionAction.Kick => "Kick",
+            InfractionAction.Ban => "Ban",
             _ => netWatchSnare.Action.ToString()
         };
 

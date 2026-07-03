@@ -504,8 +504,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .HasMaxLength(200);
 
             entity.Property(e => e.Action)
-                  .IsRequired()
-                  .HasDefaultValue(NetWatchSnareAction.SoftBan);
+                  .IsRequired();
 
             entity.Property(e => e.TimeoutMinutes)
                   .IsRequired()

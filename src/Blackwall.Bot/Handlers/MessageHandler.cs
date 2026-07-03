@@ -1,5 +1,4 @@
 using Blackwall.Bot.Services;
-using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
 using Blackwall.Infrastructure.Cache;
 using Discord;
@@ -87,7 +86,7 @@ public sealed class MessageHandler(
                     discordGuildId,
                     message,
                     ["netWatchSnare_trap"],
-                    netWatchSnare.Action == NetWatchSnareAction.SoftBan ? InfractionAction.Ban : (InfractionAction)netWatchSnare.Action,
+                    netWatchSnare.Action,
                     config.IsDryRun,
                     config.MessageAuditRetentionDays,
                     null,
