@@ -361,4 +361,34 @@ public sealed class BlackwallApiService(
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<IReadOnlyList<MessageAuditEventSummaryDto>> GetAuditEventsAsync(long discordGuildId, int page = 1, int pageSize = 20, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/audit/events?page={page}&pageSize={pageSize}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<MessageAuditEventSummaryDto>>(ct) ?? [];
+    }
+
+    public async Task<MessageAuditEventDetailDto?> GetAuditEventDetailAsync(long discordGuildId, long eventId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/audit/events/{eventId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<MessageAuditEventDetailDto>(ct);
+    }
+
+    public async Task DeleteAuditEventAsync(long discordGuildId, long eventId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/audit/events/{eventId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteAuditRecordAsync(long discordGuildId, long eventId, long recordId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/audit/events/{eventId}/records/{recordId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

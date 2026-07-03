@@ -15,6 +15,7 @@ public sealed class MessageHandler(
     SafeBrowsingService safeBrowsingService,
     ContentGuardService contentGuardService,
     AllowedBotService allowedBotService,
+    MessageAuditService messageAuditService,
     DiscordSocketClient discordClient,
     ILogger<MessageHandler> logger
 ) {
@@ -187,6 +188,19 @@ public sealed class MessageHandler(
 
         if (config.LogChannelId.HasValue)
             await SendLogMessageAsync(message, guildChannel.Guild, violations, effectiveAction, config.IsDryRun);
+
+        if (config.IsMessageAuditEnabled) {
+            _ = Task.Run(() => messageAuditService.RecordEventAsync(
+                discordGuildId,
+                message,
+                violations,
+                effectiveAction,
+                config.IsDryRun,
+                config.MessageAuditRetentionDays,
+                duplicateMessagesToDelete,
+                CancellationToken.None
+            ));
+        }
     }
 
     /// <summary>

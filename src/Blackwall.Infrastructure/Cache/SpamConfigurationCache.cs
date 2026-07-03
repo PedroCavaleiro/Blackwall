@@ -91,7 +91,9 @@ public sealed class SpamConfigurationCache(
                 x.SpamConfiguration.ContentGuardAction,
                 x.SpamConfiguration.ContentGuardAutoLockdown,
                 x.SpamConfiguration.ContentGuardTimeoutMinutes,
-                x.SpamConfiguration.ContentGuardMessageDeleteDays
+                x.SpamConfiguration.ContentGuardMessageDeleteDays,
+                x.SpamConfiguration.IsMessageAuditEnabled,
+                x.SpamConfiguration.MessageAuditRetentionDays
             ))
             .FirstOrDefaultAsync(cancellationToken);
 

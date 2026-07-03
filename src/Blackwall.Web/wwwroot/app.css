@@ -529,3 +529,223 @@ h1:focus { outline: none; }
 
 /* --- Reconnect modal --- */
 #components-reconnect-modal { display: none; }
+
+/* --- Audit modal --- */
+.bw-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(13, 17, 23, 0.85);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.bw-modal {
+    background: var(--bs-card-bg);
+    border: 1px solid var(--bw-primary);
+    box-shadow: 0 0 0 1px var(--bw-primary), 0 0 48px rgba(34, 211, 238, 0.2);
+    width: 100%;
+    max-width: 1100px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.bw-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 1.25rem;
+    border-bottom: 1px solid rgba(34, 211, 238, 0.15);
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+}
+
+.bw-modal-close {
+    background: transparent;
+    border: none;
+    color: var(--bw-muted);
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 0.25rem;
+    transition: color 0.15s;
+}
+
+.bw-modal-close:hover { color: var(--bw-danger); }
+
+.bw-modal-body {
+    flex: 1;
+    overflow: hidden;
+    padding: 0;
+}
+
+/* --- Audit layout --- */
+.bw-audit-layout {
+    display: flex;
+    height: 100%;
+    min-height: 400px;
+}
+
+.bw-audit-event-list {
+    flex: 0 0 320px;
+    border-right: 1px solid rgba(34, 211, 238, 0.12);
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+.bw-audit-event-item {
+    padding: 0.65rem 0.75rem;
+    border: 1px solid transparent;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    margin-bottom: 0.25rem;
+}
+
+.bw-audit-event-item:hover {
+    background: rgba(34, 211, 238, 0.05);
+    border-left-color: rgba(34, 211, 238, 0.3);
+}
+
+.bw-audit-event-item.active {
+    background: rgba(34, 211, 238, 0.08);
+    border-left-color: var(--bw-primary);
+}
+
+.bw-audit-event-user { font-size: 0.78rem; margin-bottom: 0.2rem; }
+.bw-audit-event-meta { font-size: 0.68rem; margin-bottom: 0.15rem; }
+.bw-audit-event-time { font-size: 0.62rem; }
+
+.bw-audit-viol { color: var(--bw-danger); margin-right: 0.35rem; }
+.bw-audit-dryrun {
+    color: #e6b800;
+    margin-right: 0.35rem;
+    font-weight: 700;
+    font-size: 0.6rem;
+}
+
+/* --- Audit detail --- */
+.bw-audit-detail {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.bw-audit-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid rgba(34, 211, 238, 0.12);
+    flex-shrink: 0;
+}
+
+.bw-audit-detail-info { font-size: 0.72rem; line-height: 1.6; }
+
+.bw-audit-messages {
+    padding: 0.75rem 1rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* --- Discord-like message --- */
+.bw-discord-msg {
+    background: #0f1820;
+    border: 1px solid rgba(34, 211, 238, 0.1);
+    border-left: 3px solid var(--bw-primary);
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.bw-discord-msg-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.bw-discord-msg-author { font-weight: 700; font-size: 0.8rem; }
+.bw-discord-msg-channel { font-size: 0.7rem; }
+.bw-discord-msg-time { font-size: 0.62rem; }
+
+.bw-discord-msg-content {
+    font-size: 0.78rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--bs-body-color);
+    margin-bottom: 0.5rem;
+}
+
+/* --- Discord embed --- */
+.bw-discord-embeds { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+
+.bw-discord-embed {
+    background: #0a1015;
+    border: 1px solid rgba(34, 211, 238, 0.08);
+    border-left: 4px solid var(--bw-primary);
+    border-radius: 0;
+    padding: 0.65rem 0.85rem;
+    max-width: 520px;
+}
+
+.bw-discord-embed-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--bw-primary);
+    margin-bottom: 0.35rem;
+}
+
+.bw-discord-embed-desc {
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: var(--bs-body-color);
+    margin-bottom: 0.4rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.bw-discord-embed-fields { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.4rem; }
+
+.bw-discord-embed-field { width: 100%; }
+.bw-discord-embed-field.inline { flex: 1 1 45%; min-width: 120px; }
+
+.bw-discord-embed-field-name {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--bw-primary);
+    margin-bottom: 0.15rem;
+}
+
+.bw-discord-embed-field-value {
+    font-size: 0.68rem;
+    line-height: 1.4;
+    color: var(--bs-body-color);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.bw-discord-embed-footer {
+    font-size: 0.6rem;
+    color: var(--bw-muted);
+    margin-top: 0.35rem;
+    border-top: 1px solid rgba(34, 211, 238, 0.08);
+    padding-top: 0.3rem;
+}
+
+.bw-discord-embed-image { max-width: 100%; max-height: 300px; margin-top: 0.4rem; }
+.bw-discord-embed-thumb { max-width: 80px; max-height: 80px; float: right; margin-left: 0.5rem; margin-bottom: 0.25rem; }
+
+@media (max-width: 768px) {
+    .bw-audit-layout { flex-direction: column; }
+    .bw-audit-event-list { flex: none; max-height: 200px; border-right: none; border-bottom: 1px solid rgba(34, 211, 238, 0.12); }
+    .bw-modal { max-height: 90vh; }
+}

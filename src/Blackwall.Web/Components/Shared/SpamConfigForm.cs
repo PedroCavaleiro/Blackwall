@@ -61,4 +61,7 @@ public sealed class SpamConfigForm {
     public bool ContentGuardAutoLockdown { get; set; }
     public int ContentGuardTimeoutMinutes { get; set; } = 10;
     public int ContentGuardMessageDeleteDays { get; set; }
+
+    public bool IsMessageAuditEnabled { get; set; }
+    public int MessageAuditRetentionDays { get; set; } = 30;
 }

@@ -60,5 +60,7 @@ public sealed record UpdateGuildSettingsRequest(
     InfractionAction ContentGuardAction,
     bool ContentGuardAutoLockdown,
     int ContentGuardTimeoutMinutes,
-    int ContentGuardMessageDeleteDays
+    int ContentGuardMessageDeleteDays,
+    bool IsMessageAuditEnabled,
+    int MessageAuditRetentionDays
 );
