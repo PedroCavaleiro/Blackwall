@@ -33,10 +33,10 @@ public sealed class MessageAuditPurgeBackgroundService(
             } catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) {
                 break;
             } catch (Exception ex) {
-                logger.LogError(ex, "Error during message audit purge.");
+                logger.LogError(ex, "Error during message audit purge");
             }
         }
 
-        logger.LogInformation("Message audit purge background service stopped.");
+        logger.LogInformation("Message audit purge background service stopped");
     }
 }
