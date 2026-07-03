@@ -9,9 +9,9 @@
 
 <div style="max-width:980px;margin:0 auto;padding:2.5rem 1.5rem">
     @if (_loading) {
-        <div class="font-mono bw-loading">&gt; Loading configuration...</div>
+        <div class="font-mono bw-loading bw-typewriter">&gt; Loading configuration...</div>
     } else if (_settings is null) {
-        <div class="font-mono mb-4 bw-err">&gt; SIGNAL LOST: Guild not found or access denied.</div>
+        <div class="font-mono mb-4 bw-err bw-typewriter">&gt; SIGNAL LOST: Guild not found or access denied.</div>
         <a href="/dashboard" class="btn btn-primary cut-corner font-display bw-btn-sm">RETURN TO GRID</a>
     } else {
         <a href="/dashboard" class="d-inline-flex align-items-center gap-2 mb-4 font-mono text-decoration-none bw-status bw-text-muted">

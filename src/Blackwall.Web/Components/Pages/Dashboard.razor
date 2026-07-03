@@ -13,9 +13,9 @@
     </div>
 
     @if (_loading) {
-        <div class="font-mono bw-loading">&gt; Scanning grid...</div>
+        <div class="font-mono bw-loading bw-typewriter">&gt; Scanning grid...</div>
     } else if (_guilds is null) {
-        <div class="font-mono bw-err">&gt; Connection error. Could not retrieve server list.</div>
+        <div class="font-mono bw-err bw-typewriter">&gt; Connection error. Could not retrieve server list.</div>
     } else {
         <!-- DEPLOYED section -->
         <section class="mb-5">

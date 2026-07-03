@@ -10,7 +10,7 @@
             <div class="bw-audit-layout">
                 <div class="bw-audit-event-list">
                     @if (_loadingEvents) {
-                        <div class="font-mono bw-loading p-3">&gt; Loading events...</div>
+                        <div class="font-mono bw-loading p-3 bw-typewriter">&gt; Loading events...</div>
                     } else if (_events.Count == 0) {
                         <div class="font-mono bw-desc p-3">// No audit events recorded.</div>
                     } else {
