@@ -440,7 +440,7 @@ namespace Blackwall.Infrastructure.Migrations
                     b.ToTable("MessageAuditRecords");
                 });
 
-            modelBuilder.Entity("Blackwall.Core.Entities.SentinelChannel", b =>
+            modelBuilder.Entity("Blackwall.Core.Entities.NetWatchSnareChannel", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -494,7 +494,7 @@ namespace Blackwall.Infrastructure.Migrations
                     b.HasIndex("SpamConfigurationId", "DiscordChannelId")
                         .IsUnique();
 
-                    b.ToTable("SentinelChannels");
+                    b.ToTable("NetWatchSnareChannels");
                 });
 
             modelBuilder.Entity("Blackwall.Core.Entities.SpamConfiguration", b =>
@@ -914,10 +914,10 @@ namespace Blackwall.Infrastructure.Migrations
                     b.Navigation("Event");
                 });
 
-            modelBuilder.Entity("Blackwall.Core.Entities.SentinelChannel", b =>
+            modelBuilder.Entity("Blackwall.Core.Entities.NetWatchSnareChannel", b =>
                 {
                     b.HasOne("Blackwall.Core.Entities.SpamConfiguration", "SpamConfiguration")
-                        .WithMany("SentinelChannels")
+                        .WithMany("NetWatchSnareChannels")
                         .HasForeignKey("SpamConfigurationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -970,7 +970,7 @@ namespace Blackwall.Infrastructure.Migrations
 
                     b.Navigation("Blacklists");
 
-                    b.Navigation("SentinelChannels");
+                    b.Navigation("NetWatchSnareChannels");
                 });
 #pragma warning restore 612, 618
         }

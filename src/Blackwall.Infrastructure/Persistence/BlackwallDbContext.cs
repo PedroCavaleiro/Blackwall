@@ -18,7 +18,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<GuildAllowedBot> GuildAllowedBots => Set<GuildAllowedBot>();
     public DbSet<MessageAuditEvent> MessageAuditEvents => Set<MessageAuditEvent>();
     public DbSet<MessageAuditRecord> MessageAuditRecords => Set<MessageAuditRecord>();
-    public DbSet<SentinelChannel> SentinelChannels => Set<SentinelChannel>();
+    public DbSet<NetWatchSnareChannel> NetWatchSnareChannels => Set<NetWatchSnareChannel>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -295,7 +295,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .HasForeignKey(e => e.SpamConfigurationId)
                   .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasMany(e => e.SentinelChannels)
+            entity.HasMany(e => e.NetWatchSnareChannels)
                   .WithOne(e => e.SpamConfiguration)
                   .HasForeignKey(e => e.SpamConfigurationId)
                   .OnDelete(DeleteBehavior.Cascade);
@@ -495,7 +495,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.HasIndex(e => e.ExpiresAtUtc);
         });
 
-        modelBuilder.Entity<SentinelChannel>(entity => {
+        modelBuilder.Entity<NetWatchSnareChannel>(entity => {
             entity.Property(e => e.DiscordChannelId)
                   .IsRequired();
 
@@ -505,7 +505,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
 
             entity.Property(e => e.Action)
                   .IsRequired()
-                  .HasDefaultValue(SentinelAction.SoftBan);
+                  .HasDefaultValue(NetWatchSnareAction.SoftBan);
 
             entity.Property(e => e.TimeoutMinutes)
                   .IsRequired()

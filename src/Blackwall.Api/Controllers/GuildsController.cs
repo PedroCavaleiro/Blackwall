@@ -20,7 +20,7 @@ public sealed class GuildsController(
     DiscordOAuthService discordOAuthService,
     GuildClaimService guildClaimService,
     SpamConfigurationCache spamConfigurationCache,
-    SentinelChannelCache sentinelChannelCache,
+    NetWatchSnareChannelCache netWatchSnareChannelCache,
     DiscordGuildCacheService guildCache,
     DiscordSocketClient discordClient,
     LockdownService lockdownService,
@@ -2148,25 +2148,25 @@ public sealed class GuildsController(
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
-    //  SENTINEL CHANNELS (TRAP CHANNELS)
+    //  NETWATCH SNARE CHANNELS (TRAP CHANNELS)
     // ─────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Returns all sentinel (trap) channels configured for a guild.
+    /// Returns all netWatchSnare (trap) channels configured for a guild.
     /// </summary>
     /// <param name="discordGuildId">The Discord guild ID.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <returns>A list of sentinel channel configurations.</returns>
-    /// <response code="200">Returns the list of sentinel channels.</response>
+    /// <returns>A list of netWatchSnare channel configurations.</returns>
+    /// <response code="200">Returns the list of netWatchSnare channels.</response>
     /// <response code="401">The user identity could not be resolved from the JWT.</response>
     /// <response code="403">The current user cannot manage the specified guild.</response>
     /// <response code="404">The guild instance does not exist.</response>
-    [HttpGet("{discordGuildId:long}/sentinels")]
-    [ProducesResponseType(typeof(IReadOnlyList<SentinelChannelDto>), StatusCodes.Status200OK)]
+    [HttpGet("{discordGuildId:long}/netWatchSnares")]
+    [ProducesResponseType(typeof(IReadOnlyList<NetWatchSnareChannelDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<IReadOnlyList<SentinelChannelDto>>> GetSentinelChannels(
+    public async Task<ActionResult<IReadOnlyList<NetWatchSnareChannelDto>>> GetNetWatchSnareChannels(
         long discordGuildId,
         CancellationToken cancellationToken
     ) {
@@ -2183,7 +2183,7 @@ public sealed class GuildsController(
             return Forbid();
 
         var instance = await dbContext.GuildInstances
-            .Include(x => x.SpamConfiguration.SentinelChannels)
+            .Include(x => x.SpamConfiguration.NetWatchSnareChannels)
             .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
 
         if (instance is null)
@@ -2193,8 +2193,8 @@ public sealed class GuildsController(
                 Status = StatusCodes.Status404NotFound
             });
 
-        return Ok(instance.SpamConfiguration.SentinelChannels
-            .Select(s => new SentinelChannelDto(
+        return Ok(instance.SpamConfiguration.NetWatchSnareChannels
+            .Select(s => new NetWatchSnareChannelDto(
                 s.Id,
                 s.DiscordChannelId,
                 s.ChannelName,
@@ -2208,28 +2208,28 @@ public sealed class GuildsController(
     }
 
     /// <summary>
-    /// Creates a new sentinel (trap) channel for the guild.
+    /// Creates a new netWatchSnare (trap) channel for the guild.
     /// When a user sends a message in the designated channel, the configured action is applied automatically.
     /// </summary>
     /// <param name="discordGuildId">The Discord guild ID.</param>
-    /// <param name="request">The sentinel channel configuration to create.</param>
+    /// <param name="request">The netWatchSnare channel configuration to create.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <response code="200">Sentinel channel created successfully.</response>
+    /// <response code="200">NetWatchSnare channel created successfully.</response>
     /// <response code="400">The channel ID is invalid or the channel does not exist.</response>
     /// <response code="401">The user identity could not be resolved from the JWT.</response>
     /// <response code="403">The current user cannot manage the specified guild.</response>
     /// <response code="404">The guild instance does not exist.</response>
-    /// <response code="409">A sentinel already exists for this channel.</response>
-    [HttpPost("{discordGuildId:long}/sentinels")]
-    [ProducesResponseType(typeof(SentinelChannelDto), StatusCodes.Status200OK)]
+    /// <response code="409">A netWatchSnare already exists for this channel.</response>
+    [HttpPost("{discordGuildId:long}/netWatchSnares")]
+    [ProducesResponseType(typeof(NetWatchSnareChannelDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<SentinelChannelDto>> CreateSentinelChannel(
+    public async Task<ActionResult<NetWatchSnareChannelDto>> CreateNetWatchSnareChannel(
         long discordGuildId,
-        [FromBody] CreateSentinelChannelRequest request,
+        [FromBody] CreateNetWatchSnareChannelRequest request,
         CancellationToken cancellationToken
     ) {
         var appUserId = GetCurrentUserId();
@@ -2245,7 +2245,7 @@ public sealed class GuildsController(
             return Forbid();
 
         var instance = await dbContext.GuildInstances
-            .Include(x => x.SpamConfiguration.SentinelChannels)
+            .Include(x => x.SpamConfiguration.NetWatchSnareChannels)
             .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
 
         if (instance is null)
@@ -2262,10 +2262,10 @@ public sealed class GuildsController(
                 Status = StatusCodes.Status400BadRequest
             });
 
-        if (instance.SpamConfiguration.SentinelChannels.Any(s => s.DiscordChannelId == request.DiscordChannelId))
+        if (instance.SpamConfiguration.NetWatchSnareChannels.Any(s => s.DiscordChannelId == request.DiscordChannelId))
             return Conflict(new ProblemDetails {
-                Title = "Sentinel already exists.",
-                Detail = "A sentinel channel is already configured for this Discord channel.",
+                Title = "NetWatchSnare already exists.",
+                Detail = "A netWatchSnare channel is already configured for this Discord channel.",
                 Status = StatusCodes.Status409Conflict
             });
 
@@ -2282,7 +2282,7 @@ public sealed class GuildsController(
             channelName = channel.Name;
         }
 
-        var sentinel = new SentinelChannel {
+        var netWatchSnare = new NetWatchSnareChannel {
             SpamConfigurationId = instance.SpamConfiguration.Id,
             DiscordChannelId = request.DiscordChannelId,
             ChannelName = channelName,
@@ -2293,45 +2293,45 @@ public sealed class GuildsController(
             IsEnabled = true
         };
 
-        instance.SpamConfiguration.SentinelChannels.Add(sentinel);
+        instance.SpamConfiguration.NetWatchSnareChannels.Add(netWatchSnare);
         instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        await sentinelChannelCache.InvalidateAsync(discordGuildId);
+        await netWatchSnareChannelCache.InvalidateAsync(discordGuildId);
 
-        return Ok(new SentinelChannelDto(
-            sentinel.Id,
-            sentinel.DiscordChannelId,
-            sentinel.ChannelName,
-            sentinel.Action,
-            sentinel.TimeoutMinutes,
-            sentinel.MessageDeleteDays,
-            sentinel.AssignRoleId,
-            sentinel.IsEnabled
+        return Ok(new NetWatchSnareChannelDto(
+            netWatchSnare.Id,
+            netWatchSnare.DiscordChannelId,
+            netWatchSnare.ChannelName,
+            netWatchSnare.Action,
+            netWatchSnare.TimeoutMinutes,
+            netWatchSnare.MessageDeleteDays,
+            netWatchSnare.AssignRoleId,
+            netWatchSnare.IsEnabled
         ));
     }
 
     /// <summary>
-    /// Updates an existing sentinel (trap) channel configuration.
+    /// Updates an existing netWatchSnare (trap) channel configuration.
     /// </summary>
     /// <param name="discordGuildId">The Discord guild ID.</param>
-    /// <param name="sentinelId">The ID of the sentinel channel to update.</param>
+    /// <param name="netWatchSnareId">The ID of the netWatchSnare channel to update.</param>
     /// <param name="request">The updated configuration.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <response code="200">Sentinel channel updated successfully.</response>
+    /// <response code="200">NetWatchSnare channel updated successfully.</response>
     /// <response code="401">The user identity could not be resolved from the JWT.</response>
     /// <response code="403">The current user cannot manage the specified guild.</response>
-    /// <response code="404">The guild instance or sentinel channel does not exist.</response>
-    [HttpPut("{discordGuildId:long}/sentinels/{sentinelId:long}")]
-    [ProducesResponseType(typeof(SentinelChannelDto), StatusCodes.Status200OK)]
+    /// <response code="404">The guild instance or netWatchSnare channel does not exist.</response>
+    [HttpPut("{discordGuildId:long}/netWatchSnares/{netWatchSnareId:long}")]
+    [ProducesResponseType(typeof(NetWatchSnareChannelDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<SentinelChannelDto>> UpdateSentinelChannel(
+    public async Task<ActionResult<NetWatchSnareChannelDto>> UpdateNetWatchSnareChannel(
         long discordGuildId,
-        long sentinelId,
-        [FromBody] UpdateSentinelChannelRequest request,
+        long netWatchSnareId,
+        [FromBody] UpdateNetWatchSnareChannelRequest request,
         CancellationToken cancellationToken
     ) {
         var appUserId = GetCurrentUserId();
@@ -2347,7 +2347,7 @@ public sealed class GuildsController(
             return Forbid();
 
         var instance = await dbContext.GuildInstances
-            .Include(x => x.SpamConfiguration.SentinelChannels)
+            .Include(x => x.SpamConfiguration.NetWatchSnareChannels)
             .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
 
         if (instance is null)
@@ -2357,56 +2357,56 @@ public sealed class GuildsController(
                 Status = StatusCodes.Status404NotFound
             });
 
-        var sentinel = instance.SpamConfiguration.SentinelChannels.FirstOrDefault(s => s.Id == sentinelId);
-        if (sentinel is null)
+        var netWatchSnare = instance.SpamConfiguration.NetWatchSnareChannels.FirstOrDefault(s => s.Id == netWatchSnareId);
+        if (netWatchSnare is null)
             return NotFound(new ProblemDetails {
-                Title = "Sentinel not found.",
-                Detail = "No sentinel channel with this ID exists for this guild.",
+                Title = "NetWatchSnare not found.",
+                Detail = "No netWatchSnare channel with this ID exists for this guild.",
                 Status = StatusCodes.Status404NotFound
             });
 
-        sentinel.Action = request.Action;
-        sentinel.TimeoutMinutes = Math.Max(1, request.TimeoutMinutes);
-        sentinel.MessageDeleteDays = Math.Clamp(request.MessageDeleteDays, 0, 7);
-        sentinel.AssignRoleId = request.AssignRoleId;
-        sentinel.IsEnabled = request.IsEnabled;
-        sentinel.UpdatedAtUtc = DateTime.UtcNow;
+        netWatchSnare.Action = request.Action;
+        netWatchSnare.TimeoutMinutes = Math.Max(1, request.TimeoutMinutes);
+        netWatchSnare.MessageDeleteDays = Math.Clamp(request.MessageDeleteDays, 0, 7);
+        netWatchSnare.AssignRoleId = request.AssignRoleId;
+        netWatchSnare.IsEnabled = request.IsEnabled;
+        netWatchSnare.UpdatedAtUtc = DateTime.UtcNow;
         instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        await sentinelChannelCache.InvalidateAsync(discordGuildId);
+        await netWatchSnareChannelCache.InvalidateAsync(discordGuildId);
 
-        return Ok(new SentinelChannelDto(
-            sentinel.Id,
-            sentinel.DiscordChannelId,
-            sentinel.ChannelName,
-            sentinel.Action,
-            sentinel.TimeoutMinutes,
-            sentinel.MessageDeleteDays,
-            sentinel.AssignRoleId,
-            sentinel.IsEnabled
+        return Ok(new NetWatchSnareChannelDto(
+            netWatchSnare.Id,
+            netWatchSnare.DiscordChannelId,
+            netWatchSnare.ChannelName,
+            netWatchSnare.Action,
+            netWatchSnare.TimeoutMinutes,
+            netWatchSnare.MessageDeleteDays,
+            netWatchSnare.AssignRoleId,
+            netWatchSnare.IsEnabled
         ));
     }
 
     /// <summary>
-    /// Deletes a sentinel (trap) channel configuration.
+    /// Deletes a netWatchSnare (trap) channel configuration.
     /// </summary>
     /// <param name="discordGuildId">The Discord guild ID.</param>
-    /// <param name="sentinelId">The ID of the sentinel channel to delete.</param>
+    /// <param name="netWatchSnareId">The ID of the netWatchSnare channel to delete.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <response code="204">Sentinel channel deleted successfully.</response>
+    /// <response code="204">NetWatchSnare channel deleted successfully.</response>
     /// <response code="401">The user identity could not be resolved from the JWT.</response>
     /// <response code="403">The current user cannot manage the specified guild.</response>
-    /// <response code="404">The guild instance or sentinel channel does not exist.</response>
-    [HttpDelete("{discordGuildId:long}/sentinels/{sentinelId:long}")]
+    /// <response code="404">The guild instance or netWatchSnare channel does not exist.</response>
+    [HttpDelete("{discordGuildId:long}/netWatchSnares/{netWatchSnareId:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteSentinelChannel(
+    public async Task<IActionResult> DeleteNetWatchSnareChannel(
         long discordGuildId,
-        long sentinelId,
+        long netWatchSnareId,
         CancellationToken cancellationToken
     ) {
         var appUserId = GetCurrentUserId();
@@ -2422,7 +2422,7 @@ public sealed class GuildsController(
             return Forbid();
 
         var instance = await dbContext.GuildInstances
-            .Include(x => x.SpamConfiguration.SentinelChannels)
+            .Include(x => x.SpamConfiguration.NetWatchSnareChannels)
             .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
 
         if (instance is null)
@@ -2432,39 +2432,39 @@ public sealed class GuildsController(
                 Status = StatusCodes.Status404NotFound
             });
 
-        var sentinel = instance.SpamConfiguration.SentinelChannels.FirstOrDefault(s => s.Id == sentinelId);
-        if (sentinel is null)
+        var netWatchSnare = instance.SpamConfiguration.NetWatchSnareChannels.FirstOrDefault(s => s.Id == netWatchSnareId);
+        if (netWatchSnare is null)
             return NotFound(new ProblemDetails {
-                Title = "Sentinel not found.",
-                Detail = "No sentinel channel with this ID exists for this guild.",
+                Title = "NetWatchSnare not found.",
+                Detail = "No netWatchSnare channel with this ID exists for this guild.",
                 Status = StatusCodes.Status404NotFound
             });
 
-        instance.SpamConfiguration.SentinelChannels.Remove(sentinel);
+        instance.SpamConfiguration.NetWatchSnareChannels.Remove(netWatchSnare);
         instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        await sentinelChannelCache.InvalidateAsync(discordGuildId);
+        await netWatchSnareChannelCache.InvalidateAsync(discordGuildId);
 
         return NoContent();
     }
 
     /// <summary>
-    /// Deletes all sentinel (trap) channels for the guild.
+    /// Deletes all netWatchSnare (trap) channels for the guild.
     /// </summary>
     /// <param name="discordGuildId">The Discord guild ID.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <response code="204">All sentinel channels deleted successfully.</response>
+    /// <response code="204">All netWatchSnare channels deleted successfully.</response>
     /// <response code="401">The user identity could not be resolved from the JWT.</response>
     /// <response code="403">The current user cannot manage the specified guild.</response>
     /// <response code="404">The guild instance does not exist.</response>
-    [HttpDelete("{discordGuildId:long}/sentinels")]
+    [HttpDelete("{discordGuildId:long}/netWatchSnares")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteAllSentinelChannels(
+    public async Task<IActionResult> DeleteAllNetWatchSnareChannels(
         long discordGuildId,
         CancellationToken cancellationToken
     ) {
@@ -2481,7 +2481,7 @@ public sealed class GuildsController(
             return Forbid();
 
         var instance = await dbContext.GuildInstances
-            .Include(x => x.SpamConfiguration.SentinelChannels)
+            .Include(x => x.SpamConfiguration.NetWatchSnareChannels)
             .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
 
         if (instance is null)
@@ -2491,12 +2491,12 @@ public sealed class GuildsController(
                 Status = StatusCodes.Status404NotFound
             });
 
-        dbContext.SentinelChannels.RemoveRange(instance.SpamConfiguration.SentinelChannels);
+        dbContext.NetWatchSnareChannels.RemoveRange(instance.SpamConfiguration.NetWatchSnareChannels);
         instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        await sentinelChannelCache.InvalidateAsync(discordGuildId);
+        await netWatchSnareChannelCache.InvalidateAsync(discordGuildId);
 
         return NoContent();
     }

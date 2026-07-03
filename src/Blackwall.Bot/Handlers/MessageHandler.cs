@@ -17,7 +17,7 @@ public sealed class MessageHandler(
     ContentGuardService contentGuardService,
     AllowedBotService allowedBotService,
     MessageAuditService messageAuditService,
-    SentinelService sentinelService,
+    NetWatchSnareService netWatchSnareService,
     DiscordSocketClient discordClient,
     ILogger<MessageHandler> logger
 ) {
@@ -61,10 +61,10 @@ public sealed class MessageHandler(
         if (message.Author.IsBot && await allowedBotService.IsBotAllowedAsync(discordGuildId, discordUserId))
             return;
 
-        var sentinel = await sentinelService.GetTriggeredSentinelAsync(discordGuildId, message.Channel.Id);
-        if (sentinel is not null) {
+        var netWatchSnare = await netWatchSnareService.GetTriggeredNetWatchSnareAsync(discordGuildId, message.Channel.Id);
+        if (netWatchSnare is not null) {
             logger.LogInformation(
-                "Sentinel trap triggered in guild {GuildId} channel {ChannelId} by user {UserId}",
+                "NetWatchSnare trap triggered in guild {GuildId} channel {ChannelId} by user {UserId}",
                 discordGuildId, message.Channel.Id, discordUserId);
 
             if (!config.IsDryRun) {
@@ -72,22 +72,22 @@ public sealed class MessageHandler(
                     await message.DeleteAsync();
                 } catch (Exception ex) {
                     logger.LogWarning(ex,
-                        "Failed to delete sentinel-triggered message {MessageId} in guild {GuildId}",
+                        "Failed to delete netWatchSnare-triggered message {MessageId} in guild {GuildId}",
                         message.Id, discordGuildId);
                 }
 
-                await sentinelService.ApplySentinelActionAsync(message, guildChannel.Guild, sentinel);
+                await netWatchSnareService.ApplyNetWatchSnareActionAsync(message, guildChannel.Guild, netWatchSnare);
             }
 
             if (config.LogChannelId.HasValue)
-                await sentinelService.SendSentinelLogAsync(message, guildChannel.Guild, sentinel, config.LogChannelId);
+                await netWatchSnareService.SendNetWatchSnareLogAsync(message, guildChannel.Guild, netWatchSnare, config.LogChannelId);
 
             if (config.IsMessageAuditEnabled) {
                 _ = Task.Run(() => messageAuditService.RecordEventAsync(
                     discordGuildId,
                     message,
-                    ["sentinel_trap"],
-                    sentinel.Action == SentinelAction.SoftBan ? InfractionAction.Ban : (InfractionAction)sentinel.Action,
+                    ["netWatchSnare_trap"],
+                    netWatchSnare.Action == NetWatchSnareAction.SoftBan ? InfractionAction.Ban : (InfractionAction)netWatchSnare.Action,
                     config.IsDryRun,
                     config.MessageAuditRetentionDays,
                     null,

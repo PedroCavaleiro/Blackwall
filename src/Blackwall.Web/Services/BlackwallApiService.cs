@@ -392,41 +392,41 @@ public sealed class BlackwallApiService(
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task<IReadOnlyList<SentinelChannelDto>> GetSentinelChannelsAsync(long discordGuildId, CancellationToken ct = default) {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/sentinels");
+    public async Task<IReadOnlyList<NetWatchSnareChannelDto>> GetNetWatchSnareChannelsAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/netWatchSnares");
         ApplyAuth(request);
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<IReadOnlyList<SentinelChannelDto>>(ct) ?? [];
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<NetWatchSnareChannelDto>>(ct) ?? [];
     }
 
-    public async Task<SentinelChannelDto?> CreateSentinelChannelAsync(long discordGuildId, CreateSentinelChannelRequest dto, CancellationToken ct = default) {
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/sentinels");
-        ApplyAuth(request);
-        request.Content = JsonContent.Create(dto);
-        var response = await httpClient.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<SentinelChannelDto>(ct);
-    }
-
-    public async Task<SentinelChannelDto?> UpdateSentinelChannelAsync(long discordGuildId, long sentinelId, UpdateSentinelChannelRequest dto, CancellationToken ct = default) {
-        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/guilds/{discordGuildId}/sentinels/{sentinelId}");
+    public async Task<NetWatchSnareChannelDto?> CreateNetWatchSnareChannelAsync(long discordGuildId, CreateNetWatchSnareChannelRequest dto, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/netWatchSnares");
         ApplyAuth(request);
         request.Content = JsonContent.Create(dto);
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<SentinelChannelDto>(ct);
+        return await response.Content.ReadFromJsonAsync<NetWatchSnareChannelDto>(ct);
     }
 
-    public async Task DeleteSentinelChannelAsync(long discordGuildId, long sentinelId, CancellationToken ct = default) {
-        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/sentinels/{sentinelId}");
+    public async Task<NetWatchSnareChannelDto?> UpdateNetWatchSnareChannelAsync(long discordGuildId, long netWatchSnareId, UpdateNetWatchSnareChannelRequest dto, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/guilds/{discordGuildId}/netWatchSnares/{netWatchSnareId}");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(dto);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<NetWatchSnareChannelDto>(ct);
+    }
+
+    public async Task DeleteNetWatchSnareChannelAsync(long discordGuildId, long netWatchSnareId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/netWatchSnares/{netWatchSnareId}");
         ApplyAuth(request);
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task DeleteAllSentinelChannelsAsync(long discordGuildId, CancellationToken ct = default) {
-        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/sentinels");
+    public async Task DeleteAllNetWatchSnareChannelsAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/netWatchSnares");
         ApplyAuth(request);
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
