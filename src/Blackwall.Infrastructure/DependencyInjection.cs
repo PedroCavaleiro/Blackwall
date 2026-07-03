@@ -32,6 +32,7 @@ public static class DependencyInjection {
         services.AddDbContext<BlackwallDbContext>(options => options.UseNpgsql(dbConnection));
         services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConnection));
         services.AddScoped<SpamConfigurationCache>();
+        services.AddScoped<SentinelChannelCache>();
     }
 
 }

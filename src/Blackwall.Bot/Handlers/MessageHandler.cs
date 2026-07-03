@@ -1,4 +1,5 @@
 using Blackwall.Bot.Services;
+using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
 using Blackwall.Infrastructure.Cache;
 using Discord;
@@ -16,6 +17,7 @@ public sealed class MessageHandler(
     ContentGuardService contentGuardService,
     AllowedBotService allowedBotService,
     MessageAuditService messageAuditService,
+    SentinelService sentinelService,
     DiscordSocketClient discordClient,
     ILogger<MessageHandler> logger
 ) {
@@ -58,6 +60,43 @@ public sealed class MessageHandler(
 
         if (message.Author.IsBot && await allowedBotService.IsBotAllowedAsync(discordGuildId, discordUserId))
             return;
+
+        var sentinel = await sentinelService.GetTriggeredSentinelAsync(discordGuildId, message.Channel.Id);
+        if (sentinel is not null) {
+            logger.LogInformation(
+                "Sentinel trap triggered in guild {GuildId} channel {ChannelId} by user {UserId}",
+                discordGuildId, message.Channel.Id, discordUserId);
+
+            if (!config.IsDryRun) {
+                try {
+                    await message.DeleteAsync();
+                } catch (Exception ex) {
+                    logger.LogWarning(ex,
+                        "Failed to delete sentinel-triggered message {MessageId} in guild {GuildId}",
+                        message.Id, discordGuildId);
+                }
+
+                await sentinelService.ApplySentinelActionAsync(message, guildChannel.Guild, sentinel);
+            }
+
+            if (config.LogChannelId.HasValue)
+                await sentinelService.SendSentinelLogAsync(message, guildChannel.Guild, sentinel, config.LogChannelId);
+
+            if (config.IsMessageAuditEnabled) {
+                _ = Task.Run(() => messageAuditService.RecordEventAsync(
+                    discordGuildId,
+                    message,
+                    ["sentinel_trap"],
+                    sentinel.Action == SentinelAction.SoftBan ? InfractionAction.Ban : (InfractionAction)sentinel.Action,
+                    config.IsDryRun,
+                    config.MessageAuditRetentionDays,
+                    null,
+                    CancellationToken.None
+                ));
+            }
+
+            return;
+        }
 
         var violations = new List<string>(5);
         var triggeredModules = new List<(InfractionAction Action, int TimeoutMinutes, int DeleteDays)>(5);

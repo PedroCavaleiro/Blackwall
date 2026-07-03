@@ -391,4 +391,44 @@ public sealed class BlackwallApiService(
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<IReadOnlyList<SentinelChannelDto>> GetSentinelChannelsAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/sentinels");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<SentinelChannelDto>>(ct) ?? [];
+    }
+
+    public async Task<SentinelChannelDto?> CreateSentinelChannelAsync(long discordGuildId, CreateSentinelChannelRequest dto, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/sentinels");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(dto);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<SentinelChannelDto>(ct);
+    }
+
+    public async Task<SentinelChannelDto?> UpdateSentinelChannelAsync(long discordGuildId, long sentinelId, UpdateSentinelChannelRequest dto, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/guilds/{discordGuildId}/sentinels/{sentinelId}");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(dto);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<SentinelChannelDto>(ct);
+    }
+
+    public async Task DeleteSentinelChannelAsync(long discordGuildId, long sentinelId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/sentinels/{sentinelId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteAllSentinelChannelsAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/sentinels");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

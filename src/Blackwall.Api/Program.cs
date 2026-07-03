@@ -102,6 +102,7 @@ builder.Services.AddSingleton<BanSyncService>();
 builder.Services.AddSingleton<SafeBrowsingService>();
 builder.Services.AddSingleton<ContentGuardService>();
 builder.Services.AddSingleton<AllowedBotService>();
+builder.Services.AddSingleton<SentinelService>();
 builder.Services.AddScoped<SafeBrowsingSyncService>();
 builder.Services.AddScoped<MessageAuditService>();
 builder.Services.AddHostedService<SafeBrowsingSyncBackgroundService>();

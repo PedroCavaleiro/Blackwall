@@ -20,6 +20,7 @@ public sealed class GuildsController(
     DiscordOAuthService discordOAuthService,
     GuildClaimService guildClaimService,
     SpamConfigurationCache spamConfigurationCache,
+    SentinelChannelCache sentinelChannelCache,
     DiscordGuildCacheService guildCache,
     DiscordSocketClient discordClient,
     LockdownService lockdownService,
@@ -2142,6 +2143,360 @@ public sealed class GuildsController(
 
         dbContext.MessageAuditRecords.Remove(record);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    //  SENTINEL CHANNELS (TRAP CHANNELS)
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns all sentinel (trap) channels configured for a guild.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of sentinel channel configurations.</returns>
+    /// <response code="200">Returns the list of sentinel channels.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpGet("{discordGuildId:long}/sentinels")]
+    [ProducesResponseType(typeof(IReadOnlyList<SentinelChannelDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<SentinelChannelDto>>> GetSentinelChannels(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.SentinelChannels)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        return Ok(instance.SpamConfiguration.SentinelChannels
+            .Select(s => new SentinelChannelDto(
+                s.Id,
+                s.DiscordChannelId,
+                s.ChannelName,
+                s.Action,
+                s.TimeoutMinutes,
+                s.MessageDeleteDays,
+                s.AssignRoleId,
+                s.IsEnabled
+            ))
+            .ToList());
+    }
+
+    /// <summary>
+    /// Creates a new sentinel (trap) channel for the guild.
+    /// When a user sends a message in the designated channel, the configured action is applied automatically.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="request">The sentinel channel configuration to create.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Sentinel channel created successfully.</response>
+    /// <response code="400">The channel ID is invalid or the channel does not exist.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    /// <response code="409">A sentinel already exists for this channel.</response>
+    [HttpPost("{discordGuildId:long}/sentinels")]
+    [ProducesResponseType(typeof(SentinelChannelDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<SentinelChannelDto>> CreateSentinelChannel(
+        long discordGuildId,
+        [FromBody] CreateSentinelChannelRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.SentinelChannels)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        if (request.DiscordChannelId <= 0)
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid channel ID.",
+                Detail = "The channel ID must be a valid Discord snowflake.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        if (instance.SpamConfiguration.SentinelChannels.Any(s => s.DiscordChannelId == request.DiscordChannelId))
+            return Conflict(new ProblemDetails {
+                Title = "Sentinel already exists.",
+                Detail = "A sentinel channel is already configured for this Discord channel.",
+                Status = StatusCodes.Status409Conflict
+            });
+
+        var guild = discordClient.GetGuild((ulong)discordGuildId);
+        string channelName = request.ChannelName;
+        if (guild is not null) {
+            var channel = guild.GetTextChannel((ulong)request.DiscordChannelId);
+            if (channel is null)
+                return BadRequest(new ProblemDetails {
+                    Title = "Channel not found.",
+                    Detail = "The bot cannot see the specified channel. Ensure it is a text channel in this guild.",
+                    Status = StatusCodes.Status400BadRequest
+                });
+            channelName = channel.Name;
+        }
+
+        var sentinel = new SentinelChannel {
+            SpamConfigurationId = instance.SpamConfiguration.Id,
+            DiscordChannelId = request.DiscordChannelId,
+            ChannelName = channelName,
+            Action = request.Action,
+            TimeoutMinutes = Math.Max(1, request.TimeoutMinutes),
+            MessageDeleteDays = Math.Clamp(request.MessageDeleteDays, 0, 7),
+            AssignRoleId = request.AssignRoleId,
+            IsEnabled = true
+        };
+
+        instance.SpamConfiguration.SentinelChannels.Add(sentinel);
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await sentinelChannelCache.InvalidateAsync(discordGuildId);
+
+        return Ok(new SentinelChannelDto(
+            sentinel.Id,
+            sentinel.DiscordChannelId,
+            sentinel.ChannelName,
+            sentinel.Action,
+            sentinel.TimeoutMinutes,
+            sentinel.MessageDeleteDays,
+            sentinel.AssignRoleId,
+            sentinel.IsEnabled
+        ));
+    }
+
+    /// <summary>
+    /// Updates an existing sentinel (trap) channel configuration.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="sentinelId">The ID of the sentinel channel to update.</param>
+    /// <param name="request">The updated configuration.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Sentinel channel updated successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance or sentinel channel does not exist.</response>
+    [HttpPut("{discordGuildId:long}/sentinels/{sentinelId:long}")]
+    [ProducesResponseType(typeof(SentinelChannelDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<SentinelChannelDto>> UpdateSentinelChannel(
+        long discordGuildId,
+        long sentinelId,
+        [FromBody] UpdateSentinelChannelRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.SentinelChannels)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var sentinel = instance.SpamConfiguration.SentinelChannels.FirstOrDefault(s => s.Id == sentinelId);
+        if (sentinel is null)
+            return NotFound(new ProblemDetails {
+                Title = "Sentinel not found.",
+                Detail = "No sentinel channel with this ID exists for this guild.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        sentinel.Action = request.Action;
+        sentinel.TimeoutMinutes = Math.Max(1, request.TimeoutMinutes);
+        sentinel.MessageDeleteDays = Math.Clamp(request.MessageDeleteDays, 0, 7);
+        sentinel.AssignRoleId = request.AssignRoleId;
+        sentinel.IsEnabled = request.IsEnabled;
+        sentinel.UpdatedAtUtc = DateTime.UtcNow;
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await sentinelChannelCache.InvalidateAsync(discordGuildId);
+
+        return Ok(new SentinelChannelDto(
+            sentinel.Id,
+            sentinel.DiscordChannelId,
+            sentinel.ChannelName,
+            sentinel.Action,
+            sentinel.TimeoutMinutes,
+            sentinel.MessageDeleteDays,
+            sentinel.AssignRoleId,
+            sentinel.IsEnabled
+        ));
+    }
+
+    /// <summary>
+    /// Deletes a sentinel (trap) channel configuration.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="sentinelId">The ID of the sentinel channel to delete.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">Sentinel channel deleted successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance or sentinel channel does not exist.</response>
+    [HttpDelete("{discordGuildId:long}/sentinels/{sentinelId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteSentinelChannel(
+        long discordGuildId,
+        long sentinelId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.SentinelChannels)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var sentinel = instance.SpamConfiguration.SentinelChannels.FirstOrDefault(s => s.Id == sentinelId);
+        if (sentinel is null)
+            return NotFound(new ProblemDetails {
+                Title = "Sentinel not found.",
+                Detail = "No sentinel channel with this ID exists for this guild.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        instance.SpamConfiguration.SentinelChannels.Remove(sentinel);
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await sentinelChannelCache.InvalidateAsync(discordGuildId);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Deletes all sentinel (trap) channels for the guild.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">All sentinel channels deleted successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpDelete("{discordGuildId:long}/sentinels")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteAllSentinelChannels(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.SentinelChannels)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        dbContext.SentinelChannels.RemoveRange(instance.SpamConfiguration.SentinelChannels);
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await sentinelChannelCache.InvalidateAsync(discordGuildId);
 
         return NoContent();
     }

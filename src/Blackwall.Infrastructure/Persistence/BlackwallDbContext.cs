@@ -18,6 +18,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<GuildAllowedBot> GuildAllowedBots => Set<GuildAllowedBot>();
     public DbSet<MessageAuditEvent> MessageAuditEvents => Set<MessageAuditEvent>();
     public DbSet<MessageAuditRecord> MessageAuditRecords => Set<MessageAuditRecord>();
+    public DbSet<SentinelChannel> SentinelChannels => Set<SentinelChannel>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -198,8 +199,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .HasDefaultValue(false);
 
             entity.Property(e => e.RateLimitAction)
-                  .IsRequired()
-                  .HasDefaultValue(InfractionAction.Timeout);
+                  .IsRequired();
 
             entity.Property(e => e.RateLimitAutoLockdown)
                   .IsRequired()
@@ -214,8 +214,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .HasDefaultValue(0);
 
             entity.Property(e => e.DuplicateAction)
-                  .IsRequired()
-                  .HasDefaultValue(InfractionAction.Timeout);
+                  .IsRequired();
 
             entity.Property(e => e.DuplicateAutoLockdown)
                   .IsRequired()
@@ -230,8 +229,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .HasDefaultValue(0);
 
             entity.Property(e => e.MentionLimitAction)
-                  .IsRequired()
-                  .HasDefaultValue(InfractionAction.Timeout);
+                  .IsRequired();
 
             entity.Property(e => e.MentionLimitAutoLockdown)
                   .IsRequired()
@@ -246,8 +244,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .HasDefaultValue(0);
 
             entity.Property(e => e.InviteLinkAction)
-                  .IsRequired()
-                  .HasDefaultValue(InfractionAction.Timeout);
+                  .IsRequired();
 
             entity.Property(e => e.InviteLinkAutoLockdown)
                   .IsRequired()
@@ -262,8 +259,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .HasDefaultValue(0);
 
             entity.Property(e => e.SuspiciousLinkAction)
-                  .IsRequired()
-                  .HasDefaultValue(InfractionAction.Timeout);
+                  .IsRequired();
 
             entity.Property(e => e.SuspiciousLinkAutoLockdown)
                   .IsRequired()
@@ -295,6 +291,11 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasMany(e => e.AllowedBots)
+                  .WithOne(e => e.SpamConfiguration)
+                  .HasForeignKey(e => e.SpamConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.SentinelChannels)
                   .WithOne(e => e.SpamConfiguration)
                   .HasForeignKey(e => e.SpamConfigurationId)
                   .OnDelete(DeleteBehavior.Cascade);
@@ -492,6 +493,34 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
 
             entity.HasIndex(e => e.EventId);
             entity.HasIndex(e => e.ExpiresAtUtc);
+        });
+
+        modelBuilder.Entity<SentinelChannel>(entity => {
+            entity.Property(e => e.DiscordChannelId)
+                  .IsRequired();
+
+            entity.Property(e => e.ChannelName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.Action)
+                  .IsRequired()
+                  .HasDefaultValue(SentinelAction.SoftBan);
+
+            entity.Property(e => e.TimeoutMinutes)
+                  .IsRequired()
+                  .HasDefaultValue(60);
+
+            entity.Property(e => e.MessageDeleteDays)
+                  .IsRequired()
+                  .HasDefaultValue(1);
+
+            entity.Property(e => e.IsEnabled)
+                  .IsRequired()
+                  .HasDefaultValue(true);
+
+            entity.HasIndex(e => new { e.SpamConfigurationId, e.DiscordChannelId })
+                  .IsUnique();
         });
 
     }

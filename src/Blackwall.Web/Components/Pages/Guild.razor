@@ -60,6 +60,7 @@
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "antiraid" ? "active" : "")" @onclick='() => _activeTab = "antiraid"'>ANTI-RAID</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "scoring" ? "active" : "")" @onclick='() => _activeTab = "scoring"'>SCORING</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "bans" ? "active" : "")" @onclick='() => _activeTab = "bans"'>BANS</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "sentinel" ? "active" : "")" @onclick='() => _activeTab = "sentinel"'>SENTINEL</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "audit" ? "active" : "")" @onclick='() => _activeTab = "audit"'>AUDIT</button>
                 </nav>
 
@@ -85,6 +86,9 @@
                     }
                     @if (_activeTab == "bans") {
                         <BansTab DiscordGuildId="DiscordGuildId" InitialShareBanList="@_settings.ShareBanList" OnError="HandleError" />
+                    }
+                    @if (_activeTab == "sentinel") {
+                        <SentinelTab DiscordGuildId="DiscordGuildId" OnError="HandleError" />
                     }
                     @if (_activeTab == "audit") {
                         <AuditTab Form="Form" DiscordGuildId="DiscordGuildId" />
