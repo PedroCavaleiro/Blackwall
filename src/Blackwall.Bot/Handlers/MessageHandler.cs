@@ -14,6 +14,8 @@ public sealed class MessageHandler(
     LockdownService lockdownService,
     SafeBrowsingService safeBrowsingService,
     ContentGuardService contentGuardService,
+    AllowedBotService allowedBotService,
+    DiscordSocketClient discordClient,
     ILogger<MessageHandler> logger
 ) {
     /// <summary>
@@ -47,7 +49,13 @@ public sealed class MessageHandler(
             discordUserId, message.Author.IsBot, discordGuildId, config.IsTestMode, config.MaxMessagesPerWindow, config.RateLimitWindowSeconds);
         */
 
-        if ((message.Author.IsBot || message.Author.IsWebhook) && !config.IsTestMode)
+        if (message.Author.IsWebhook)
+            return;
+
+        if (message.Author.Id == discordClient.CurrentUser.Id)
+            return;
+
+        if (message.Author.IsBot && await allowedBotService.IsBotAllowedAsync(discordGuildId, discordUserId))
             return;
 
         var violations = new List<string>(5);

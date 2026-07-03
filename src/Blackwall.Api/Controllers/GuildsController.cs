@@ -24,7 +24,8 @@ public sealed class GuildsController(
     DiscordSocketClient discordClient,
     LockdownService lockdownService,
     BlacklistService blacklistService,
-    BanSyncService banSyncService
+    BanSyncService banSyncService,
+    AllowedBotService allowedBotService
 ) : ControllerBase {
     
     /// <summary>
@@ -1695,6 +1696,197 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await spamConfigurationCache.InvalidateAsync(discordGuildId);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Returns all allowed bots configured for a guild the authenticated user can manage.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of allowed bots configured for the guild.</returns>
+    /// <response code="200">Returns the list of allowed bots.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpGet("{discordGuildId:long}/allowed-bots")]
+    [ProducesResponseType(typeof(IReadOnlyList<AllowedBotResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<AllowedBotResponse>>> GetAllowedBots(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.AllowedBots)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        return Ok(instance.SpamConfiguration.AllowedBots
+            .Select(b => new AllowedBotResponse(b.Id, b.DiscordBotId, b.BotUsername))
+            .ToList());
+    }
+
+    /// <summary>
+    /// Adds a bot to the guild's allowed bots list. Messages from this bot will be
+    /// skipped by the spam detection pipeline.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="request">The bot to add.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">Bot added successfully.</response>
+    /// <response code="400">The bot ID is invalid.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    /// <response code="409">The bot is already configured for this guild.</response>
+    [HttpPost("{discordGuildId:long}/allowed-bots")]
+    [ProducesResponseType(typeof(AllowedBotResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<AllowedBotResponse>> AddAllowedBot(
+        long discordGuildId,
+        [FromBody] AddAllowedBotRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.AllowedBots)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        if (request.DiscordBotId <= 0)
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid bot ID.",
+                Detail = "The bot ID must be a valid Discord snowflake.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        if (instance.SpamConfiguration.AllowedBots.Any(b => b.DiscordBotId == request.DiscordBotId))
+            return Conflict(new ProblemDetails {
+                Title = "Bot already allowed.",
+                Detail = "This bot is already on the allowed list for this guild.",
+                Status = StatusCodes.Status409Conflict
+            });
+
+        var entry = new GuildAllowedBot {
+            SpamConfigurationId = instance.SpamConfiguration.Id,
+            DiscordBotId = request.DiscordBotId,
+            BotUsername = string.IsNullOrWhiteSpace(request.BotUsername) ? request.DiscordBotId.ToString() : request.BotUsername.Trim()
+        };
+
+        instance.SpamConfiguration.AllowedBots.Add(entry);
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        _ = Task.Run(() => allowedBotService.RefreshGuildAsync(discordGuildId, CancellationToken.None), cancellationToken);
+
+        return Ok(new AllowedBotResponse(entry.Id, entry.DiscordBotId, entry.BotUsername));
+    }
+
+    /// <summary>
+    /// Removes a bot from the guild's allowed bots list.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="botId">The ID of the allowed bot entry to remove.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">Bot removed successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance or bot entry does not exist.</response>
+    [HttpDelete("{discordGuildId:long}/allowed-bots/{botId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveAllowedBot(
+        long discordGuildId,
+        long botId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.AllowedBots)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var entry = instance.SpamConfiguration.AllowedBots.FirstOrDefault(b => b.Id == botId);
+        if (entry is null)
+            return NotFound(new ProblemDetails {
+                Title = "Allowed bot not found.",
+                Detail = "No allowed bot with this ID exists for this guild.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        instance.SpamConfiguration.AllowedBots.Remove(entry);
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        _ = Task.Run(() => allowedBotService.RefreshGuildAsync(discordGuildId, CancellationToken.None), cancellationToken);
 
         return NoContent();
     }

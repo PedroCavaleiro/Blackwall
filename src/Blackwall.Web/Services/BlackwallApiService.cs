@@ -337,4 +337,28 @@ public sealed class BlackwallApiService(
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<IReadOnlyList<AllowedBotResponse>> GetAllowedBotsAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/allowed-bots");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<AllowedBotResponse>>(ct) ?? [];
+    }
+
+    public async Task<AllowedBotResponse?> AddAllowedBotAsync(long discordGuildId, long discordBotId, string botUsername, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/allowed-bots");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddAllowedBotRequest(discordBotId, botUsername));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<AllowedBotResponse>(ct);
+    }
+
+    public async Task RemoveAllowedBotAsync(long discordGuildId, long botId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/allowed-bots/{botId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

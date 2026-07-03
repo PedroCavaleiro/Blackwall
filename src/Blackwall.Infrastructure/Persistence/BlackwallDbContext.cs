@@ -15,6 +15,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<GuildBan> GuildBans => Set<GuildBan>();
     public DbSet<GuildBanSyncRule> GuildBanSyncRules => Set<GuildBanSyncRule>();
     public DbSet<GuildBannedWord> GuildBannedWords => Set<GuildBannedWord>();
+    public DbSet<GuildAllowedBot> GuildAllowedBots => Set<GuildAllowedBot>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -291,6 +292,11 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .HasForeignKey(e => e.SpamConfigurationId)
                   .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasMany(e => e.AllowedBots)
+                  .WithOne(e => e.SpamConfiguration)
+                  .HasForeignKey(e => e.SpamConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
             entity.Property(e => e.IsContentGuardEnabled)
                   .IsRequired()
                   .HasDefaultValue(false);
@@ -397,6 +403,18 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .HasMaxLength(100);
 
             entity.HasIndex(e => new { e.SpamConfigurationId, e.Word })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<GuildAllowedBot>(entity => {
+            entity.Property(e => e.DiscordBotId)
+                  .IsRequired();
+
+            entity.Property(e => e.BotUsername)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.HasIndex(e => new { e.SpamConfigurationId, e.DiscordBotId })
                   .IsUnique();
         });
 

@@ -65,8 +65,8 @@
 
                 <div class="bw-sidebar-content">
                     @if (_activeTab == "general") {
-                        <GeneralTab Form="Form" IsLockedDown="_isLockedDown" LockdownBusy="_lockdownBusy"
-                                    OnLockdown="LockdownAsync" OnUnlock="UnlockAsync" />
+                        <GeneralTab Form="Form" DiscordGuildId="DiscordGuildId" IsLockedDown="_isLockedDown" LockdownBusy="_lockdownBusy"
+                                    OnLockdown="LockdownAsync" OnUnlock="UnlockAsync" OnError="HandleError" />
                     }
                     @if (_activeTab == "detection") {
                         <DetectionTab Form="Form" />

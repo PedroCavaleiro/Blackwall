@@ -101,8 +101,14 @@ public sealed class GuildMemberHandler(
             }
         }
 
-        if (config.LogChannelId.HasValue)
-            await SendScoringLogAsync(user.Guild, config, user, scoreResult, shouldTimeout);
+        if (!config.LogChannelId.HasValue) {
+            logger.LogWarning(
+                "Cannot send scoring log for user {UserId} in guild {GuildId}: no log channel configured",
+                user.Id, user.Guild.Id);
+            return;
+        }
+
+        await SendScoringLogAsync(user.Guild, config, user, scoreResult, shouldTimeout);
     }
 
     /// <summary>
@@ -140,8 +146,12 @@ public sealed class GuildMemberHandler(
         SocketGuildUser triggeringUser
     ) {
         var channel = guild.GetTextChannel((ulong)config.LogChannelId!.Value);
-        if (channel is null)
+        if (channel is null) {
+            logger.LogWarning(
+                "Cannot send raid log: channel {ChannelId} not found in guild {GuildId}",
+                config.LogChannelId.Value, guild.Id);
             return;
+        }
 
         var actionLine = config.IsDryRun
             ? "**[DRY RUN]** Invites would have been paused — no action taken."
@@ -182,8 +192,12 @@ public sealed class GuildMemberHandler(
         bool wasTimedOut
     ) {
         var channel = guild.GetTextChannel((ulong)config.LogChannelId!.Value);
-        if (channel is null)
+        if (channel is null) {
+            logger.LogWarning(
+                "Cannot send scoring log: channel {ChannelId} not found in guild {GuildId}",
+                config.LogChannelId.Value, guild.Id);
             return;
+        }
 
         var color = scoreResult.ThreatLevel == ThreatLevel.High ? Color.Red : Color.Gold;
         var levelEmoji = scoreResult.ThreatLevel == ThreatLevel.High ? "🔴" : "🟡";

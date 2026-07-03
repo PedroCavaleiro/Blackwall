@@ -80,4 +80,5 @@ public class SpamConfiguration: EntityBase {
     public ICollection<GuildBlacklist> Blacklists { get; set; } = [];
     public ICollection<GuildBlacklistDomain> BlacklistDomains { get; set; } = [];
     public ICollection<GuildBannedWord> BannedWords { get; set; } = [];
+    public ICollection<GuildAllowedBot> AllowedBots { get; set; } = [];
 }
