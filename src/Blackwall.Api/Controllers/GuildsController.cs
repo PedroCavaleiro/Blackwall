@@ -20,6 +20,7 @@ public sealed class GuildsController(
     DiscordOAuthService discordOAuthService,
     GuildClaimService guildClaimService,
     SpamConfigurationCache spamConfigurationCache,
+    NetWatchSnareChannelCache netWatchSnareChannelCache,
     DiscordGuildCacheService guildCache,
     DiscordSocketClient discordClient,
     LockdownService lockdownService,
@@ -2142,6 +2143,355 @@ public sealed class GuildsController(
 
         dbContext.MessageAuditRecords.Remove(record);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    //  NETWATCH SNARE CHANNELS (TRAP CHANNELS)
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns all netWatchSnare (trap) channels configured for a guild.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of netWatchSnare channel configurations.</returns>
+    /// <response code="200">Returns the list of netWatchSnare channels.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpGet("{discordGuildId:long}/netWatchSnares")]
+    [ProducesResponseType(typeof(IReadOnlyList<NetWatchSnareChannelDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<NetWatchSnareChannelDto>>> GetNetWatchSnareChannels(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.NetWatchSnareChannels)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        return Ok(instance.SpamConfiguration.NetWatchSnareChannels
+            .Select(s => new NetWatchSnareChannelDto(
+                s.Id,
+                s.DiscordChannelId,
+                s.ChannelName,
+                s.Action,
+                s.TimeoutMinutes,
+                s.MessageDeleteDays,
+                s.IsEnabled
+            ))
+            .ToList());
+    }
+
+    /// <summary>
+    /// Creates a new netWatchSnare (trap) channel for the guild.
+    /// When a user sends a message in the designated channel, the configured action is applied automatically.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="request">The netWatchSnare channel configuration to create.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">NetWatchSnare channel created successfully.</response>
+    /// <response code="400">The channel ID is invalid or the channel does not exist.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    /// <response code="409">A netWatchSnare already exists for this channel.</response>
+    [HttpPost("{discordGuildId:long}/netWatchSnares")]
+    [ProducesResponseType(typeof(NetWatchSnareChannelDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<NetWatchSnareChannelDto>> CreateNetWatchSnareChannel(
+        long discordGuildId,
+        [FromBody] CreateNetWatchSnareChannelRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.NetWatchSnareChannels)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        if (request.DiscordChannelId <= 0)
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid channel ID.",
+                Detail = "The channel ID must be a valid Discord snowflake.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        if (instance.SpamConfiguration.NetWatchSnareChannels.Any(s => s.DiscordChannelId == request.DiscordChannelId))
+            return Conflict(new ProblemDetails {
+                Title = "NetWatchSnare already exists.",
+                Detail = "A netWatchSnare channel is already configured for this Discord channel.",
+                Status = StatusCodes.Status409Conflict
+            });
+
+        var guild = discordClient.GetGuild((ulong)discordGuildId);
+        string channelName = request.ChannelName;
+        if (guild is not null) {
+            var channel = guild.GetTextChannel((ulong)request.DiscordChannelId);
+            if (channel is null)
+                return BadRequest(new ProblemDetails {
+                    Title = "Channel not found.",
+                    Detail = "The bot cannot see the specified channel. Ensure it is a text channel in this guild.",
+                    Status = StatusCodes.Status400BadRequest
+                });
+            channelName = channel.Name;
+        }
+
+        var netWatchSnare = new NetWatchSnareChannel {
+            SpamConfigurationId = instance.SpamConfiguration.Id,
+            DiscordChannelId = request.DiscordChannelId,
+            ChannelName = channelName,
+            Action = request.Action,
+            TimeoutMinutes = Math.Max(1, request.TimeoutMinutes),
+            MessageDeleteDays = Math.Clamp(request.MessageDeleteDays, 0, 7),
+            IsEnabled = true
+        };
+
+        instance.SpamConfiguration.NetWatchSnareChannels.Add(netWatchSnare);
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await netWatchSnareChannelCache.InvalidateAsync(discordGuildId);
+
+        return Ok(new NetWatchSnareChannelDto(
+            netWatchSnare.Id,
+            netWatchSnare.DiscordChannelId,
+            netWatchSnare.ChannelName,
+            netWatchSnare.Action,
+            netWatchSnare.TimeoutMinutes,
+            netWatchSnare.MessageDeleteDays,
+            netWatchSnare.IsEnabled
+        ));
+    }
+
+    /// <summary>
+    /// Updates an existing netWatchSnare (trap) channel configuration.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="netWatchSnareId">The ID of the netWatchSnare channel to update.</param>
+    /// <param name="request">The updated configuration.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="200">NetWatchSnare channel updated successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance or netWatchSnare channel does not exist.</response>
+    [HttpPut("{discordGuildId:long}/netWatchSnares/{netWatchSnareId:long}")]
+    [ProducesResponseType(typeof(NetWatchSnareChannelDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<NetWatchSnareChannelDto>> UpdateNetWatchSnareChannel(
+        long discordGuildId,
+        long netWatchSnareId,
+        [FromBody] UpdateNetWatchSnareChannelRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.NetWatchSnareChannels)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var netWatchSnare = instance.SpamConfiguration.NetWatchSnareChannels.FirstOrDefault(s => s.Id == netWatchSnareId);
+        if (netWatchSnare is null)
+            return NotFound(new ProblemDetails {
+                Title = "NetWatchSnare not found.",
+                Detail = "No netWatchSnare channel with this ID exists for this guild.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        netWatchSnare.Action = request.Action;
+        netWatchSnare.TimeoutMinutes = Math.Max(1, request.TimeoutMinutes);
+        netWatchSnare.MessageDeleteDays = Math.Clamp(request.MessageDeleteDays, 0, 7);
+        netWatchSnare.IsEnabled = request.IsEnabled;
+        netWatchSnare.UpdatedAtUtc = DateTime.UtcNow;
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await netWatchSnareChannelCache.InvalidateAsync(discordGuildId);
+
+        return Ok(new NetWatchSnareChannelDto(
+            netWatchSnare.Id,
+            netWatchSnare.DiscordChannelId,
+            netWatchSnare.ChannelName,
+            netWatchSnare.Action,
+            netWatchSnare.TimeoutMinutes,
+            netWatchSnare.MessageDeleteDays,
+            netWatchSnare.IsEnabled
+        ));
+    }
+
+    /// <summary>
+    /// Deletes a netWatchSnare (trap) channel configuration.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="netWatchSnareId">The ID of the netWatchSnare channel to delete.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">NetWatchSnare channel deleted successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance or netWatchSnare channel does not exist.</response>
+    [HttpDelete("{discordGuildId:long}/netWatchSnares/{netWatchSnareId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteNetWatchSnareChannel(
+        long discordGuildId,
+        long netWatchSnareId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.NetWatchSnareChannels)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var netWatchSnare = instance.SpamConfiguration.NetWatchSnareChannels.FirstOrDefault(s => s.Id == netWatchSnareId);
+        if (netWatchSnare is null)
+            return NotFound(new ProblemDetails {
+                Title = "NetWatchSnare not found.",
+                Detail = "No netWatchSnare channel with this ID exists for this guild.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        instance.SpamConfiguration.NetWatchSnareChannels.Remove(netWatchSnare);
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await netWatchSnareChannelCache.InvalidateAsync(discordGuildId);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Deletes all netWatchSnare (trap) channels for the guild.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">All netWatchSnare channels deleted successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpDelete("{discordGuildId:long}/netWatchSnares")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteAllNetWatchSnareChannels(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.SpamConfiguration.NetWatchSnareChannels)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        dbContext.NetWatchSnareChannels.RemoveRange(instance.SpamConfiguration.NetWatchSnareChannels);
+        instance.SpamConfiguration.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await netWatchSnareChannelCache.InvalidateAsync(discordGuildId);
 
         return NoContent();
     }

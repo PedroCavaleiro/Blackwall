@@ -66,6 +66,7 @@
                 <option value="@InfractionAction.DeleteOnly">Delete only</option>
                 <option value="@InfractionAction.Timeout">Timeout</option>
                 <option value="@InfractionAction.Kick">Kick</option>
+                <option value="@InfractionAction.SoftBan">Soft ban (ban + unban)</option>
                 <option value="@InfractionAction.Ban">Ban</option>
             </InputSelect>
         </div>
@@ -78,7 +79,7 @@
                 <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="Form.RateLimitTimeoutMinutes" />
             </div>
         }
-        @if (Form.RateLimitAction is InfractionAction.Ban) {
+        @if (Form.RateLimitAction is InfractionAction.Ban or InfractionAction.SoftBan) {
             <div class="bw-field">
                 <div class="bw-field-label">
                     <div class="form-label mb-1">Rate limit &mdash; delete messages (days)</div>
@@ -106,6 +107,7 @@
                 <option value="@InfractionAction.DeleteOnly">Delete only</option>
                 <option value="@InfractionAction.Timeout">Timeout</option>
                 <option value="@InfractionAction.Kick">Kick</option>
+                <option value="@InfractionAction.SoftBan">Soft ban (ban + unban)</option>
                 <option value="@InfractionAction.Ban">Ban</option>
             </InputSelect>
         </div>
@@ -118,7 +120,7 @@
                 <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="Form.DuplicateTimeoutMinutes" />
             </div>
         }
-        @if (Form.DuplicateAction is InfractionAction.Ban) {
+        @if (Form.DuplicateAction is InfractionAction.Ban or InfractionAction.SoftBan) {
             <div class="bw-field">
                 <div class="bw-field-label">
                     <div class="form-label mb-1">Duplicate &mdash; delete messages (days)</div>
@@ -146,6 +148,7 @@
                 <option value="@InfractionAction.DeleteOnly">Delete only</option>
                 <option value="@InfractionAction.Timeout">Timeout</option>
                 <option value="@InfractionAction.Kick">Kick</option>
+                <option value="@InfractionAction.SoftBan">Soft ban (ban + unban)</option>
                 <option value="@InfractionAction.Ban">Ban</option>
             </InputSelect>
         </div>
@@ -158,7 +161,7 @@
                 <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="Form.MentionLimitTimeoutMinutes" />
             </div>
         }
-        @if (Form.MentionLimitAction is InfractionAction.Ban) {
+        @if (Form.MentionLimitAction is InfractionAction.Ban or InfractionAction.SoftBan) {
             <div class="bw-field">
                 <div class="bw-field-label">
                     <div class="form-label mb-1">Mention limit &mdash; delete messages (days)</div>

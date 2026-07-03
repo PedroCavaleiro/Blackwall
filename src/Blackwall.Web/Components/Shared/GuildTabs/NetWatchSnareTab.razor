@@ -1,0 +1,182 @@
+@using Blackwall.Core.Entities
+@inject BlackwallApiService Api
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">NETWATCH SNARE TRAP CHANNELS</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">
+            NetWatch Snare channels are invisible traps. When a user sends a message in a designated trap channel, Blackwall instantly applies the configured action &mdash; no warnings, no escalation. These are designed to catch spam bots and raiders that blindly post across every channel. Real users should never see these channels; hide them from @@everyone and only leave them accessible to bots or as visible bait.
+        </p>
+
+        @if (_netWatchSnares.Any()) {
+            <div class="mb-3">
+                @foreach (var s in _netWatchSnares) {
+                    <div class="d-flex align-items-center justify-content-between border-bottom py-2">
+                        <div class="font-mono" style="font-size:0.75rem;flex:1;min-width:0">
+                            <span class="bw-text-primary">#@s.ChannelName</span>
+                            <span class="bw-text-muted"> &mdash; @s.Action</span>
+                            @if (!s.IsEnabled) {
+                                <span class="bw-text-muted"> (disabled)</span>
+                            }
+                        </div>
+                        <div class="d-flex gap-2 ms-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary cut-corner font-display bw-btn-xs-nowrap"
+                                    disabled="@_busy"
+                                    @onclick="() => ToggleNetWatchSnareAsync(s)">
+                                @(s.IsEnabled ? "DISABLE" : "ENABLE")
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger bw-btn-remove"
+                                    disabled="@_busy"
+                                    @onclick="() => RemoveNetWatchSnareAsync(s.Id)">
+                                REMOVE
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="d-flex justify-content-end mb-3">
+                <button type="button" class="btn btn-outline-danger cut-corner font-display bw-btn-xs-nowrap"
+                        disabled="@_busy"
+                        @onclick="RemoveAllNetWatchSnaresAsync">
+                    REMOVE ALL
+                </button>
+            </div>
+        } else {
+            <div class="font-mono mb-3 bw-desc">No NetWatch Snare channels configured. Add a trap channel below to start catching bots.</div>
+        }
+
+        <div class="border-top pt-3">
+            <label class="form-label font-mono bw-label">ADD TRAP CHANNEL</label>
+            <div class="mb-2">
+                <InputSelect class="form-select mb-2" @bind-Value="_newChannelId">
+                    <option value="">— Select channel —</option>
+                    @foreach (var ch in _channels) {
+                        <option value="@ch.Id">#@ch.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="mb-2">
+                <label class="form-label font-mono bw-label" style="font-size:0.7rem">ACTION</label>
+                <InputSelect class="form-select" @bind-Value="_newAction">
+                    <option value="@InfractionAction.Timeout">Timeout</option>
+                    <option value="@InfractionAction.Kick">Kick</option>
+                    <option value="@InfractionAction.SoftBan">Soft ban (ban + unban)</option>
+                    <option value="@InfractionAction.Ban">Ban</option>
+                </InputSelect>
+            </div>
+            @if (_newAction is InfractionAction.Timeout) {
+                <div class="mb-2">
+                    <label class="form-label font-mono bw-label" style="font-size:0.7rem">TIMEOUT (MINUTES)</label>
+                    <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="_newTimeoutMinutes" />
+                </div>
+            }
+            @if (_newAction is InfractionAction.Ban or InfractionAction.SoftBan) {
+                <div class="mb-2">
+                    <label class="form-label font-mono bw-label" style="font-size:0.7rem">DELETE MESSAGE HISTORY (DAYS, 0&ndash;7)</label>
+                    <InputNumber class="form-control bw-input-narrow" min="0" max="7" @bind-Value="_newDeleteDays" />
+                </div>
+            }
+            <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-xs-nowrap mt-1"
+                    disabled="@(_newChannelId is null || _busy)"
+                    @onclick="AddNetWatchSnareAsync">
+                ADD TRAP
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required long DiscordGuildId { get; set; }
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private IReadOnlyList<DiscordChannelDto> _channels = [];
+    private IReadOnlyList<NetWatchSnareChannelDto> _netWatchSnares = [];
+    private long? _newChannelId;
+    private InfractionAction _newAction = InfractionAction.Timeout;
+    private int _newTimeoutMinutes = 60;
+    private int _newDeleteDays = 1;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() {
+        try {
+            _channels = await Api.GetChannelsAsync(DiscordGuildId);
+            _netWatchSnares = await Api.GetNetWatchSnareChannelsAsync(DiscordGuildId);
+        } catch {
+            _channels = [];
+            _netWatchSnares = [];
+        }
+    }
+
+    private async Task ReloadNetWatchSnaresAsync() {
+        try {
+            _netWatchSnares = await Api.GetNetWatchSnareChannelsAsync(DiscordGuildId);
+        } catch {
+            // keep stale list
+        }
+    }
+
+    private async Task AddNetWatchSnareAsync() {
+        if (_newChannelId is null || _newChannelId <= 0)
+            return;
+
+        var channelName = _channels.FirstOrDefault(c => c.Id == _newChannelId)?.Name ?? "unknown";
+
+        _busy = true;
+        try {
+            await Api.CreateNetWatchSnareChannelAsync(DiscordGuildId, new CreateNetWatchSnareChannelRequest(
+                _newChannelId.Value,
+                channelName,
+                _newAction,
+                _newTimeoutMinutes,
+                _newDeleteDays
+            ));
+            await ReloadNetWatchSnaresAsync();
+            _newChannelId = null;
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to add trap channel: {ex.Message}");
+        } finally {
+            _busy = false;
+        }
+    }
+
+    private async Task ToggleNetWatchSnareAsync(NetWatchSnareChannelDto s) {
+        _busy = true;
+        try {
+            await Api.UpdateNetWatchSnareChannelAsync(DiscordGuildId, s.Id, new UpdateNetWatchSnareChannelRequest(
+                s.Action,
+                s.TimeoutMinutes,
+                s.MessageDeleteDays,
+                !s.IsEnabled
+            ));
+            await ReloadNetWatchSnaresAsync();
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to toggle netWatchSnare: {ex.Message}");
+        } finally {
+            _busy = false;
+        }
+    }
+
+    private async Task RemoveNetWatchSnareAsync(long netWatchSnareId) {
+        _busy = true;
+        try {
+            await Api.DeleteNetWatchSnareChannelAsync(DiscordGuildId, netWatchSnareId);
+            await ReloadNetWatchSnaresAsync();
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to remove netWatchSnare: {ex.Message}");
+        } finally {
+            _busy = false;
+        }
+    }
+
+    private async Task RemoveAllNetWatchSnaresAsync() {
+        _busy = true;
+        try {
+            await Api.DeleteAllNetWatchSnareChannelsAsync(DiscordGuildId);
+            await ReloadNetWatchSnaresAsync();
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to remove all netWatchSnares: {ex.Message}");
+        } finally {
+            _busy = false;
+        }
+    }
+}

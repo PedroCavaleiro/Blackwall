@@ -16,6 +16,7 @@ public sealed class MessageHandler(
     ContentGuardService contentGuardService,
     AllowedBotService allowedBotService,
     MessageAuditService messageAuditService,
+    NetWatchSnareService netWatchSnareService,
     DiscordSocketClient discordClient,
     ILogger<MessageHandler> logger
 ) {
@@ -58,6 +59,42 @@ public sealed class MessageHandler(
 
         if (message.Author.IsBot && await allowedBotService.IsBotAllowedAsync(discordGuildId, discordUserId))
             return;
+
+        var netWatchSnare = await netWatchSnareService.GetTriggeredNetWatchSnareAsync(discordGuildId, message.Channel.Id);
+        if (netWatchSnare is not null) {
+            logger.LogInformation(
+                "NetWatchSnare trap triggered in guild {GuildId} channel {ChannelId} by user {UserId}",
+                discordGuildId, message.Channel.Id, discordUserId);
+
+            try {
+                await message.DeleteAsync();
+            } catch (Exception ex) {
+                logger.LogWarning(ex,
+                    "Failed to delete netWatchSnare-triggered message {MessageId} in guild {GuildId}",
+                    message.Id, discordGuildId);
+            }
+
+            if (!config.IsDryRun)
+                await netWatchSnareService.ApplyNetWatchSnareActionAsync(message, guildChannel.Guild, netWatchSnare);
+
+            if (config.LogChannelId.HasValue)
+                await netWatchSnareService.SendNetWatchSnareLogAsync(message, guildChannel.Guild, netWatchSnare, config.LogChannelId);
+
+            if (config.IsMessageAuditEnabled) {
+                _ = Task.Run(() => messageAuditService.RecordEventAsync(
+                    discordGuildId,
+                    message,
+                    ["NetWatchSnare_trap"],
+                    netWatchSnare.Action,
+                    config.IsDryRun,
+                    config.MessageAuditRetentionDays,
+                    null,
+                    CancellationToken.None
+                ));
+            }
+
+            return;
+        }
 
         var violations = new List<string>(5);
         var triggeredModules = new List<(InfractionAction Action, int TimeoutMinutes, int DeleteDays)>(5);
@@ -244,6 +281,10 @@ public sealed class MessageHandler(
                     break;
                 case InfractionAction.Ban:
                     await guild.AddBanAsync(guildUser, pruneDays, "Spam violation detected by Blackwall.");
+                    break;
+                case InfractionAction.SoftBan:
+                    await guild.AddBanAsync(guildUser, pruneDays, "Spam violation detected by Blackwall.");
+                    await guild.RemoveBanAsync(guildUser);
                     break;
                 case InfractionAction.DeleteOnly:
                 default:
