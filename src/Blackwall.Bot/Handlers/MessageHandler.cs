@@ -66,17 +66,16 @@ public sealed class MessageHandler(
                 "NetWatchSnare trap triggered in guild {GuildId} channel {ChannelId} by user {UserId}",
                 discordGuildId, message.Channel.Id, discordUserId);
 
-            if (!config.IsDryRun) {
-                try {
-                    await message.DeleteAsync();
-                } catch (Exception ex) {
-                    logger.LogWarning(ex,
-                        "Failed to delete netWatchSnare-triggered message {MessageId} in guild {GuildId}",
-                        message.Id, discordGuildId);
-                }
-
-                await netWatchSnareService.ApplyNetWatchSnareActionAsync(message, guildChannel.Guild, netWatchSnare);
+            try {
+                await message.DeleteAsync();
+            } catch (Exception ex) {
+                logger.LogWarning(ex,
+                    "Failed to delete netWatchSnare-triggered message {MessageId} in guild {GuildId}",
+                    message.Id, discordGuildId);
             }
+
+            if (!config.IsDryRun)
+                await netWatchSnareService.ApplyNetWatchSnareActionAsync(message, guildChannel.Guild, netWatchSnare);
 
             if (config.LogChannelId.HasValue)
                 await netWatchSnareService.SendNetWatchSnareLogAsync(message, guildChannel.Guild, netWatchSnare, config.LogChannelId);
@@ -85,7 +84,7 @@ public sealed class MessageHandler(
                 _ = Task.Run(() => messageAuditService.RecordEventAsync(
                     discordGuildId,
                     message,
-                    ["netWatchSnare_trap"],
+                    ["NetWatchSnare_trap"],
                     netWatchSnare.Action,
                     config.IsDryRun,
                     config.MessageAuditRetentionDays,
