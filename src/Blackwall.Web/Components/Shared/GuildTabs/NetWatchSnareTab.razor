@@ -5,7 +5,7 @@
     <div class="card-header">NETWATCH SNARE TRAP CHANNELS</div>
     <div class="p-4">
         <p class="font-mono mb-4 bw-desc">
-            NetWatchSnare channels are invisible traps. When a user sends a message in a designated trap channel, Blackwall instantly applies the configured action &mdash; no warnings, no escalation. These are designed to catch spam bots and raiders that blindly post across every channel. Real users should never see these channels; hide them from @@everyone and only leave them accessible to bots or as visible bait.
+            NetWatch Snare channels are invisible traps. When a user sends a message in a designated trap channel, Blackwall instantly applies the configured action &mdash; no warnings, no escalation. These are designed to catch spam bots and raiders that blindly post across every channel. Real users should never see these channels; hide them from @@everyone and only leave them accessible to bots or as visible bait.
         </p>
 
         @if (_netWatchSnares.Any()) {
@@ -42,7 +42,7 @@
                 </button>
             </div>
         } else {
-            <div class="font-mono mb-3 bw-desc">No netWatchSnare channels configured. Add a trap channel below to start catching bots.</div>
+            <div class="font-mono mb-3 bw-desc">No NetWatch Snare channels configured. Add a trap channel below to start catching bots.</div>
         }
 
         <div class="border-top pt-3">
@@ -83,7 +83,7 @@
                            @bind="_newRoleId" disabled="@_busy" />
                 </div>
             }
-            <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-xs-nowrap"
+            <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-xs-nowrap mt-1"
                     disabled="@(_newChannelId is null || _busy)"
                     @onclick="AddNetWatchSnareAsync">
                 ADD TRAP
