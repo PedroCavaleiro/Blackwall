@@ -126,6 +126,12 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
         if (!string.IsNullOrWhiteSpace(message.Content))
             parts.Add(message.Content.Trim());
 
+        foreach (var attachment in message.Attachments) {
+            if (!string.IsNullOrWhiteSpace(attachment.Filename))
+                parts.Add(attachment.Filename.Trim());
+            parts.Add($"att:{attachment.Filename}:{attachment.Size}:{attachment.Width}:{attachment.Height}");
+        }
+
         foreach (var embed in message.Embeds) {
             if (!string.IsNullOrWhiteSpace(embed.Title))
                 parts.Add(embed.Title.Trim());
@@ -137,6 +143,10 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
                 parts.Add(author.Name.Trim());
             if (embed.Footer is { } footer && !string.IsNullOrWhiteSpace(footer.Text))
                 parts.Add(footer.Text.Trim());
+            if (embed.Image is { } image && !string.IsNullOrWhiteSpace(image.Url))
+                parts.Add(image.Url.Trim());
+            if (embed.Thumbnail is { } thumbnail && !string.IsNullOrWhiteSpace(thumbnail.Url))
+                parts.Add(thumbnail.Url.Trim());
             foreach (var field in embed.Fields) {
                 if (!string.IsNullOrWhiteSpace(field.Name))
                     parts.Add(field.Name.Trim());
