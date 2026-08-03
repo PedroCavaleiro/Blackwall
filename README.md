@@ -26,6 +26,7 @@ Tools provided by the community and improving upon the existing ones.
 - **Discord OAuth2 login** — users authenticate via Discord; JWT tokens are issued for API/Web access.
 - **Guild permission sync** — a background service periodically synchronises guild manager permissions from Discord.
 - **Web dashboard** — Blazor Server UI for guild owners and managers to configure spam rules visually.
+- **AI Sentinel** — AI-powered content moderation that runs as the last step in the protection pipeline. Supports OpenAI, Anthropic, Google Gemini, and self-hosted Ollama with training mode and per-guild configuration.
 
 ## Account Scoring
 
@@ -148,6 +149,7 @@ Edit `.env` and fill in the required values. You can use the **[.env Generator](
 | `APP__DISABLE_NEW_USERS` | When `true`, only the instance owner can register new accounts (existing users can still log in). If `APP__INSTANCE_OWNER` is not set, no new users can register. Defaults to `false`. |
 | `APP__PRIVATE_INSTANCE` | When `true` (and `APP__DISABLE_NEW_USERS` is `false`), only users listed in `AllowedUsers` (in `appsettings.json`) and the instance owner can register. Defaults to `false`. |
 | `APP__INSTANCE_OWNER` | Discord user ID of the instance owner. The owner is always allowed to register when `APP__DISABLE_NEW_USERS` is `true`, and is also allowed when `APP__PRIVATE_INSTANCE` is `true` (even if not listed in `AllowedUsers`). Optional — the bot starts without it, but no one can register if `APP__DISABLE_NEW_USERS` is `true` and this is unset. |
+| `APP__AI_SENTINEL_ENABLED` | When `false`, the AI Sentinel module is globally disabled — the tab is hidden in the dashboard and all AI endpoints return a disabled response. Defaults to `true`. |
 
 **API**
 
