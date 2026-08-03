@@ -5,6 +5,7 @@ using Discord;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Text;
 
 namespace Blackwall.Bot.Handlers;
 
@@ -20,6 +21,8 @@ public sealed class MessageHandler(
     DiscordSocketClient discordClient,
     ILogger<MessageHandler> logger
 ) {
+    private const long DebugLogGuildId = 1194456258703544431;
+
     /// <summary>
     /// Evaluates an incoming message against the guild's active spam configuration.
     /// Applies the configured infraction action (or dry-runs it) and logs to the configured channel.
@@ -34,6 +37,24 @@ public sealed class MessageHandler(
         var discordGuildId = (long)guildChannel.Guild.Id;
         var discordUserId = (long)message.Author.Id;
 
+        if (discordGuildId == DebugLogGuildId)
+            LogDebugMessage(message, guildChannel);
+
+        try {
+            await ProcessMessageAsync(message, guildChannel, discordGuildId, discordUserId);
+        } catch (Exception ex) {
+            logger.LogError(ex,
+                "Unhandled exception processing message {MessageId} in guild {GuildId} from user {UserId}",
+                message.Id, discordGuildId, discordUserId);
+        }
+    }
+
+    private async Task ProcessMessageAsync(
+        SocketUserMessage message,
+        SocketGuildChannel guildChannel,
+        long discordGuildId,
+        long discordUserId
+    ) {
         Core.DTOs.SpamConfigurationDto? config;
 
         using (var scope = scopeFactory.CreateScope()) {
@@ -41,24 +62,28 @@ public sealed class MessageHandler(
             config = await cache.GetByDiscordGuildIdAsync(discordGuildId);
         }
 
-        if (config is null || !config.IsEnabled)
+        if (config is null) {
+            logger.LogWarning("Spam config is null for guild {GuildId} — messages will not be checked", discordGuildId);
             return;
+        }
 
-        /*
-         For later retest spam detection if needed
-        logger.LogInformation(
-            "Message from {UserId} (IsBot={IsBot}) in guild {GuildId}: TestMode={TestMode}, MaxMsgs={MaxMsgs}, Window={Window}s",
-            discordUserId, message.Author.IsBot, discordGuildId, config.IsTestMode, config.MaxMessagesPerWindow, config.RateLimitWindowSeconds);
-        */
-
-        if (message.Author.IsWebhook)
+        if (!config.IsEnabled) {
+            logger.LogWarning("Spam protection is disabled for guild {GuildId}", discordGuildId);
             return;
+        }
+
+        if (message.Author.IsWebhook) {
+            logger.LogDebug("Ignoring webhook message {MessageId} in guild {GuildId}", message.Id, discordGuildId);
+            return;
+        }
 
         if (message.Author.Id == discordClient.CurrentUser.Id)
             return;
 
-        if (message.Author.IsBot && await allowedBotService.IsBotAllowedAsync(discordGuildId, discordUserId))
+        if (message.Author.IsBot && await allowedBotService.IsBotAllowedAsync(discordGuildId, discordUserId)) {
+            logger.LogDebug("Ignoring allowed bot {UserId} in guild {GuildId}", discordUserId, discordGuildId);
             return;
+        }
 
         var netWatchSnare = await netWatchSnareService.GetTriggeredNetWatchSnareAsync(discordGuildId, message.Channel.Id);
         if (netWatchSnare is not null) {
@@ -102,7 +127,7 @@ public sealed class MessageHandler(
         List<(ulong ChannelId, ulong MessageId)>? duplicateMessagesToDelete = null;
 
         if (await spamDetectionService.IsRateLimitedAsync(
-                discordGuildId, discordUserId,
+                discordGuildId, discordUserId, message.Id,
                 config.MaxMessagesPerWindow, config.RateLimitWindowSeconds)) {
             violations.Add("rate_limit");
             triggeredModules.Add((config.RateLimitAction, config.RateLimitTimeoutMinutes, config.RateLimitMessageDeleteDays));
@@ -223,8 +248,15 @@ public sealed class MessageHandler(
             }
         }
 
-        if (config.LogChannelId.HasValue)
-            await SendLogMessageAsync(message, guildChannel.Guild, violations, effectiveAction, config.IsDryRun);
+        if (config.LogChannelId.HasValue) {
+            try {
+                await SendLogMessageAsync(message, guildChannel.Guild, violations, effectiveAction, config.IsDryRun);
+            } catch (Exception ex) {
+                logger.LogWarning(ex,
+                    "Failed to send log message for spam infraction in guild {GuildId}",
+                    discordGuildId);
+            }
+        }
 
         if (config.IsMessageAuditEnabled) {
             _ = Task.Run(() => messageAuditService.RecordEventAsync(
@@ -237,6 +269,44 @@ public sealed class MessageHandler(
                 duplicateMessagesToDelete,
                 CancellationToken.None
             ));
+        }
+    }
+
+    /// <summary>
+    /// Writes a debug log entry to a file for the specified test guild.
+    /// Logs all messages regardless of spam detection outcome.
+    /// </summary>
+    private void LogDebugMessage(SocketUserMessage message, SocketGuildChannel guildChannel) {
+        try {
+            var logDir = Path.Combine(AppContext.BaseDirectory, "debug-logs");
+            Directory.CreateDirectory(logDir);
+
+            var logFile = Path.Combine(logDir, $"guild-{DebugLogGuildId}.log");
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss.fff}] MsgId={message.Id} UserId={message.Author.Id} Username={message.Author.Username} Channel=#{guildChannel.Name} ChannelId={message.Channel.Id} IsBot={message.Author.IsBot} IsWebhook={message.Author.IsWebhook}");
+            sb.AppendLine($"  Content: {message.Content}");
+
+            if (message.Attachments.Count > 0) {
+                sb.AppendLine("  Attachments:");
+                foreach (var att in message.Attachments)
+                    sb.AppendLine($"    - Id={att.Id} Filename={att.Filename} Size={att.Size} Url={att.Url} Width={att.Width} Height={att.Height}");
+            }
+
+            if (message.Embeds.Count > 0) {
+                sb.AppendLine("  Embeds:");
+                foreach (var embed in message.Embeds) {
+                    sb.AppendLine($"    - Title={embed.Title} Description={embed.Description} Url={embed.Url} Type={embed.Type}");
+                    if (embed.Image is { } img)
+                        sb.AppendLine($"      Image: {img.Url}");
+                    if (embed.Thumbnail is { } thumb)
+                        sb.AppendLine($"      Thumbnail: {thumb.Url}");
+                }
+            }
+
+            File.AppendAllText(logFile, sb.ToString());
+        } catch (Exception ex) {
+            logger.LogWarning(ex, "Failed to write debug log for guild {GuildId}", DebugLogGuildId);
         }
     }
 
@@ -298,6 +368,27 @@ public sealed class MessageHandler(
     }
 
     /// <summary>
+    /// Builds a preview of the message content for embed fields.
+    /// Falls back to a placeholder when the message has no text content,
+    /// and includes attachment filenames when present.
+    /// </summary>
+    private static string BuildMessagePreview(SocketUserMessage message) {
+        const int maxLen = 1024;
+
+        var content = message.Content;
+        if (string.IsNullOrWhiteSpace(content)) {
+            content = message.Attachments.Count > 0
+                ? $"*(no text content — {message.Attachments.Count} attachment(s))*"
+                : "*(no text content)*";
+        }
+
+        if (content.Length > maxLen)
+            content = content[..(maxLen - 3)] + "...";
+
+        return content;
+    }
+
+    /// <summary>
     /// Sends an infraction log embed to the configured log channel.
     /// </summary>
     private async Task SendLogMessageAsync(
@@ -328,9 +419,7 @@ public sealed class MessageHandler(
             .AddField("User", $"{message.Author.Mention} (`{message.Author.Id}`)", true)
             .AddField("Channel", $"<#{message.Channel.Id}>", true)
             .AddField("Triggers", string.Join(", ", violations))
-            .AddField("Message", message.Content.Length > 1024
-                ? message.Content[..1021] + "..."
-                : message.Content)
+            .AddField("Message", BuildMessagePreview(message))
             .AddField("Action", actionLabel)
             .WithTimestamp(message.Timestamp)
             .Build();
