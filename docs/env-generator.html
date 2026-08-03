@@ -533,6 +533,15 @@ const sections = [
         placeholder: "123456789012345678",
         desc: "Discord user ID of the instance owner.",
         help: "The owner is always allowed to register. To find your Discord user ID, enable Developer Mode in Discord settings, right-click your profile, and select <strong>Copy User ID</strong>."
+      },
+      {
+        key: "APP__AI_SENTINEL_ENABLED",
+        label: "APP__AI_SENTINEL_ENABLED",
+        required: false,
+        type: "bool",
+        default: true,
+        desc: "Globally enable or disable the AI Sentinel module.",
+        help: "When <code>false</code>, the AI Sentinel tab is hidden in the dashboard and all AI endpoints return a disabled response. Default is <code>true</code>."
       }
     ]
   },
