@@ -11,11 +11,21 @@ Tools provided by the community and improving upon the existing ones.
 
 ## Features
 
-- **Real-time spam detection** — rate limiting, duplicate message detection, mention flooding, invite link blocking, and suspicious link filtering.
-- **Per-guild configuration** — each server gets its own spam thresholds managed through the dashboard.
+- **Real-time spam detection** — sliding-window rate limiting, sliding-window duplicate detection with cross-channel support, mention flooding, invite link blocking, and suspicious link filtering.
+- **Content Guard** — banned word filtering with Levenshtein fuzzy matching and leetspeak normalisation, Zalgo text blocking, copypasta hash detection, and invisible character scrubbing.
+- **Link blocking** — AdGuard-format blacklist support with custom domains, whitelist mode, and Google Safe Browsing real-time threat checks via a locally synced Global Cache.
+- **Anti-raid** — velocity-based join detection that automatically pauses invites when a raid threshold is reached, with configurable cooldown.
+- **Account scoring** — evaluates new members on join based on account age, profile picture, and username patterns; assigns a threat score with optional auto-timeout.
+- **NetWatchSnare** — trap channels that automatically punish users who post in them, with configurable actions per trap.
+- **Lockdown** — instantly deny send permissions for @everyone across all channels, manually or automatically on infraction.
+- **Ban management** — share, sync, and import bans across Blackwall-managed servers with auto-sync support.
+- **Message audit** — records deleted messages and infraction events with configurable retention for review in the dashboard.
+- **Bot allowlist** — only explicitly trusted bots bypass detection; all other bot-flagged accounts are scanned.
+- **Dry run mode** — test detection rules without taking action against users.
+- **Per-guild configuration** — each server gets its own spam thresholds, module toggles, and actions managed through the dashboard.
 - **Discord OAuth2 login** — users authenticate via Discord; JWT tokens are issued for API/Web access.
 - **Guild permission sync** — a background service periodically synchronises guild manager permissions from Discord.
-- **Web dashboard** — Blazor Server UI for guild owners and managers to configure spam rules.
+- **Web dashboard** — Blazor Server UI for guild owners and managers to configure spam rules visually.
 
 ## Account Scoring
 

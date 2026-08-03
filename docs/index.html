@@ -152,13 +152,21 @@
       <section class="content-section" id="features">
         <h2>Features</h2>
         <div class="card-grid">
-          <div class="card"><h4><span class="card-icon">&#9889;</span> Real-time Spam Detection</h4><p>Rate limiting, duplicate message detection, mention flooding, invite link blocking, and suspicious link filtering &mdash; all in real time.</p></div>
-          <div class="card"><h4><span class="card-icon">&#127760;</span> Per-guild Configuration</h4><p>Each server gets its own spam thresholds managed through the web dashboard. No one-size-fits-all.</p></div>
+          <div class="card"><h4><span class="card-icon">&#9889;</span> Real-time Spam Detection</h4><p>Sliding-window rate limiting, sliding-window duplicate detection with cross-channel support, mention flooding, invite link blocking, and suspicious link filtering &mdash; all in real time.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128737;</span> Content Guard</h4><p>Banned word filtering with Levenshtein fuzzy matching and leetspeak normalisation, Zalgo text blocking, copypasta hash detection, and invisible character scrubbing.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128279;</span> Link Blocking</h4><p>AdGuard-format blacklist support with custom domains, whitelist mode, and Google Safe Browsing real-time threat checks via a locally synced Global Cache.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128680;</span> Anti-Raid</h4><p>Velocity-based join detection that automatically pauses invites when a raid threshold is reached, with configurable cooldown.</p></div>
+          <div class="card"><h4><span class="card-icon">&#129302;</span> Account Scoring</h4><p>Evaluates new members on join based on account age, profile picture, and username patterns; assigns a threat score with optional auto-timeout.</p></div>
+          <div class="card"><h4><span class="card-icon">&#129692;</span> NetWatchSnare</h4><p>Trap channels that automatically punish users who post in them, with configurable actions per trap.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128274;</span> Lockdown</h4><p>Instantly deny send permissions for @everyone across all channels, manually or automatically on infraction.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128721;</span> Ban Management</h4><p>Share, sync, and import bans across Blackwall-managed servers with auto-sync support.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128221;</span> Message Audit</h4><p>Records deleted messages and infraction events with configurable retention for review in the dashboard.</p></div>
+          <div class="card"><h4><span class="card-icon">&#9989;</span> Bot Allowlist</h4><p>Only trusted bots bypass spam detection. All other bot-flagged accounts &mdash; including attack tools disguised as bots &mdash; are scanned.</p></div>
+          <div class="card"><h4><span class="card-icon">&#129514;</span> Dry Run Mode</h4><p>Test detection rules without taking action against users. Detections are logged only.</p></div>
+          <div class="card"><h4><span class="card-icon">&#127760;</span> Per-guild Configuration</h4><p>Each server gets its own spam thresholds, module toggles, and actions managed through the web dashboard.</p></div>
           <div class="card"><h4><span class="card-icon">&#128273;</span> Discord OAuth2 Login</h4><p>Users authenticate via Discord. JWT tokens are issued for API and Web access.</p></div>
           <div class="card"><h4><span class="card-icon">&#128260;</span> Guild Permission Sync</h4><p>A background service periodically synchronises guild manager permissions from Discord.</p></div>
           <div class="card"><h4><span class="card-icon">&#128187;</span> Web Dashboard</h4><p>Blazor Server UI for guild owners and managers to configure spam rules visually.</p></div>
-          <div class="card"><h4><span class="card-icon">&#129302;</span> Account Scoring</h4><p>Evaluates new members on join and assigns a threat score based on account metadata.</p></div>
-          <div class="card"><h4><span class="card-icon">&#9989;</span> Bot Allowlist</h4><p>Only trusted bots bypass spam detection. All other bot-flagged accounts &mdash; including attack tools disguised as bots &mdash; are scanned.</p></div>
         </div>
       </section>
 
@@ -611,8 +619,8 @@ dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
         <table>
           <thead><tr><th>Filter</th><th>Settings</th><th>Description</th></tr></thead>
           <tbody>
-            <tr><td><strong>Rate limiting</strong></td><td>Window (seconds), max messages per window</td><td>Counts messages from a single user in a rolling time window. The next message after the limit triggers an infraction. The counter resets once the window expires with no new messages.</td></tr>
-            <tr><td><strong>Duplicate detection</strong></td><td>Threshold, window (seconds), cross-channel toggle</td><td>Tracks identical message hashes per user. When the threshold is reached within the window, the filter trips. Cross-channel mode counts duplicates across different channels; per-channel mode only counts within the same channel. Set threshold to 0 to disable.</td></tr>
+            <tr><td><strong>Rate limiting</strong></td><td>Window (seconds), max messages per window</td><td>Counts messages from a single user using a true sliding window. The next message after the limit triggers an infraction. Entries older than the window are continuously evicted, so spacing messages out does not reset the counter.</td></tr>
+            <tr><td><strong>Duplicate detection</strong></td><td>Threshold, window (seconds), cross-channel toggle</td><td>Tracks identical message hashes per user using a true sliding window. When the threshold is reached within the window, the filter trips. Cross-channel mode counts duplicates across different channels; per-channel mode only counts within the same channel. Set threshold to 0 to disable.</td></tr>
             <tr><td><strong>Mention limit</strong></td><td>Max mentions per message</td><td>Flags messages that exceed the configured combined user, role, and <code>@everyone</code>/<code>@here</code> mention count as mass-ping spam.</td></tr>
           </tbody>
         </table>
@@ -690,6 +698,9 @@ dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
           </tbody>
         </table>
 
+        <h3>NetWatchSnare</h3>
+        <p>Trap channels that automatically punish users who post in them. Useful for channels that should never receive messages (e.g. announcement channels where only admins post). Each trap channel has its own configurable action (delete only, timeout, kick, or ban), timeout duration, and message delete days.</p>
+
         <h3>Ban Management</h3>
         <p>Tools for sharing, syncing, and importing bans across Blackwall-managed servers.</p>
         <table>
@@ -704,6 +715,16 @@ dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
 
         <h3>Audit Log</h3>
         <p>Select a channel where Blackwall will post an embed for each infraction: who triggered it, which filter fired, the message content, and the action taken. Leave blank to disable audit logging.</p>
+
+        <h3>Message Audit</h3>
+        <p>When enabled, Blackwall records deleted messages and infraction events to the database, including full message content, embeds, and metadata. Records are retained for a configurable number of days (7&ndash;90) and can be reviewed in the dashboard's event viewer. A background service automatically purges expired records.</p>
+        <table>
+          <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Enable message audit</strong></td><td>Record deleted messages and infraction events for review in the dashboard.</td></tr>
+            <tr><td><strong>Retention (days)</strong></td><td>How long audit records are kept before automatic purge. Range: 7&ndash;90 days.</td></tr>
+          </tbody>
+        </table>
 
         <div class="callout callout-info">
           <strong>Module actions</strong>
