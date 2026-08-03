@@ -248,8 +248,15 @@ public sealed class MessageHandler(
             }
         }
 
-        if (config.LogChannelId.HasValue)
-            await SendLogMessageAsync(message, guildChannel.Guild, violations, effectiveAction, config.IsDryRun);
+        if (config.LogChannelId.HasValue) {
+            try {
+                await SendLogMessageAsync(message, guildChannel.Guild, violations, effectiveAction, config.IsDryRun);
+            } catch (Exception ex) {
+                logger.LogWarning(ex,
+                    "Failed to send log message for spam infraction in guild {GuildId}",
+                    discordGuildId);
+            }
+        }
 
         if (config.IsMessageAuditEnabled) {
             _ = Task.Run(() => messageAuditService.RecordEventAsync(
@@ -361,6 +368,27 @@ public sealed class MessageHandler(
     }
 
     /// <summary>
+    /// Builds a preview of the message content for embed fields.
+    /// Falls back to a placeholder when the message has no text content,
+    /// and includes attachment filenames when present.
+    /// </summary>
+    private static string BuildMessagePreview(SocketUserMessage message) {
+        const int maxLen = 1024;
+
+        var content = message.Content;
+        if (string.IsNullOrWhiteSpace(content)) {
+            content = message.Attachments.Count > 0
+                ? $"*(no text content — {message.Attachments.Count} attachment(s))*"
+                : "*(no text content)*";
+        }
+
+        if (content.Length > maxLen)
+            content = content[..(maxLen - 3)] + "...";
+
+        return content;
+    }
+
+    /// <summary>
     /// Sends an infraction log embed to the configured log channel.
     /// </summary>
     private async Task SendLogMessageAsync(
@@ -391,9 +419,7 @@ public sealed class MessageHandler(
             .AddField("User", $"{message.Author.Mention} (`{message.Author.Id}`)", true)
             .AddField("Channel", $"<#{message.Channel.Id}>", true)
             .AddField("Triggers", string.Join(", ", violations))
-            .AddField("Message", message.Content.Length > 1024
-                ? message.Content[..1021] + "..."
-                : message.Content)
+            .AddField("Message", BuildMessagePreview(message))
             .AddField("Action", actionLabel)
             .WithTimestamp(message.Timestamp)
             .Build();
