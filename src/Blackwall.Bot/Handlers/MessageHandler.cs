@@ -1,4 +1,5 @@
 using Blackwall.Bot.Services;
+using Blackwall.Core.Configuration;
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
 using Blackwall.Infrastructure.Cache;
@@ -6,6 +7,7 @@ using Discord;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Text;
 
 namespace Blackwall.Bot.Handlers;
@@ -21,6 +23,7 @@ public sealed class MessageHandler(
     NetWatchSnareService netWatchSnareService,
     AiSentinelService aiSentinelService,
     DiscordSocketClient discordClient,
+    IOptions<AppConfiguration> appConfiguration,
     ILogger<MessageHandler> logger
 ) {
     private const long DebugLogGuildId = 1194456258703544431;
@@ -204,7 +207,7 @@ public sealed class MessageHandler(
             }
         }
 
-        if (violations.Count == 0) {
+        if (violations.Count == 0 && appConfiguration.Value.AiSentinelEnabled) {
             await RunAiSentinelAsync(message, guildChannel, discordGuildId, discordUserId, config);
             return;
         }

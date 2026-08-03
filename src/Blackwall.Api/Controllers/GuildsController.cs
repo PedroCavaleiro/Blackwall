@@ -41,6 +41,15 @@ public sealed class GuildsController(
         return (key, iv);
     }
 
+    private bool IsAiSentinelDisabled()
+        => !appConfiguration.Value.AiSentinelEnabled;
+
+    private ActionResult AiSentinelDisabledResult() => NotFound(new ProblemDetails {
+        Title = "AI Sentinel is not available.",
+        Detail = "AI Sentinel capability is disabled on this instance.",
+        Status = StatusCodes.Status404NotFound
+    });
+
     private static string? Encrypt(string? plainText, byte[] key, byte[] iv) {
         if (string.IsNullOrWhiteSpace(plainText))
             return plainText;
@@ -2543,6 +2552,9 @@ public sealed class GuildsController(
         long discordGuildId,
         CancellationToken cancellationToken
     ) {
+        if (IsAiSentinelDisabled())
+            return AiSentinelDisabledResult();
+
         var appUserId = GetCurrentUserId();
         if (appUserId is null)
             return Unauthorized(new ProblemDetails {
@@ -2609,6 +2621,9 @@ public sealed class GuildsController(
         [FromBody] UpdateAiSentinelConfigurationRequest request,
         CancellationToken cancellationToken
     ) {
+        if (IsAiSentinelDisabled())
+            return AiSentinelDisabledResult();
+
         var appUserId = GetCurrentUserId();
         if (appUserId is null)
             return Unauthorized(new ProblemDetails {
@@ -2677,6 +2692,9 @@ public sealed class GuildsController(
         long discordGuildId,
         CancellationToken cancellationToken
     ) {
+        if (IsAiSentinelDisabled())
+            return AiSentinelDisabledResult();
+
         var appUserId = GetCurrentUserId();
         if (appUserId is null)
             return Unauthorized(new ProblemDetails {
@@ -2730,6 +2748,9 @@ public sealed class GuildsController(
         [FromBody] ListAiSentinelModelsRequest request,
         CancellationToken cancellationToken
     ) {
+        if (IsAiSentinelDisabled())
+            return AiSentinelDisabledResult();
+
         var appUserId = GetCurrentUserId();
         if (appUserId is null)
             return Unauthorized(new ProblemDetails {
@@ -2806,6 +2827,9 @@ public sealed class GuildsController(
         int pageSize = 20,
         CancellationToken cancellationToken = default
     ) {
+        if (IsAiSentinelDisabled())
+            return AiSentinelDisabledResult();
+
         var appUserId = GetCurrentUserId();
         if (appUserId is null)
             return Unauthorized(new ProblemDetails {
@@ -2868,6 +2892,9 @@ public sealed class GuildsController(
         long logId,
         CancellationToken cancellationToken
     ) {
+        if (IsAiSentinelDisabled())
+            return AiSentinelDisabledResult();
+
         var appUserId = GetCurrentUserId();
         if (appUserId is null)
             return Unauthorized(new ProblemDetails {
@@ -2936,6 +2963,9 @@ public sealed class GuildsController(
         [FromBody] UpdateAiSentinelTrainingFeedbackRequest request,
         CancellationToken cancellationToken
     ) {
+        if (IsAiSentinelDisabled())
+            return AiSentinelDisabledResult();
+
         var appUserId = GetCurrentUserId();
         if (appUserId is null)
             return Unauthorized(new ProblemDetails {

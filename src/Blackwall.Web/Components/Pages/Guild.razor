@@ -4,6 +4,7 @@
 @inject BlackwallApiService Api
 @inject NavigationManager Nav
 @inject IJSRuntime Js
+@inject IOptions<AppConfiguration> AppCfg
 @implements IDisposable
 
 <PageTitle>@(_settings?.Name ?? "Config") — Blackwall</PageTitle>
@@ -67,7 +68,9 @@
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "scoring" ? "active" : "")" @onclick='() => _activeTab = "scoring"'>SCORING</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "bans" ? "active" : "")" @onclick='() => _activeTab = "bans"'>BANS</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "netWatchSnare" ? "active" : "")" @onclick='() => _activeTab = "netWatchSnare"'>NETWATCH SNARE</button>
-                    <button type="button" class="bw-sidebar-btn @(_activeTab == "aisentinel" ? "active" : "")" @onclick='() => _activeTab = "aisentinel"'>AI SENTINEL</button>
+                    @if (AppCfg.Value.AiSentinelEnabled) {
+                        <button type="button" class="bw-sidebar-btn @(_activeTab == "aisentinel" ? "active" : "")" @onclick='() => _activeTab = "aisentinel"'>AI SENTINEL</button>
+                    }
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "audit" ? "active" : "")" @onclick='() => _activeTab = "audit"'>AUDIT</button>
                 </nav>
 
