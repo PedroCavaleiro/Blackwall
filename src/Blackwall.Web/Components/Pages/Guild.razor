@@ -3,6 +3,8 @@
 @rendermode InteractiveServer
 @inject BlackwallApiService Api
 @inject NavigationManager Nav
+@inject IJSRuntime Js
+@implements IDisposable
 
 <PageTitle>@(_settings?.Name ?? "Config") — Blackwall</PageTitle>
 
@@ -45,8 +47,13 @@
                 // WARNING: No audit log channel set. Infractions, raids, and account scoring alerts will not be visible to moderators. Configure one in the AUDIT tab.
             </div>
         }
+        @if (_isDirty) {
+            <div class="bw-warning font-mono mb-4">
+                // WARNING: You have unsaved changes. Press COMMIT CHANGES to save your configuration.
+            </div>
+        }
 
-        <EditForm Model="Form" OnValidSubmit="SaveAsync">
+        <EditForm EditContext="_editContext" OnValidSubmit="SaveAsync">
             <DataAnnotationsValidator />
 
             <div class="bw-sidebar-layout">
@@ -159,8 +166,13 @@
     private AiSentinelForm AiForm { get; set; } = new();
     private bool _isLockedDown;
     private bool _lockdownBusy;
+    private bool _isDirty;
+    private EditContext _editContext = default!;
 
     protected override async Task OnInitializedAsync() {
+        _editContext = new EditContext(Form);
+        _editContext.OnFieldChanged += OnFieldChanged;
+
         try {
             _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
 
@@ -259,6 +271,11 @@
         }
     }
 
+    private void OnFieldChanged(object? sender, FieldChangedEventArgs e) {
+        _isDirty = true;
+        _saved = false;
+    }
+
     private void HandleError(string error) {
         _error = error;
     }
@@ -333,6 +350,7 @@
                 Form.MessageAuditRetentionDays
             ));
             _saved = true;
+            _isDirty = false;
             _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
 
             try {
@@ -360,6 +378,8 @@
             }
         } catch (Exception ex) {
             _error = $"Failed to save settings: {ex.Message}";
+        } finally {
+            await Js.InvokeVoidAsync("window.scrollTo", 0, 0);
         }
     }
 
@@ -408,5 +428,9 @@
         } finally {
             _lockdownBusy = false;
         }
+    }
+
+    public void Dispose() {
+        _editContext.OnFieldChanged -= OnFieldChanged;
     }
 }
