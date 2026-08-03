@@ -1,0 +1,354 @@
+@using Blackwall.Core.Entities
+@inject BlackwallApiService Api
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">AI SENTINEL</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">
+            AI-powered content moderation that runs as the last step in the protection pipeline. Only messages that pass all other filters are analyzed. Supports OpenAI, Anthropic, Google Gemini, and self-hosted or cloud Ollama.
+        </p>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Enable AI Sentinel</div>
+                <div class="form-text">Master toggle for the entire AI Sentinel module. This is independent from other protection modules.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="aiEnable" @bind-Value="Form.IsEnabled" />
+            </div>
+        </div>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Dry run</div>
+                <div class="form-text">When enabled, AI Sentinel will not take any action. When disabled, it respects the global dry-run setting.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="aiDryRun" @bind-Value="Form.IsDryRun" disabled="@(!Form.IsEnabled)" />
+            </div>
+        </div>
+
+        <div class="bw-field bw-field-last">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Training mode</div>
+                <div class="form-text">When enabled, all messages are analyzed and logged but no actions are taken. You can mark each result as correct or incorrect. Only results that would have triggered an action are logged to the audit channel. Activating AI Sentinel starts in training mode automatically.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="aiTraining" @bind-Value="Form.IsTrainingMode" disabled="@(!Form.IsEnabled)" />
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (Form.IsEnabled) {
+    <div class="cut-corner border mb-4 bw-card">
+        <div class="card-header">PROVIDER CONFIGURATION</div>
+        <div class="p-4">
+            <div class="bw-field">
+                <div class="bw-field-label">
+                    <div class="form-label mb-1">Provider</div>
+                    <div class="form-text">Select the AI provider to use for message analysis.</div>
+                </div>
+                <InputSelect class="form-select bw-input-select" style="max-width:260px" @bind-Value="Form.Provider" @bind-Value:after="OnProviderChangedAsync">
+                    <option value="@AiSentinelProvider.OpenAI">OpenAI</option>
+                    <option value="@AiSentinelProvider.Anthropic">Anthropic</option>
+                    <option value="@AiSentinelProvider.GoogleGemini">Google Gemini</option>
+                    <option value="@AiSentinelProvider.Ollama">Ollama</option>
+                </InputSelect>
+            </div>
+
+            @if (Form.Provider != AiSentinelProvider.Ollama) {
+                <div class="bw-field">
+                    <div class="bw-field-label">
+                        <div class="form-label mb-1">API Key</div>
+                        <div class="form-text">Enter the API key for @(Form.Provider). Leave blank to keep the existing key.</div>
+                    </div>
+                    <InputText type="password" class="form-control" style="max-width:400px" @bind-Value="Form.ApiKey" @bind-Value:after="OnCredentialsChangedAsync" placeholder="••••••••••••••••" />
+                </div>
+            }
+
+            @if (Form.Provider == AiSentinelProvider.Ollama) {
+                <div class="bw-field">
+                    <div class="bw-field-label">
+                        <div class="form-label mb-1">Ollama URL</div>
+                        <div class="form-text">The base URL of your Ollama instance (e.g. http://localhost:11434 or https://your-ollama-cloud-url.com).</div>
+                    </div>
+                    <InputText class="form-control" style="max-width:400px" @bind-Value="Form.OllamaUrl" @bind-Value:after="OnCredentialsChangedAsync" placeholder="http://localhost:11434" />
+                </div>
+
+                <div class="bw-field">
+                    <div class="bw-field-label">
+                        <div class="form-label mb-1">Custom header 1 (optional)</div>
+                        <div class="form-text">Add a custom header for authentication or routing. Useful for Ollama Cloud or proxies.</div>
+                    </div>
+                    <div class="d-flex gap-2" style="max-width:500px">
+                        <InputText class="form-control" placeholder="Header name" @bind-Value="Form.OllamaHeader1Key" />
+                        <InputText class="form-control" placeholder="Header value" @bind-Value="Form.OllamaHeader1Value" @bind-Value:after="OnCredentialsChangedAsync" />
+                    </div>
+                </div>
+                <div class="bw-field">
+                    <div class="bw-field-label">
+                        <div class="form-label mb-1">Custom header 2 (optional)</div>
+                    </div>
+                    <div class="d-flex gap-2" style="max-width:500px">
+                        <InputText class="form-control" placeholder="Header name" @bind-Value="Form.OllamaHeader2Key" />
+                        <InputText class="form-control" placeholder="Header value" @bind-Value="Form.OllamaHeader2Value" @bind-Value:after="OnCredentialsChangedAsync" />
+                    </div>
+                </div>
+                <div class="bw-field bw-field-last">
+                    <div class="bw-field-label">
+                        <div class="form-label mb-1">Custom header 3 (optional)</div>
+                    </div>
+                    <div class="d-flex gap-2" style="max-width:500px">
+                        <InputText class="form-control" placeholder="Header name" @bind-Value="Form.OllamaHeader3Key" />
+                        <InputText class="form-control" placeholder="Header value" @bind-Value="Form.OllamaHeader3Value" @bind-Value:after="OnCredentialsChangedAsync" />
+                    </div>
+                </div>
+            }
+
+            <div class="bw-field bw-field-last">
+                <div class="bw-field-label">
+                    <div class="form-label mb-1">Model</div>
+                    <div class="form-text">Select the model to use for analysis. Models load automatically when you enter credentials. Click refresh to reload manually.</div>
+                </div>
+                <div class="d-flex gap-2 align-items-center" style="max-width:500px">
+                    <select class="form-select bw-input-select" value="@Form.Model" @onchange="@(e => Form.Model = e.Value?.ToString())" disabled="@_modelsBusy">
+                        @if (_models.Count == 0 && string.IsNullOrWhiteSpace(Form.Model)) {
+                            <option value="" selected>— Select a model —</option>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Form.Model) && !_models.Any(m => m.Id == Form.Model)) {
+                            <option value="@Form.Model" selected>@Form.Model</option>
+                        }
+                        @foreach (var m in _models) {
+                            <option value="@m.Id" selected="@(m.Id == Form.Model)">@m.Name</option>
+                        }
+                    </select>
+                    <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-sm"
+                            disabled="@_modelsBusy"
+                            @onclick="LoadModelsAsync">
+                        @if (_modelsBusy) { <text>...</text> } else { <text>REFRESH</text> }
+                    </button>
+                </div>
+                @if (_modelsError is not null) {
+                    <div class="font-mono mt-2 bw-desc" style="color:var(--bw-danger)">
+                        // @_modelsError
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="cut-corner border mb-4 bw-card-danger">
+        <div class="card-header bw-header-danger">MODULE ACTIONS</div>
+        <div class="p-4">
+            <p class="font-mono mb-4 bw-desc">Configure the action and lockdown behavior for AI Sentinel.</p>
+
+            <div class="bw-field">
+                <div class="bw-field-label">
+                    <div class="form-label mb-1">AI Sentinel &mdash; action</div>
+                    <div class="form-text">Action taken when AI Sentinel flags a message.</div>
+                </div>
+                <InputSelect class="form-select bw-input-select" @bind-Value="Form.Action">
+                    <option value="@InfractionAction.DeleteOnly">Delete only</option>
+                    <option value="@InfractionAction.Timeout">Timeout</option>
+                    <option value="@InfractionAction.Kick">Kick</option>
+                    <option value="@InfractionAction.SoftBan">Soft ban (ban + unban)</option>
+                    <option value="@InfractionAction.Ban">Ban</option>
+                </InputSelect>
+            </div>
+            @if (Form.Action is InfractionAction.Timeout) {
+                <div class="bw-field">
+                    <div class="bw-field-label">
+                        <div class="form-label mb-1">AI Sentinel &mdash; timeout (minutes)</div>
+                        <div class="form-text">How long the user is timed out. Minimum: 1 minute.</div>
+                    </div>
+                    <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="Form.TimeoutMinutes" />
+                </div>
+            }
+            @if (Form.Action is InfractionAction.Ban or InfractionAction.SoftBan) {
+                <div class="bw-field">
+                    <div class="bw-field-label">
+                        <div class="form-label mb-1">AI Sentinel &mdash; delete messages (days)</div>
+                        <div class="form-text">Number of days of message history to purge when banning. Maximum is 7 days.</div>
+                    </div>
+                    <InputNumber class="form-control bw-input-narrow" min="0" max="7" @bind-Value="Form.MessageDeleteDays" />
+                </div>
+            }
+            <div class="bw-field bw-field-last">
+                <div class="bw-field-label">
+                    <div class="form-label mb-1">AI Sentinel &mdash; auto-lockdown</div>
+                    <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
+                </div>
+                <div class="form-check form-switch">
+                    <InputCheckbox class="form-check-input bw-switch" id="aiAutoLockdown" @bind-Value="Form.AutoLockdown" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (Form.IsTrainingMode) {
+        <div class="cut-corner border mb-4 bw-card">
+            <div class="card-header">TRAINING LOG</div>
+            <div class="p-4">
+                <p class="font-mono mb-3 bw-desc">
+                    Review AI analysis results and mark them as correct or incorrect. Only results that would have triggered an action are shown here.
+                </p>
+                <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-sm"
+                        disabled="@_logsBusy"
+                        @onclick="LoadLogsAsync">
+                    @if (_logsBusy) { <text>LOADING...</text> } else { <text>REFRESH LOGS</text> }
+                </button>
+
+                @if (_logs.Count > 0) {
+                    <div class="mt-3">
+                        @foreach (var log in _logs) {
+                            <div class="border-bottom py-3">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div>
+                                        <span class="font-mono bw-role @(log.WouldAction ? "bw-text-primary" : "bw-text-muted")">
+                                            @log.Classification.ToString().ToUpperInvariant()
+                                        </span>
+                                        @if (log.IsDryRun) {
+                                            <span class="font-mono bw-meta ms-2">[DRY RUN]</span>
+                                        }
+                                        @if (log.TrainingFeedback != AiSentinelTrainingFeedback.None) {
+                                            <span class="font-mono bw-meta ms-2">
+                                                @(log.TrainingFeedback == AiSentinelTrainingFeedback.Correct ? "✓ CORRECT" : "✗ INCORRECT")
+                                            </span>
+                                        }
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-outline-success bw-btn-sm font-display cut-corner"
+                                                disabled="@(_feedbackBusy == log.Id)"
+                                                @onclick="() => SetFeedbackAsync(log.Id, AiSentinelTrainingFeedback.Correct)">
+                                            ✓ CORRECT
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger bw-btn-sm font-display cut-corner"
+                                                disabled="@(_feedbackBusy == log.Id)"
+                                                @onclick="() => SetFeedbackAsync(log.Id, AiSentinelTrainingFeedback.Incorrect)">
+                                            ✗ INCORRECT
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="font-mono bw-desc mb-1">
+                                    <strong>@log.Username</strong> in <strong>#@log.ChannelName</strong> &mdash; @log.Provider / @log.Model
+                                </div>
+                                <div class="font-mono bw-desc" style="font-size:0.8rem">
+                                    <strong>Reasoning:</strong> @(log.Reasoning.Length > 200 ? log.Reasoning[..197] + "..." : log.Reasoning)
+                                </div>
+                            </div>
+                        }
+                    </div>
+                } else if (!_logsBusy) {
+                    <div class="font-mono mt-3 bw-desc">
+                        // No training logs yet. Messages analyzed by AI Sentinel will appear here.
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public required AiSentinelForm Form { get; set; }
+    [Parameter, EditorRequired] public required long DiscordGuildId { get; set; }
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private IReadOnlyList<AiSentinelModelDto> _models = [];
+    private bool _modelsBusy;
+    private string? _modelsError;
+
+    private IReadOnlyList<AiSentinelLogSummaryDto> _logs = [];
+    private bool _logsBusy;
+    private long? _feedbackBusy;
+
+    private bool _initialized;
+    private CancellationTokenSource? _debounceCts;
+
+    protected override async Task OnInitializedAsync() {
+        await LoadModelsAsync();
+        if (Form.IsTrainingMode && Form.IsEnabled) {
+            await LoadLogsAsync();
+        }
+        _initialized = true;
+    }
+
+    private async Task LoadModelsAsync() {
+        _modelsBusy = true;
+        _modelsError = null;
+        try {
+            _models = await Api.GetAiSentinelModelsWithCredentialsAsync(DiscordGuildId, new ListAiSentinelModelsRequest(
+                Form.Provider,
+                Form.ApiKey,
+                Form.OllamaUrl,
+                Form.OllamaHeader1Key, Form.OllamaHeader1Value,
+                Form.OllamaHeader2Key, Form.OllamaHeader2Value,
+                Form.OllamaHeader3Key, Form.OllamaHeader3Value
+            ));
+        } catch (Exception ex) {
+            _modelsError = ex.Message;
+            _models = [];
+        } finally {
+            _modelsBusy = false;
+        }
+    }
+
+    private async Task OnProviderChangedAsync() {
+        if (!_initialized) return;
+        _models = [];
+        _modelsError = null;
+        Form.Model = null;
+        await DebounceLoadModelsAsync();
+    }
+
+    private async Task OnCredentialsChangedAsync() {
+        if (!_initialized) return;
+        await DebounceLoadModelsAsync();
+    }
+
+    private async Task DebounceLoadModelsAsync() {
+        _debounceCts?.Cancel();
+        _debounceCts = new CancellationTokenSource();
+        var token = _debounceCts.Token;
+
+        try {
+            await Task.Delay(500, token);
+        } catch (TaskCanceledException) {
+            return;
+        }
+
+        if (token.IsCancellationRequested)
+            return;
+
+        if (Form.Provider != AiSentinelProvider.Ollama && string.IsNullOrWhiteSpace(Form.ApiKey))
+            return;
+
+        if (Form.Provider == AiSentinelProvider.Ollama && string.IsNullOrWhiteSpace(Form.OllamaUrl))
+            return;
+
+        await LoadModelsAsync();
+    }
+
+    private async Task LoadLogsAsync() {
+        _logsBusy = true;
+        try {
+            _logs = await Api.GetAiSentinelLogsAsync(DiscordGuildId, page: 1, pageSize: 50);
+        } catch {
+            _logs = [];
+        } finally {
+            _logsBusy = false;
+        }
+    }
+
+    private async Task SetFeedbackAsync(long logId, AiSentinelTrainingFeedback feedback) {
+        _feedbackBusy = logId;
+        try {
+            await Api.UpdateAiSentinelTrainingFeedbackAsync(DiscordGuildId, logId, feedback);
+            _logs = await Api.GetAiSentinelLogsAsync(DiscordGuildId, page: 1, pageSize: 50);
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to update feedback: {ex.Message}");
+        } finally {
+            _feedbackBusy = null;
+        }
+    }
+}

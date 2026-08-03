@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using Blackwall.Core.DTOs;
+using Blackwall.Core.Entities;
 
 namespace Blackwall.Web.Services;
 
@@ -428,6 +429,63 @@ public sealed class BlackwallApiService(
     public async Task DeleteAllNetWatchSnareChannelsAsync(long discordGuildId, CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/netWatchSnares");
         ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<AiSentinelConfigurationDto?> GetAiSentinelConfigAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/ai-sentinel/config");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<AiSentinelConfigurationDto>(ct);
+    }
+
+    public async Task UpdateAiSentinelConfigAsync(long discordGuildId, UpdateAiSentinelConfigurationRequest dto, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/guilds/{discordGuildId}/ai-sentinel/config");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(dto);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<AiSentinelModelDto>> GetAiSentinelModelsAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/ai-sentinel/models");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) return [];
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<AiSentinelModelDto>>(ct) ?? [];
+    }
+
+    public async Task<IReadOnlyList<AiSentinelModelDto>> GetAiSentinelModelsWithCredentialsAsync(long discordGuildId, ListAiSentinelModelsRequest request, CancellationToken ct = default) {
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/ai-sentinel/models");
+        ApplyAuth(req);
+        req.Content = JsonContent.Create(request);
+        var response = await httpClient.SendAsync(req, ct);
+        if (!response.IsSuccessStatusCode) return [];
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<AiSentinelModelDto>>(ct) ?? [];
+    }
+
+    public async Task<IReadOnlyList<AiSentinelLogSummaryDto>> GetAiSentinelLogsAsync(long discordGuildId, int page = 1, int pageSize = 20, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/ai-sentinel/logs?page={page}&pageSize={pageSize}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<AiSentinelLogSummaryDto>>(ct) ?? [];
+    }
+
+    public async Task<AiSentinelLogDetailDto?> GetAiSentinelLogDetailAsync(long discordGuildId, long logId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/ai-sentinel/logs/{logId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<AiSentinelLogDetailDto>(ct);
+    }
+
+    public async Task UpdateAiSentinelTrainingFeedbackAsync(long discordGuildId, long logId, AiSentinelTrainingFeedback feedback, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/guilds/{discordGuildId}/ai-sentinel/logs/{logId}/feedback");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new UpdateAiSentinelTrainingFeedbackRequest(feedback));
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }

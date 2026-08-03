@@ -1,14 +1,17 @@
 using System.Security.Claims;
 using Blackwall.Api.Services;
 using Blackwall.Bot.Services;
+using Blackwall.Core.Configuration;
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
+using Blackwall.Core.Services;
 using Blackwall.Infrastructure.Cache;
 using Blackwall.Infrastructure.Persistence;
 using Discord.WebSocket;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Blackwall.Api.Controllers;
 
@@ -26,8 +29,33 @@ public sealed class GuildsController(
     LockdownService lockdownService,
     BlacklistService blacklistService,
     BanSyncService banSyncService,
-    AllowedBotService allowedBotService
+    AllowedBotService allowedBotService,
+    AiSentinelCache aiSentinelCache,
+    AiSentinelService aiSentinelService,
+    IOptions<AppConfiguration> appConfiguration
 ) : ControllerBase {
+
+    private (byte[] Key, byte[] Iv) GetCryptoParams() {
+        var key = AesCrypto.GetBytes(appConfiguration.Value.EncryptionKey);
+        var iv = AesCrypto.GetBytes(appConfiguration.Value.EncryptionIv);
+        return (key, iv);
+    }
+
+    private static string? Encrypt(string? plainText, byte[] key, byte[] iv) {
+        if (string.IsNullOrWhiteSpace(plainText))
+            return plainText;
+        return AesCrypto.EncryptString(plainText, key, iv);
+    }
+
+    private static string? Decrypt(string? cipherText, byte[] key, byte[] iv) {
+        if (string.IsNullOrWhiteSpace(cipherText))
+            return cipherText;
+        try {
+            return AesCrypto.DecryptString(cipherText, key, iv);
+        } catch {
+            return cipherText;
+        }
+    }
     
     /// <summary>
     /// Returns all Discord guilds the authenticated user can manage.
@@ -2492,6 +2520,448 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await netWatchSnareChannelCache.InvalidateAsync(discordGuildId);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Returns the AI Sentinel configuration for a guild the authenticated user can manage.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The AI Sentinel configuration.</returns>
+    /// <response code="200">Returns the AI Sentinel configuration.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance or AI Sentinel configuration does not exist.</response>
+    [HttpGet("{discordGuildId:long}/ai-sentinel/config")]
+    [ProducesResponseType(typeof(AiSentinelConfigurationDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AiSentinelConfigurationDto>> GetAiSentinelConfig(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.AiSentinelConfiguration)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var ai = instance.AiSentinelConfiguration;
+        var (encKey, encIv) = GetCryptoParams();
+        return Ok(new AiSentinelConfigurationDto(
+            ai.IsEnabled,
+            ai.IsDryRun,
+            ai.IsTrainingMode,
+            ai.Provider,
+            string.IsNullOrWhiteSpace(ai.ApiKey) ? null : "••••••••••••••••",
+            ai.OllamaUrl,
+            ai.OllamaHeader1Key,
+            Decrypt(ai.OllamaHeader1Value, encKey, encIv),
+            ai.OllamaHeader2Key,
+            Decrypt(ai.OllamaHeader2Value, encKey, encIv),
+            ai.OllamaHeader3Key,
+            Decrypt(ai.OllamaHeader3Value, encKey, encIv),
+            ai.Model,
+            ai.Action,
+            ai.AutoLockdown,
+            ai.TimeoutMinutes,
+            ai.MessageDeleteDays
+        ));
+    }
+
+    /// <summary>
+    /// Updates the AI Sentinel configuration for a guild the authenticated user can manage.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="request">The updated AI Sentinel settings.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">Settings updated successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The guild instance does not exist.</response>
+    [HttpPut("{discordGuildId:long}/ai-sentinel/config")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateAiSentinelConfig(
+        long discordGuildId,
+        [FromBody] UpdateAiSentinelConfigurationRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.AiSentinelConfiguration)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Guild not found.",
+                Detail = "No guild instance exists for this Discord guild ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var ai = instance.AiSentinelConfiguration;
+        var (encKey, encIv) = GetCryptoParams();
+        ai.IsEnabled = request.IsEnabled;
+        ai.IsDryRun = request.IsDryRun;
+        ai.IsTrainingMode = request.IsTrainingMode;
+        ai.Provider = request.Provider;
+        if (!string.IsNullOrWhiteSpace(request.ApiKey) && request.ApiKey != "••••••••••••••••")
+            ai.ApiKey = Encrypt(request.ApiKey, encKey, encIv);
+        ai.OllamaUrl = request.OllamaUrl;
+        ai.OllamaHeader1Key = request.OllamaHeader1Key;
+        ai.OllamaHeader1Value = Encrypt(request.OllamaHeader1Value, encKey, encIv);
+        ai.OllamaHeader2Key = request.OllamaHeader2Key;
+        ai.OllamaHeader2Value = Encrypt(request.OllamaHeader2Value, encKey, encIv);
+        ai.OllamaHeader3Key = request.OllamaHeader3Key;
+        ai.OllamaHeader3Value = Encrypt(request.OllamaHeader3Value, encKey, encIv);
+        ai.Model = request.Model;
+        ai.Action = request.Action;
+        ai.AutoLockdown = request.AutoLockdown;
+        ai.TimeoutMinutes = Math.Max(1, request.TimeoutMinutes);
+        ai.MessageDeleteDays = Math.Clamp(request.MessageDeleteDays, 0, 7);
+        ai.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await aiSentinelCache.InvalidateAsync(discordGuildId);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Lists available models for the configured AI provider.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of available models.</returns>
+    /// <response code="200">Returns the list of available models.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    [HttpGet("{discordGuildId:long}/ai-sentinel/models")]
+    [ProducesResponseType(typeof(IReadOnlyList<AiSentinelModelDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IReadOnlyList<AiSentinelModelDto>>> ListAiSentinelModels(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.GuildInstances
+            .Include(x => x.AiSentinelConfiguration)
+            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+        if (instance is null)
+            return Ok(new List<AiSentinelModelDto>());
+
+        var ai = instance.AiSentinelConfiguration;
+        var (encKey, encIv) = GetCryptoParams();
+        var models = await aiSentinelService.ListModelsAsync(
+            ai.Provider,
+            Decrypt(ai.ApiKey, encKey, encIv),
+            ai.OllamaUrl,
+            ai.OllamaHeader1Key, Decrypt(ai.OllamaHeader1Value, encKey, encIv),
+            ai.OllamaHeader2Key, Decrypt(ai.OllamaHeader2Value, encKey, encIv),
+            ai.OllamaHeader3Key, Decrypt(ai.OllamaHeader3Value, encKey, encIv),
+            cancellationToken);
+
+        return Ok(models);
+    }
+
+    /// <summary>
+    /// Lists available models for the provided AI provider credentials without saving.
+    /// Used for live model loading when the user enters or changes API keys.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="request">The provider credentials to test.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of available models.</returns>
+    /// <response code="200">Returns the list of available models.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    [HttpPost("{discordGuildId:long}/ai-sentinel/models")]
+    [ProducesResponseType(typeof(IReadOnlyList<AiSentinelModelDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IReadOnlyList<AiSentinelModelDto>>> ListAiSentinelModelsWithCredentials(
+        long discordGuildId,
+        [FromBody] ListAiSentinelModelsRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var (encKey, encIv) = GetCryptoParams();
+
+        string? apiKey = request.ApiKey;
+        if (string.IsNullOrWhiteSpace(apiKey) || apiKey == "••••••••••••••••") {
+            var instance = await dbContext.GuildInstances
+                .Include(x => x.AiSentinelConfiguration)
+                .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+            apiKey = instance is not null
+                ? Decrypt(instance.AiSentinelConfiguration.ApiKey, encKey, encIv)
+                : null;
+        }
+
+        string? ollamaUrl = request.OllamaUrl;
+        string? h1v = request.OllamaHeader1Value;
+        string? h2v = request.OllamaHeader2Value;
+        string? h3v = request.OllamaHeader3Value;
+
+        if (request.Provider == AiSentinelProvider.Ollama) {
+            var instance = await dbContext.GuildInstances
+                .Include(x => x.AiSentinelConfiguration)
+                .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId, cancellationToken);
+
+            if (instance is not null) {
+                var ai = instance.AiSentinelConfiguration;
+                ollamaUrl = string.IsNullOrWhiteSpace(ollamaUrl) ? ai.OllamaUrl : ollamaUrl;
+                h1v = string.IsNullOrWhiteSpace(h1v) ? Decrypt(ai.OllamaHeader1Value, encKey, encIv) : h1v;
+                h2v = string.IsNullOrWhiteSpace(h2v) ? Decrypt(ai.OllamaHeader2Value, encKey, encIv) : h2v;
+                h3v = string.IsNullOrWhiteSpace(h3v) ? Decrypt(ai.OllamaHeader3Value, encKey, encIv) : h3v;
+            }
+        }
+
+        var models = await aiSentinelService.ListModelsAsync(
+            request.Provider,
+            apiKey,
+            ollamaUrl,
+            request.OllamaHeader1Key, h1v,
+            request.OllamaHeader2Key, h2v,
+            request.OllamaHeader3Key, h3v,
+            cancellationToken);
+
+        return Ok(models);
+    }
+
+    /// <summary>
+    /// Returns a paginated list of AI Sentinel log entries for a guild.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="page">The page number (1-based).</param>
+    /// <param name="pageSize">The number of entries per page.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of AI Sentinel log summaries.</returns>
+    /// <response code="200">Returns the list of log entries.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    [HttpGet("{discordGuildId:long}/ai-sentinel/logs")]
+    [ProducesResponseType(typeof(IReadOnlyList<AiSentinelLogSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IReadOnlyList<AiSentinelLogSummaryDto>>> GetAiSentinelLogs(
+        long discordGuildId,
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken cancellationToken = default
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var logs = await dbContext.AiSentinelLogs
+            .Where(l => l.AiSentinelConfiguration.GuildInstance.DiscordGuildId == discordGuildId)
+            .OrderByDescending(l => l.CreatedAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(l => new AiSentinelLogSummaryDto(
+                l.Id,
+                l.DiscordMessageId,
+                l.DiscordUserId,
+                l.Username,
+                l.DiscordChannelId,
+                l.ChannelName,
+                l.Classification,
+                l.Reasoning,
+                l.Provider,
+                l.Model,
+                l.IsDryRun,
+                l.WouldAction,
+                l.TrainingFeedback,
+                l.CreatedAtUtc
+            ))
+            .ToListAsync(cancellationToken);
+
+        return Ok(logs);
+    }
+
+    /// <summary>
+    /// Returns the full detail of a specific AI Sentinel log entry.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="logId">The log entry ID.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The full log entry detail.</returns>
+    /// <response code="200">Returns the log entry detail.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The log entry does not exist.</response>
+    [HttpGet("{discordGuildId:long}/ai-sentinel/logs/{logId:long}")]
+    [ProducesResponseType(typeof(AiSentinelLogDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AiSentinelLogDetailDto>> GetAiSentinelLogDetail(
+        long discordGuildId,
+        long logId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var log = await dbContext.AiSentinelLogs
+            .Where(l => l.Id == logId
+                && l.AiSentinelConfiguration.GuildInstance.DiscordGuildId == discordGuildId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (log is null)
+            return NotFound(new ProblemDetails {
+                Title = "Log not found.",
+                Detail = "No AI Sentinel log entry exists with this ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        return Ok(new AiSentinelLogDetailDto(
+            log.Id,
+            log.DiscordMessageId,
+            log.DiscordUserId,
+            log.Username,
+            log.AvatarHash,
+            log.DiscordChannelId,
+            log.ChannelName,
+            log.Content,
+            log.EmbedsJson,
+            log.Classification,
+            log.Reasoning,
+            log.Provider,
+            log.Model,
+            log.IsDryRun,
+            log.WouldAction,
+            log.TrainingFeedback,
+            log.MessageTimestampUtc,
+            log.CreatedAtUtc
+        ));
+    }
+
+    /// <summary>
+    /// Updates the training feedback for a specific AI Sentinel log entry.
+    /// </summary>
+    /// <param name="discordGuildId">The Discord guild ID.</param>
+    /// <param name="logId">The log entry ID.</param>
+    /// <param name="request">The training feedback update.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <response code="204">Feedback updated successfully.</response>
+    /// <response code="401">The user identity could not be resolved from the JWT.</response>
+    /// <response code="403">The current user cannot manage the specified guild.</response>
+    /// <response code="404">The log entry does not exist.</response>
+    [HttpPut("{discordGuildId:long}/ai-sentinel/logs/{logId:long}/feedback")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateAiSentinelTrainingFeedback(
+        long discordGuildId,
+        long logId,
+        [FromBody] UpdateAiSentinelTrainingFeedbackRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var log = await dbContext.AiSentinelLogs
+            .Where(l => l.Id == logId
+                && l.AiSentinelConfiguration.GuildInstance.DiscordGuildId == discordGuildId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (log is null)
+            return NotFound(new ProblemDetails {
+                Title = "Log not found.",
+                Detail = "No AI Sentinel log entry exists with this ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        log.TrainingFeedback = request.Feedback;
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return NoContent();
     }

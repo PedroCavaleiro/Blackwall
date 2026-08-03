@@ -61,6 +61,7 @@
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "scoring" ? "active" : "")" @onclick='() => _activeTab = "scoring"'>SCORING</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "bans" ? "active" : "")" @onclick='() => _activeTab = "bans"'>BANS</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "netWatchSnare" ? "active" : "")" @onclick='() => _activeTab = "netWatchSnare"'>NETWATCH SNARE</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "aisentinel" ? "active" : "")" @onclick='() => _activeTab = "aisentinel"'>AI SENTINEL</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "audit" ? "active" : "")" @onclick='() => _activeTab = "audit"'>AUDIT</button>
                 </nav>
 
@@ -89,6 +90,9 @@
                     }
                     @if (_activeTab == "netWatchSnare") {
                         <NetWatchSnareTab DiscordGuildId="DiscordGuildId" OnError="HandleError" />
+                    }
+                    @if (_activeTab == "aisentinel") {
+                        <AiSentinelTab Form="AiForm" DiscordGuildId="DiscordGuildId" OnError="HandleError" />
                     }
                     @if (_activeTab == "audit") {
                         <AuditTab Form="Form" DiscordGuildId="DiscordGuildId" />
@@ -153,6 +157,7 @@
     private string _activeTab = "general";
 
     private SpamConfigForm Form { get; set; } = new();
+    private AiSentinelForm AiForm { get; set; } = new();
     private bool _isLockedDown;
     private bool _lockdownBusy;
 
@@ -222,6 +227,31 @@
                 Form.IsMessageAuditEnabled = s.IsMessageAuditEnabled;
                 Form.MessageAuditRetentionDays = s.MessageAuditRetentionDays;
                 _isLockedDown = s.IsLockedDown;
+            }
+
+            try {
+                var ai = await Api.GetAiSentinelConfigAsync(DiscordGuildId);
+                if (ai is not null) {
+                    AiForm.IsEnabled = ai.IsEnabled;
+                    AiForm.IsDryRun = ai.IsDryRun;
+                    AiForm.IsTrainingMode = ai.IsTrainingMode;
+                    AiForm.Provider = ai.Provider;
+                    AiForm.ApiKey = null;
+                    AiForm.OllamaUrl = ai.OllamaUrl;
+                    AiForm.OllamaHeader1Key = ai.OllamaHeader1Key;
+                    AiForm.OllamaHeader1Value = ai.OllamaHeader1Value;
+                    AiForm.OllamaHeader2Key = ai.OllamaHeader2Key;
+                    AiForm.OllamaHeader2Value = ai.OllamaHeader2Value;
+                    AiForm.OllamaHeader3Key = ai.OllamaHeader3Key;
+                    AiForm.OllamaHeader3Value = ai.OllamaHeader3Value;
+                    AiForm.Model = ai.Model;
+                    AiForm.Action = ai.Action;
+                    AiForm.AutoLockdown = ai.AutoLockdown;
+                    AiForm.TimeoutMinutes = ai.TimeoutMinutes;
+                    AiForm.MessageDeleteDays = ai.MessageDeleteDays;
+                }
+            } catch {
+                // AI sentinel config not available yet — defaults are fine
             }
         } catch {
             _settings = null;
@@ -305,6 +335,30 @@
             ));
             _saved = true;
             _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
+
+            try {
+                await Api.UpdateAiSentinelConfigAsync(DiscordGuildId, new UpdateAiSentinelConfigurationRequest(
+                    AiForm.IsEnabled,
+                    AiForm.IsDryRun,
+                    AiForm.IsTrainingMode,
+                    AiForm.Provider,
+                    AiForm.ApiKey,
+                    AiForm.OllamaUrl,
+                    AiForm.OllamaHeader1Key,
+                    AiForm.OllamaHeader1Value,
+                    AiForm.OllamaHeader2Key,
+                    AiForm.OllamaHeader2Value,
+                    AiForm.OllamaHeader3Key,
+                    AiForm.OllamaHeader3Value,
+                    AiForm.Model,
+                    AiForm.Action,
+                    AiForm.AutoLockdown,
+                    AiForm.TimeoutMinutes,
+                    AiForm.MessageDeleteDays
+                ));
+            } catch (Exception ex) {
+                _error = $"Failed to save AI Sentinel settings: {ex.Message}";
+            }
         } catch (Exception ex) {
             _error = $"Failed to save settings: {ex.Message}";
         }

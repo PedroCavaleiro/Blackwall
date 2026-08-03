@@ -19,6 +19,8 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<MessageAuditEvent> MessageAuditEvents => Set<MessageAuditEvent>();
     public DbSet<MessageAuditRecord> MessageAuditRecords => Set<MessageAuditRecord>();
     public DbSet<NetWatchSnareChannel> NetWatchSnareChannels => Set<NetWatchSnareChannel>();
+    public DbSet<AiSentinelConfiguration> AiSentinelConfigurations => Set<AiSentinelConfiguration>();
+    public DbSet<AiSentinelLog> AiSentinelLogs => Set<AiSentinelLog>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -77,6 +79,11 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.HasOne(e => e.SpamConfiguration)
                   .WithOne(e => e.GuildInstance)
                   .HasForeignKey<SpamConfiguration>(e => e.GuildInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.AiSentinelConfiguration)
+                  .WithOne(e => e.GuildInstance)
+                  .HasForeignKey<AiSentinelConfiguration>(e => e.GuildInstanceId)
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasMany(e => e.Bans)
@@ -520,6 +527,129 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
 
             entity.HasIndex(e => new { e.SpamConfigurationId, e.DiscordChannelId })
                   .IsUnique();
+        });
+
+        modelBuilder.Entity<AiSentinelConfiguration>(entity => {
+            entity.Property(e => e.IsEnabled)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.IsDryRun)
+                  .IsRequired()
+                  .HasDefaultValue(true);
+
+            entity.Property(e => e.IsTrainingMode)
+                  .IsRequired()
+                  .HasDefaultValue(true);
+
+            entity.Property(e => e.Provider)
+                  .IsRequired()
+                  .HasDefaultValue(AiSentinelProvider.OpenAI);
+
+            entity.Property(e => e.ApiKey)
+                  .HasMaxLength(512);
+
+            entity.Property(e => e.OllamaUrl)
+                  .HasMaxLength(512);
+
+            entity.Property(e => e.OllamaHeader1Key)
+                  .HasMaxLength(100);
+
+            entity.Property(e => e.OllamaHeader1Value)
+                  .HasMaxLength(512);
+
+            entity.Property(e => e.OllamaHeader2Key)
+                  .HasMaxLength(100);
+
+            entity.Property(e => e.OllamaHeader2Value)
+                  .HasMaxLength(512);
+
+            entity.Property(e => e.OllamaHeader3Key)
+                  .HasMaxLength(100);
+
+            entity.Property(e => e.OllamaHeader3Value)
+                  .HasMaxLength(512);
+
+            entity.Property(e => e.Model)
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.Action)
+                  .IsRequired()
+                  .HasDefaultValue(InfractionAction.DeleteOnly);
+
+            entity.Property(e => e.AutoLockdown)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.TimeoutMinutes)
+                  .IsRequired()
+                  .HasDefaultValue(10);
+
+            entity.Property(e => e.MessageDeleteDays)
+                  .IsRequired()
+                  .HasDefaultValue(0);
+
+            entity.Property(e => e.UpdatedAtUtc);
+
+            entity.HasMany(e => e.Logs)
+                  .WithOne(e => e.AiSentinelConfiguration)
+                  .HasForeignKey(e => e.AiSentinelConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AiSentinelLog>(entity => {
+            entity.Property(e => e.DiscordMessageId)
+                  .IsRequired();
+
+            entity.Property(e => e.DiscordUserId)
+                  .IsRequired();
+
+            entity.Property(e => e.Username)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.ChannelName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.Content)
+                  .IsRequired();
+
+            entity.Property(e => e.EmbedsJson)
+                  .IsRequired();
+
+            entity.Property(e => e.Classification)
+                  .IsRequired();
+
+            entity.Property(e => e.Reasoning)
+                  .IsRequired();
+
+            entity.Property(e => e.Provider)
+                  .IsRequired();
+
+            entity.Property(e => e.Model)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.IsDryRun)
+                  .IsRequired();
+
+            entity.Property(e => e.WouldAction)
+                  .IsRequired();
+
+            entity.Property(e => e.TrainingFeedback)
+                  .IsRequired()
+                  .HasDefaultValue(AiSentinelTrainingFeedback.None);
+
+            entity.Property(e => e.MessageTimestampUtc)
+                  .IsRequired();
+
+            entity.Property(e => e.ExpiresAtUtc)
+                  .IsRequired();
+
+            entity.HasIndex(e => e.AiSentinelConfigurationId);
+            entity.HasIndex(e => e.ExpiresAtUtc);
+            entity.HasIndex(e => new { e.AiSentinelConfigurationId, e.CreatedAtUtc });
         });
 
     }

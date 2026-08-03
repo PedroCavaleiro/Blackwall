@@ -22,6 +22,7 @@ public sealed class GuildHandler(
 
         var existing = await dbContext.GuildInstances
             .Include(x => x.SpamConfiguration)
+            .Include(x => x.AiSentinelConfiguration)
             .FirstOrDefaultAsync(x => x.DiscordGuildId == (long)guild.Id);
 
         if (existing is not null) {
@@ -29,6 +30,16 @@ public sealed class GuildHandler(
             existing.IconHash = guild.IconId;
             existing.IsActive = true;
             existing.UpdatedAtUtc = DateTime.UtcNow;
+
+            if (existing.AiSentinelConfiguration is null) {
+                existing.AiSentinelConfiguration = new AiSentinelConfiguration {
+                    IsEnabled = false,
+                    IsDryRun = true,
+                    IsTrainingMode = true,
+                    Provider = AiSentinelProvider.OpenAI,
+                    Action = InfractionAction.DeleteOnly
+                };
+            }
 
             if (existing.OwnerUserId is null) {
                 var ownerUser = await dbContext.AppUsers
@@ -89,6 +100,13 @@ public sealed class GuildHandler(
                 SuspiciousLinkAutoLockdown = false,
                 SuspiciousLinkTimeoutMinutes = 10,
                 SuspiciousLinkMessageDeleteDays = 0
+            },
+            AiSentinelConfiguration = new AiSentinelConfiguration {
+                IsEnabled = false,
+                IsDryRun = true,
+                IsTrainingMode = true,
+                Provider = AiSentinelProvider.OpenAI,
+                Action = InfractionAction.DeleteOnly
             }
         };
 
