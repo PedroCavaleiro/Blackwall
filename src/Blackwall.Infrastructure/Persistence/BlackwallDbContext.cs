@@ -544,7 +544,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
 
             entity.Property(e => e.Provider)
                   .IsRequired()
-                  .HasDefaultValue(AiSentinelProvider.OpenAI);
+                  .HasDefaultValue(AiSentinelProvider.OpenAi);
 
             entity.Property(e => e.ApiKey)
                   .HasMaxLength(512);

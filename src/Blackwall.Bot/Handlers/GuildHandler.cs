@@ -36,7 +36,7 @@ public sealed class GuildHandler(
                     IsEnabled = false,
                     IsDryRun = true,
                     IsTrainingMode = true,
-                    Provider = AiSentinelProvider.OpenAI,
+                    Provider = AiSentinelProvider.OpenAi,
                     Action = InfractionAction.DeleteOnly
                 };
             }
@@ -105,7 +105,7 @@ public sealed class GuildHandler(
                 IsEnabled = false,
                 IsDryRun = true,
                 IsTrainingMode = true,
-                Provider = AiSentinelProvider.OpenAI,
+                Provider = AiSentinelProvider.OpenAi,
                 Action = InfractionAction.DeleteOnly
             }
         };

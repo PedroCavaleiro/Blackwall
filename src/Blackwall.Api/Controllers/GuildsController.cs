@@ -2754,10 +2754,10 @@ public sealed class GuildsController(
                 : null;
         }
 
-        string? ollamaUrl = request.OllamaUrl;
-        string? h1v = request.OllamaHeader1Value;
-        string? h2v = request.OllamaHeader2Value;
-        string? h3v = request.OllamaHeader3Value;
+        var ollamaUrl = request.OllamaUrl;
+        var h1V = request.OllamaHeader1Value;
+        var h2V = request.OllamaHeader2Value;
+        var h3V = request.OllamaHeader3Value;
 
         if (request.Provider == AiSentinelProvider.Ollama) {
             var instance = await dbContext.GuildInstances
@@ -2767,9 +2767,9 @@ public sealed class GuildsController(
             if (instance is not null) {
                 var ai = instance.AiSentinelConfiguration;
                 ollamaUrl = string.IsNullOrWhiteSpace(ollamaUrl) ? ai.OllamaUrl : ollamaUrl;
-                h1v = string.IsNullOrWhiteSpace(h1v) ? Decrypt(ai.OllamaHeader1Value, encKey, encIv) : h1v;
-                h2v = string.IsNullOrWhiteSpace(h2v) ? Decrypt(ai.OllamaHeader2Value, encKey, encIv) : h2v;
-                h3v = string.IsNullOrWhiteSpace(h3v) ? Decrypt(ai.OllamaHeader3Value, encKey, encIv) : h3v;
+                h1V = string.IsNullOrWhiteSpace(h1V) ? Decrypt(ai.OllamaHeader1Value, encKey, encIv) : h1V;
+                h2V = string.IsNullOrWhiteSpace(h2V) ? Decrypt(ai.OllamaHeader2Value, encKey, encIv) : h2V;
+                h3V = string.IsNullOrWhiteSpace(h3V) ? Decrypt(ai.OllamaHeader3Value, encKey, encIv) : h3V;
             }
         }
 
@@ -2777,9 +2777,9 @@ public sealed class GuildsController(
             request.Provider,
             apiKey,
             ollamaUrl,
-            request.OllamaHeader1Key, h1v,
-            request.OllamaHeader2Key, h2v,
-            request.OllamaHeader3Key, h3v,
+            request.OllamaHeader1Key, h1V,
+            request.OllamaHeader2Key, h2V,
+            request.OllamaHeader3Key, h3V,
             cancellationToken);
 
         return Ok(models);

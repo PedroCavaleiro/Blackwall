@@ -1,4 +1,5 @@
 // ReSharper disable NullableWarningSuppressionIsUsed
+// ReSharper disable PropertyCanBeMadeInitOnly.Global
 namespace Blackwall.Core.Entities;
 
 public sealed class GuildInstance: EntityBase {

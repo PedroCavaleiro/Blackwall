@@ -50,7 +50,7 @@
                     <div class="form-text">Select the AI provider to use for message analysis.</div>
                 </div>
                 <InputSelect class="form-select bw-input-select" style="max-width:260px" @bind-Value="Form.Provider" @bind-Value:after="OnProviderChangedAsync">
-                    <option value="@AiSentinelProvider.OpenAI">OpenAI</option>
+                    <option value="@AiSentinelProvider.OpenAi">OpenAI</option>
                     <option value="@AiSentinelProvider.Anthropic">Anthropic</option>
                     <option value="@AiSentinelProvider.GoogleGemini">Google Gemini</option>
                     <option value="@AiSentinelProvider.Ollama">Ollama</option>
@@ -116,7 +116,7 @@
                         @if (_models.Count == 0 && string.IsNullOrWhiteSpace(Form.Model)) {
                             <option value="" selected>— Select a model —</option>
                         }
-                        @if (!string.IsNullOrWhiteSpace(Form.Model) && !_models.Any(m => m.Id == Form.Model)) {
+                        @if (!string.IsNullOrWhiteSpace(Form.Model) && _models.All(m => m.Id != Form.Model)) {
                             <option value="@Form.Model" selected>@Form.Model</option>
                         }
                         @foreach (var m in _models) {
@@ -267,7 +267,7 @@
 
     protected override async Task OnInitializedAsync() {
         await LoadModelsAsync();
-        if (Form.IsTrainingMode && Form.IsEnabled) {
+        if (Form is { IsTrainingMode: true, IsEnabled: true }) {
             await LoadLogsAsync();
         }
         _initialized = true;
@@ -307,7 +307,9 @@
     }
 
     private async Task DebounceLoadModelsAsync() {
-        _debounceCts?.Cancel();
+        if (_debounceCts != null)
+            await _debounceCts.CancelAsync();
+
         _debounceCts = new CancellationTokenSource();
         var token = _debounceCts.Token;
 

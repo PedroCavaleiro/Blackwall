@@ -6,7 +6,7 @@ public sealed class AiSentinelForm {
     public bool IsEnabled { get; set; }
     public bool IsDryRun { get; set; } = true;
     public bool IsTrainingMode { get; set; } = true;
-    public AiSentinelProvider Provider { get; set; } = AiSentinelProvider.OpenAI;
+    public AiSentinelProvider Provider { get; set; } = AiSentinelProvider.OpenAi;
     public string? ApiKey { get; set; }
     public string? OllamaUrl { get; set; }
     public string? OllamaHeader1Key { get; set; }

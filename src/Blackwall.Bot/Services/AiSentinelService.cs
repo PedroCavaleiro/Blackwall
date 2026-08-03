@@ -58,7 +58,7 @@ public sealed class AiSentinelService(
     ) {
         try {
             return provider switch {
-                AiSentinelProvider.OpenAI => await ListOpenAiModelsAsync(apiKey, cancellationToken),
+                AiSentinelProvider.OpenAi => await ListOpenAiModelsAsync(apiKey, cancellationToken),
                 AiSentinelProvider.Anthropic => await ListAnthropicModelsAsync(apiKey, cancellationToken),
                 AiSentinelProvider.GoogleGemini => await ListGeminiModelsAsync(apiKey, cancellationToken),
                 AiSentinelProvider.Ollama => await ListOllamaModelsAsync(ollamaUrl, ollamaHeader1Key, ollamaHeader1Value, ollamaHeader2Key, ollamaHeader2Value, ollamaHeader3Key, ollamaHeader3Value, cancellationToken),
@@ -86,7 +86,7 @@ public sealed class AiSentinelService(
 
         try {
             return config.Provider switch {
-                AiSentinelProvider.OpenAI => await AnalyzeOpenAiAsync(fullContent, config, cancellationToken),
+                AiSentinelProvider.OpenAi => await AnalyzeOpenAiAsync(fullContent, config, cancellationToken),
                 AiSentinelProvider.Anthropic => await AnalyzeAnthropicAsync(fullContent, config, cancellationToken),
                 AiSentinelProvider.GoogleGemini => await AnalyzeGeminiAsync(fullContent, config, cancellationToken),
                 AiSentinelProvider.Ollama => await AnalyzeOllamaAsync(fullContent, config, cancellationToken),

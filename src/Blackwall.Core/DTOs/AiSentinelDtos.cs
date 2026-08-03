@@ -1,4 +1,5 @@
 using Blackwall.Core.Entities;
+// ReSharper disable NotAccessedPositionalProperty.Global
 
 namespace Blackwall.Core.DTOs;
 

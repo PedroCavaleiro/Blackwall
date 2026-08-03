@@ -57,7 +57,7 @@ public sealed class MessageHandler(
         long discordGuildId,
         long discordUserId
     ) {
-        Core.DTOs.SpamConfigurationDto? config;
+        SpamConfigurationDto? config;
 
         using (var scope = scopeFactory.CreateScope()) {
             var cache = scope.ServiceProvider.GetRequiredService<SpamConfigurationCache>();

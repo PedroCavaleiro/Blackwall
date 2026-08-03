@@ -6,6 +6,7 @@ using Discord.WebSocket;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+// ReSharper disable UnusedParameter.Local
 
 namespace Blackwall.Bot.Services;
 
@@ -158,7 +159,7 @@ public sealed class MessageAuditService(
             if (msg is null)
                 return null;
 
-            var channelName = (guild.GetChannel(channelId) as SocketGuildChannel)?.Name ?? "unknown";
+            var channelName = guild.GetChannel(channelId)?.Name ?? "unknown";
             var embeds = ExtractEmbeds(msg);
             return new MessageAuditRecord {
                 EventId = eventId,

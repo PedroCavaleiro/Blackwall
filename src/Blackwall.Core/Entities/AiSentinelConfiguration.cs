@@ -1,4 +1,5 @@
 // ReSharper disable PropertyCanBeMadeInitOnly.Global
+// ReSharper disable NullableWarningSuppressionIsUsed
 namespace Blackwall.Core.Entities;
 
 public class AiSentinelConfiguration : EntityBase {
@@ -9,7 +10,7 @@ public class AiSentinelConfiguration : EntityBase {
     public bool IsDryRun { get; set; } = true;
     public bool IsTrainingMode { get; set; } = true;
 
-    public AiSentinelProvider Provider { get; set; } = AiSentinelProvider.OpenAI;
+    public AiSentinelProvider Provider { get; set; } = AiSentinelProvider.OpenAi;
 
     public string? ApiKey { get; set; }
     public string? OllamaUrl { get; set; }
