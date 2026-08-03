@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Blackwall.Web.Services;
 
@@ -486,6 +487,49 @@ public sealed class BlackwallApiService(
         using var request = new HttpRequestMessage(HttpMethod.Put, $"api/guilds/{discordGuildId}/ai-sentinel/logs/{logId}/feedback");
         ApplyAuth(request);
         request.Content = JsonContent.Create(new UpdateAiSentinelTrainingFeedbackRequest(feedback));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<GuildModuleInstallationDto>> GetModulesAsync(long discordGuildId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/modules");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<GuildModuleInstallationDto>>(ct) ?? [];
+    }
+
+    public async Task<GuildModuleInstallationDto?> InstallModuleAsync(long discordGuildId, string gitUrl, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/modules/install");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new InstallModuleRequest(gitUrl));
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct);
+            throw new Exception(problem?.Detail ?? problem?.Title ?? $"HTTP {response.StatusCode}");
+        }
+        return await response.Content.ReadFromJsonAsync<GuildModuleInstallationDto>(ct);
+    }
+
+    public async Task UninstallModuleAsync(long discordGuildId, string moduleName, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/modules/{Uri.EscapeDataString(moduleName)}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task SetModuleEnabledAsync(long discordGuildId, string moduleName, bool isEnabled, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/guilds/{discordGuildId}/modules/{Uri.EscapeDataString(moduleName)}/enabled");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new UpdateModuleEnabledRequest(isEnabled));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task UpdateModuleSettingsAsync(long discordGuildId, string moduleName, string settingsJson, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/guilds/{discordGuildId}/modules/{Uri.EscapeDataString(moduleName)}/settings");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new UpdateModuleSettingsRequest(settingsJson));
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }

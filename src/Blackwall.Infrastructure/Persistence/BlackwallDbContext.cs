@@ -21,6 +21,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<NetWatchSnareChannel> NetWatchSnareChannels => Set<NetWatchSnareChannel>();
     public DbSet<AiSentinelConfiguration> AiSentinelConfigurations => Set<AiSentinelConfiguration>();
     public DbSet<AiSentinelLog> AiSentinelLogs => Set<AiSentinelLog>();
+    public DbSet<GuildModuleInstallation> GuildModuleInstallations => Set<GuildModuleInstallation>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -650,6 +651,47 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.HasIndex(e => e.AiSentinelConfigurationId);
             entity.HasIndex(e => e.ExpiresAtUtc);
             entity.HasIndex(e => new { e.AiSentinelConfigurationId, e.CreatedAtUtc });
+        });
+
+        modelBuilder.Entity<GuildModuleInstallation>(entity => {
+            entity.Property(e => e.ModuleName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.ModuleVersion)
+                  .IsRequired()
+                  .HasMaxLength(50);
+
+            entity.Property(e => e.ModuleAuthor)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.EntryPoint)
+                  .IsRequired()
+                  .HasMaxLength(500);
+
+            entity.Property(e => e.CanPerformActions)
+                  .IsRequired();
+
+            entity.Property(e => e.IsEnabled)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.SettingsJson)
+                  .IsRequired();
+
+            entity.Property(e => e.ManifestJson)
+                  .IsRequired();
+
+            entity.Property(e => e.UpdatedAtUtc);
+
+            entity.HasOne(e => e.GuildInstance)
+                  .WithMany()
+                  .HasForeignKey(e => e.GuildInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.GuildInstanceId, e.ModuleName })
+                  .IsUnique();
         });
 
     }

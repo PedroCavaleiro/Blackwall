@@ -31,6 +31,12 @@ services:
     environment:
       API__PORT: "8080"
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+    user: "blackwall"
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - modules_data:/app/modules
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,6 +53,10 @@ services:
       WEB__PORT: "8080"
       API__BASE_URL: "http://api:8080"
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+    user: "blackwall"
+    read_only: true
+    tmpfs:
+      - /tmp
     depends_on:
       - api
     restart: unless-stopped
@@ -64,3 +74,4 @@ services:
 
 volumes:
   postgres_data:
+  modules_data:

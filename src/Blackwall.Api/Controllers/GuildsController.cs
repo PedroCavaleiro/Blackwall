@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Blackwall.Api.Services;
 using Blackwall.Bot.Services;
 using Blackwall.Core.Configuration;
@@ -32,8 +34,13 @@ public sealed class GuildsController(
     AllowedBotService allowedBotService,
     AiSentinelCache aiSentinelCache,
     AiSentinelService aiSentinelService,
+    ModuleInstallationService moduleInstallationService,
     IOptions<AppConfiguration> appConfiguration
 ) : ControllerBase {
+
+    private static readonly JsonSerializerOptions ModuleJsonOptions = new(JsonSerializerDefaults.Web) {
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+    };
 
     private (byte[] Key, byte[] Iv) GetCryptoParams() {
         var key = AesCrypto.GetBytes(appConfiguration.Value.EncryptionKey);
@@ -2994,6 +3001,205 @@ public sealed class GuildsController(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return NoContent();
+    }
+
+    // ─── Modules ─────────────────────────────────────────────────────────────────
+
+    [HttpGet("{discordGuildId:long}/modules")]
+    [ProducesResponseType(typeof(IReadOnlyList<GuildModuleInstallationDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IReadOnlyList<GuildModuleInstallationDto>>> ListModules(
+        long discordGuildId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var installations = await moduleInstallationService.ListInstalledAsync(discordGuildId, cancellationToken);
+
+        var dtos = installations.Select(x => {
+            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(x.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", "", "", null, "", false, null);
+            return new GuildModuleInstallationDto(
+                x.Id,
+                discordGuildId,
+                x.ModuleName,
+                x.ModuleVersion,
+                x.ModuleAuthor,
+                manifest.Description,
+                x.CanPerformActions,
+                x.IsEnabled,
+                x.SettingsJson,
+                manifest
+            );
+        }).ToList();
+
+        return Ok(dtos);
+    }
+
+    [HttpPost("{discordGuildId:long}/modules/install")]
+    [ProducesResponseType(typeof(GuildModuleInstallationDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<GuildModuleInstallationDto>> InstallModule(
+        long discordGuildId,
+        [FromBody] InstallModuleRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        try {
+            var installation = await moduleInstallationService.InstallAsync(discordGuildId, request.GitUrl, cancellationToken);
+            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(installation.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", "", "", null, "", false, null);
+            return Ok(new GuildModuleInstallationDto(
+                installation.Id,
+                discordGuildId,
+                installation.ModuleName,
+                installation.ModuleVersion,
+                installation.ModuleAuthor,
+                manifest.Description,
+                installation.CanPerformActions,
+                installation.IsEnabled,
+                installation.SettingsJson,
+                manifest
+            ));
+        } catch (ArgumentException ex) {
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid module URL.",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest
+            });
+        } catch (InvalidOperationException ex) {
+            return BadRequest(new ProblemDetails {
+                Title = "Module installation failed.",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+    }
+
+    [HttpDelete("{discordGuildId:long}/modules/{moduleName}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UninstallModule(
+        long discordGuildId,
+        string moduleName,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        try {
+            await moduleInstallationService.UninstallAsync(discordGuildId, moduleName, cancellationToken);
+            return NoContent();
+        } catch (InvalidOperationException) {
+            return NotFound(new ProblemDetails {
+                Title = "Module not found.",
+                Detail = $"Module '{moduleName}' is not installed for this guild.",
+                Status = StatusCodes.Status404NotFound
+            });
+        }
+    }
+
+    [HttpPut("{discordGuildId:long}/modules/{moduleName}/enabled")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetModuleEnabled(
+        long discordGuildId,
+        string moduleName,
+        [FromBody] UpdateModuleEnabledRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        try {
+            await moduleInstallationService.SetEnabledAsync(discordGuildId, moduleName, request.IsEnabled, cancellationToken);
+            return NoContent();
+        } catch (InvalidOperationException) {
+            return NotFound(new ProblemDetails {
+                Title = "Module not found.",
+                Detail = $"Module '{moduleName}' is not installed for this guild.",
+                Status = StatusCodes.Status404NotFound
+            });
+        }
+    }
+
+    [HttpPut("{discordGuildId:long}/modules/{moduleName}/settings")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateModuleSettings(
+        long discordGuildId,
+        string moduleName,
+        [FromBody] UpdateModuleSettingsRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        try {
+            await moduleInstallationService.UpdateSettingsAsync(discordGuildId, moduleName, request.SettingsJson, cancellationToken);
+            return NoContent();
+        } catch (InvalidOperationException) {
+            return NotFound(new ProblemDetails {
+                Title = "Module not found.",
+                Detail = $"Module '{moduleName}' is not installed for this guild.",
+                Status = StatusCodes.Status404NotFound
+            });
+        }
     }
 
     /// <summary>

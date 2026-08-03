@@ -1,0 +1,226 @@
+@inject BlackwallApiService Api
+@using System.Text.Json
+@using Blackwall.Core.DTOs
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">INSTALL MODULE</div>
+    <div class="p-4">
+        <p class="font-mono mb-3 bw-desc">
+            Install a module from a public HTTPS Git repository. The repository must contain a <code>blackwall-module.json</code> manifest at the root.
+        </p>
+        <div class="d-flex gap-2">
+            <input type="text" class="form-control bw-input font-mono" placeholder="https://github.com/user/blackwall-module.git"
+                   value="@_gitUrl" @oninput="OnGitUrlInput" disabled="@_installing" />
+            <button type="button" class="btn btn-primary cut-corner font-display bw-btn-sm"
+                    disabled="@(_installing || string.IsNullOrWhiteSpace(_gitUrl))"
+                    @onclick="InstallAsync">
+                @(_installing ? "INSTALLING..." : "INSTALL")
+            </button>
+        </div>
+        @if (_installError is not null) {
+            <div class="alert alert-danger font-mono mt-3 bw-alert-text">@_installError</div>
+        }
+    </div>
+</div>
+
+@if (_loading) {
+    <div class="font-mono bw-loading bw-typewriter">&gt; Loading modules...</div>
+} else if (!_modules.Any()) {
+    <div class="cut-corner border mb-4 bw-card">
+        <div class="card-header">INSTALLED MODULES</div>
+        <div class="p-4">
+            <p class="font-mono bw-desc">No modules installed. Install a module above to extend Blackwall's capabilities.</p>
+        </div>
+    </div>
+} else {
+    @foreach (var module in _modules) {
+        <div class="cut-corner border mb-4 bw-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>@module.ModuleName.ToUpperInvariant()</span>
+                <div class="d-flex align-items-center gap-3">
+                    <span class="font-mono bw-meta">v@module.ModuleVersion</span>
+                    <div class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input bw-switch"
+                               id="mod-enabled-@module.Id"
+                               checked="@module.IsEnabled"
+                               disabled="@_togglingId.HasValue && _togglingId.Value == module.Id"
+                               @onchange="@(e => ToggleEnabledAsync(module, (bool)e.Value!))" />
+                    </div>
+                </div>
+            </div>
+            <div class="p-4">
+                <p class="font-mono mb-1 bw-desc">
+                    by @module.ModuleAuthor
+                    @if (module.Description is not null) {
+                        <br />@module.Description
+                    }
+                </p>
+
+                @if (module.Manifest.SettingsSchema is not null) {
+                    @foreach (var card in module.Manifest.SettingsSchema.Cards) {
+                        <div class="cut-corner border mt-4 bw-card-inner">
+                            <div class="card-header bw-header-inner">@card.Title</div>
+                            <div class="p-3">
+                                @if (card.Description is not null) {
+                                    <p class="font-mono mb-3 bw-desc">@card.Description</p>
+                                }
+                                @foreach (var field in card.Fields) {
+                                    <div class="bw-field @(field == card.Fields.Last() ? "bw-field-last" : "")">
+                                        <div class="bw-field-label">
+                                            <div class="form-label mb-1">@field.UiName</div>
+                                            @if (field.HelpText is not null) {
+                                                <div class="form-text">@field.HelpText</div>
+                                            }
+                                        </div>
+                                        <div class="bw-field-control">
+                                            @if (field.InputType == Blackwall.Modules.Abstractions.ModuleInputType.Dropdown && field.Options is not null) {
+                                                <select class="form-select bw-input font-mono"
+                                                        @bind="_settingsValues[module.Id][field.Key]">
+                                                    @foreach (var opt in field.Options) {
+                                                        <option value="@opt.Value">@opt.Text</option>
+                                                    }
+                                                </select>
+                                            } else if (field.InputType == Blackwall.Modules.Abstractions.ModuleInputType.Number) {
+                                                <input type="number" class="form-control bw-input font-mono"
+                                                       @bind="_settingsValues[module.Id][field.Key]" />
+                                            } else {
+                                                <input type="text" class="form-control bw-input font-mono"
+                                                       @bind="_settingsValues[module.Id][field.Key]" />
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+
+                @if (module.CanPerformActions) {
+                    <div class="cut-corner border mt-4 bw-card-inner bw-card-warning">
+                        <div class="card-header bw-header-warning">MODULE ACTIONS</div>
+                        <div class="p-3">
+                            <p class="font-mono bw-desc">
+                                This module can perform infraction actions (timeout, kick, ban) when it detects violations.
+                                Actions are controlled by the module's logic and your global spam configuration settings.
+                            </p>
+                        </div>
+                    </div>
+                }
+
+                <div class="d-flex gap-2 mt-4">
+                    <button type="button" class="btn btn-primary cut-corner font-display bw-btn-xs"
+                            disabled="@_savingId.HasValue && _savingId.Value == module.Id"
+                            @onclick="@(async () => await SaveSettingsAsync(module))">
+                        @(_savingId.HasValue && _savingId.Value == module.Id ? "SAVING..." : "SAVE SETTINGS")
+                    </button>
+                    <button type="button" class="btn btn-outline-danger cut-corner font-display bw-btn-xs"
+                            disabled="@_uninstallingId.HasValue && _uninstallingId.Value == module.Id"
+                            @onclick="@(async () => await UninstallAsync(module))">
+                        @(_uninstallingId.HasValue && _uninstallingId.Value == module.Id ? "REMOVING..." : "UNINSTALL")
+                    </button>
+                </div>
+
+                @if (_moduleErrors.TryGetValue(module.Id, out var modError)) {
+                    <div class="alert alert-danger font-mono mt-3 bw-alert-text">@modError</div>
+                }
+                @if (_moduleSuccess.ContainsKey(module.Id)) {
+                    <div class="alert alert-success font-mono mt-3 bw-alert-text">// SETTINGS SAVED</div>
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public long DiscordGuildId { get; set; }
+    [Parameter] public Action<string>? OnError { get; set; }
+
+    private IReadOnlyList<GuildModuleInstallationDto> _modules = [];
+    private bool _loading = true;
+    private string _gitUrl { get; set; } = "";
+    private bool _installing;
+    private string? _installError;
+    private long? _togglingId;
+    private long? _savingId;
+    private long? _uninstallingId;
+    private readonly Dictionary<long, Dictionary<string, string?>> _settingsValues = [];
+    private readonly Dictionary<long, string> _moduleErrors = [];
+    private readonly Dictionary<long, bool> _moduleSuccess = [];
+
+    protected override async Task OnInitializedAsync() {
+        try {
+            _modules = await Api.GetModulesAsync(DiscordGuildId);
+            foreach (var module in _modules) {
+                var settings = JsonSerializer.Deserialize<Dictionary<string, string?>>(module.SettingsJson) ?? new();
+                _settingsValues[module.Id] = settings;
+            }
+        } catch (Exception ex) {
+            OnError?.Invoke($"Failed to load modules: {ex.Message}");
+        } finally {
+            _loading = false;
+        }
+    }
+
+    private void OnGitUrlInput(ChangeEventArgs e) {
+        _gitUrl = e.Value?.ToString() ?? "";
+    }
+
+    private async Task InstallAsync() {
+        _installing = true;
+        _installError = null;
+        try {
+            await Api.InstallModuleAsync(DiscordGuildId, _gitUrl);
+            _gitUrl = "";
+            _modules = await Api.GetModulesAsync(DiscordGuildId);
+            foreach (var module in _modules.Where(m => !_settingsValues.ContainsKey(m.Id))) {
+                var settings = JsonSerializer.Deserialize<Dictionary<string, string?>>(module.SettingsJson) ?? new();
+                _settingsValues[module.Id] = settings;
+            }
+        } catch (Exception ex) {
+            _installError = ex.Message;
+        } finally {
+            _installing = false;
+        }
+    }
+
+    private async Task ToggleEnabledAsync(GuildModuleInstallationDto module, bool isEnabled) {
+        _togglingId = module.Id;
+        try {
+            await Api.SetModuleEnabledAsync(DiscordGuildId, module.ModuleName, isEnabled);
+            _modules = await Api.GetModulesAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            OnError?.Invoke($"Failed to toggle module: {ex.Message}");
+        } finally {
+            _togglingId = null;
+        }
+    }
+
+    private async Task SaveSettingsAsync(GuildModuleInstallationDto module) {
+        _savingId = module.Id;
+        _moduleErrors.Remove(module.Id);
+        _moduleSuccess.Remove(module.Id);
+        try {
+            var json = JsonSerializer.Serialize(_settingsValues[module.Id]);
+            await Api.UpdateModuleSettingsAsync(DiscordGuildId, module.ModuleName, json);
+            _moduleSuccess[module.Id] = true;
+        } catch (Exception ex) {
+            _moduleErrors[module.Id] = ex.Message;
+        } finally {
+            _savingId = null;
+        }
+    }
+
+    private async Task UninstallAsync(GuildModuleInstallationDto module) {
+        _uninstallingId = module.Id;
+        _moduleErrors.Remove(module.Id);
+        try {
+            await Api.UninstallModuleAsync(DiscordGuildId, module.ModuleName);
+            _settingsValues.Remove(module.Id);
+            _modules = await Api.GetModulesAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            _moduleErrors[module.Id] = ex.Message;
+        } finally {
+            _uninstallingId = null;
+        }
+    }
+}

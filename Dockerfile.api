@@ -5,6 +5,7 @@ COPY src/Blackwall.Core/Blackwall.Core.csproj                         src/Blackw
 COPY src/Blackwall.Infrastructure/Blackwall.Infrastructure.csproj     src/Blackwall.Infrastructure/
 COPY src/Blackwall.Bot/Blackwall.Bot.csproj                           src/Blackwall.Bot/
 COPY src/Blackwall.Api/Blackwall.Api.csproj                           src/Blackwall.Api/
+COPY src/Blackwall.Modules.Abstractions/Blackwall.Modules.Abstractions.csproj src/Blackwall.Modules.Abstractions/
 RUN dotnet restore src/Blackwall.Api/Blackwall.Api.csproj
 
 COPY src/ src/
@@ -13,6 +14,14 @@ RUN dotnet publish src/Blackwall.Api/Blackwall.Api.csproj \
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
+
+RUN groupadd -r blackwall && useradd -r -g blackwall -s /bin/false blackwall
+
 COPY --from=build /app/publish .
+RUN chown -R blackwall:blackwall /app
+
+RUN mkdir -p /app/modules && chown blackwall:blackwall /app/modules && chmod 700 /app/modules
+
+USER blackwall
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Blackwall.Api.dll"]

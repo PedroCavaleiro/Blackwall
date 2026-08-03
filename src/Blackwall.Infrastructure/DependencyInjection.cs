@@ -34,6 +34,7 @@ public static class DependencyInjection {
         services.AddScoped<SpamConfigurationCache>();
         services.AddScoped<NetWatchSnareChannelCache>();
         services.AddScoped<AiSentinelCache>();
+        services.AddScoped<ModuleInstallationCache>();
     }
 
 }

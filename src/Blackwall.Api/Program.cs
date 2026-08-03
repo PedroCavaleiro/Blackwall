@@ -18,7 +18,8 @@ using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
-Env.TraversePath().Load();
+if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("POSTGRES__CONNECTION_STRING")))
+    try { Env.TraversePath().Load(); } catch { /* .env not readable — vars injected by systemd */ }
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -106,6 +107,8 @@ builder.Services.AddSingleton<NetWatchSnareService>();
 builder.Services.AddSingleton<AiSentinelService>();
 builder.Services.AddScoped<SafeBrowsingSyncService>();
 builder.Services.AddScoped<MessageAuditService>();
+builder.Services.AddSingleton<ModuleRunnerService>();
+builder.Services.AddScoped<ModuleInstallationService>();
 builder.Services.AddHostedService<SafeBrowsingSyncBackgroundService>();
 builder.Services.AddHostedService<MessageAuditPurgeBackgroundService>();
 builder.Services.AddHostedService<AiSentinelPurgeBackgroundService>();
@@ -141,6 +144,25 @@ builder.Services.AddOpenApi(options => {
 });
 
 var app = builder.Build();
+
+ScrubSecretEnvironmentVariables();
+
+void ScrubSecretEnvironmentVariables() {
+    var secretKeys = new[] {
+        "POSTGRES__CONNECTION_STRING",
+        "REDIS__CONNECTION_STRING",
+        "DISCORD__BOT_TOKEN",
+        "DISCORD__CLIENT_SECRET",
+        "JWT__SECRET",
+        "APP__ENC_KEY",
+        "APP__ENC_IV",
+        "SAFE_BROWSING__API_KEY",
+        "API__KEY"
+    };
+
+    foreach (var key in secretKeys)
+        Environment.SetEnvironmentVariable(key, null);
+}
 
 using (var scope = app.Services.CreateScope()) {
     var db = scope.ServiceProvider.GetRequiredService<BlackwallDbContext>();

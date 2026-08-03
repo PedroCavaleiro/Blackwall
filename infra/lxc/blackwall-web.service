@@ -16,6 +16,23 @@ KillSignal=SIGINT
 SyslogIdentifier=blackwall-web
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
+EnvironmentFile=/opt/blackwall/.env
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/blackwall/web
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+RestrictRealtime=true
+RestrictSUIDSGID=true
 
 [Install]
 WantedBy=multi-user.target

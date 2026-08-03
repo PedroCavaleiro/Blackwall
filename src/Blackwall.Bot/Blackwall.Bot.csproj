@@ -11,6 +11,7 @@
     <ItemGroup>
       <ProjectReference Include="..\Blackwall.Core\Blackwall.Core.csproj" />
       <ProjectReference Include="..\Blackwall.Infrastructure\Blackwall.Infrastructure.csproj" />
+      <ProjectReference Include="..\Blackwall.Modules.Abstractions\Blackwall.Modules.Abstractions.csproj" />
     </ItemGroup>
 
     <ItemGroup>

@@ -51,6 +51,7 @@ info "Uploading API and Web to $REMOTE:$APP_DIR/ ..."
 rsync -az -e "ssh -S $SSH_SOCKET" --delete \
     --exclude=".env" \
     --exclude="appsettings.Production.json" \
+    --exclude="modules" \
     "$OUT_DIR/" "$REMOTE:$APP_DIR/"
 
 success "Upload complete."
@@ -59,6 +60,8 @@ success "Upload complete."
 info "Fixing ownership and restarting services..."
 # We pass the -S flag so ssh uses the master socket and doesn't ask for a password.
 ssh -S "$SSH_SOCKET" "$REMOTE" "chown -R blackwall:blackwall $APP_DIR/api $APP_DIR/web && \
+               mkdir -p $APP_DIR/modules && chown blackwall:blackwall $APP_DIR/modules && chmod 700 $APP_DIR/modules && \
+               if [ -f $APP_DIR/.env ]; then chown root:root $APP_DIR/.env && chmod 600 $APP_DIR/.env; fi && \
                systemctl restart blackwall-api blackwall-web && \
                systemctl is-active blackwall-api && \
                systemctl is-active blackwall-web"
