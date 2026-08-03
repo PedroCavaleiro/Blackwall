@@ -22,35 +22,43 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     };
 
     /// <summary>
-    /// Increments a per-user per-guild message counter in Redis. Returns true if the count
-    /// exceeds <paramref name="maxMessages"/> within the rolling window.
+    /// Tracks per-user per-guild message timestamps in a Redis sorted set. Returns true if the count
+    /// exceeds <paramref name="maxMessages"/> within a true sliding window of
+    /// <paramref name="windowSeconds"/> seconds.
     /// </summary>
     /// <param name="discordGuildId">The Discord ID of the guild where the message was sent.</param>
     /// <param name="discordUserId">The Discord ID of the user who sent the message.</param>
+    /// <param name="messageId">The Discord ID of the message being checked.</param>
     /// <param name="maxMessages">The maximum number of messages allowed within the window.</param>
-    /// <param name="windowSeconds">The sliding window in seconds after which the counter resets.</param>
+    /// <param name="windowSeconds">The sliding window in seconds; entries older than this are removed before counting.</param>
     /// <returns><see langword="true"/> if the user's message count exceeds <paramref name="maxMessages"/> within the window; otherwise <see langword="false"/>.</returns>
     /// <exception cref="RedisException">Thrown when a Redis operation fails.</exception>
     public async Task<bool> IsRateLimitedAsync(
         long discordGuildId,
         long discordUserId,
+        ulong messageId,
         int maxMessages,
         int windowSeconds
     ) {
         var key = $"spam:ratelimit:{discordGuildId}:{discordUserId}";
-        var count = await _db.StringIncrementAsync(key);
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var windowStart = now - windowSeconds * 1000L;
 
-        if (count == 1)
-            await _db.KeyExpireAsync(key, TimeSpan.FromSeconds(windowSeconds));
+        await _db.SortedSetRemoveRangeByScoreAsync(key, 0, windowStart);
+        await _db.SortedSetAddAsync(key, messageId.ToString(), now);
+        await _db.KeyExpireAsync(key, TimeSpan.FromSeconds(windowSeconds + 1));
+
+        var count = await _db.SortedSetLengthAsync(key);
 
         return count > maxMessages;
     }
 
     /// <summary>
-    /// Tracks message content hashes per user per guild. Returns a result indicating whether
-    /// the same hash has been seen at least <paramref name="threshold"/> times within
-    /// <paramref name="windowSeconds"/>, along with all the message IDs that share that hash
-    /// so they can be bulk-deleted.
+    /// Tracks message content hashes per user per guild in a Redis sorted set keyed by timestamp.
+    /// Returns a result indicating whether the same hash has been seen at least
+    /// <paramref name="threshold"/> times within a true sliding window of
+    /// <paramref name="windowSeconds"/> seconds, along with all the message IDs that share
+    /// that hash so they can be bulk-deleted.
     /// When <paramref name="crossChannelEnabled"/> is true, duplicates are counted across all channels;
     /// when false, only messages within the same <paramref name="channelId"/> are counted.
     /// </summary>
@@ -60,7 +68,7 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     /// <param name="messageId">The Discord ID of the message being checked.</param>
     /// <param name="content">The text content of the message to hash for duplicate detection.</param>
     /// <param name="threshold">The number of repeated messages required to trigger a duplicate detection.</param>
-    /// <param name="windowSeconds">The sliding window in seconds after which the tracking list expires.</param>
+    /// <param name="windowSeconds">The sliding window in seconds; entries older than this are removed before counting.</param>
     /// <param name="crossChannelEnabled">Whether duplicates should be counted across all channels or only within the same channel.</param>
     /// <returns>A <see cref="DuplicateDetectionResult"/> indicating whether a duplicate was detected and the messages to delete.</returns>
     /// <exception cref="RedisException">Thrown when a Redis operation fails.</exception>
@@ -86,16 +94,21 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
         if (await _db.KeyExistsAsync(handledKey))
             return new DuplicateDetectionResult(true, []);
 
-        var entry = $"{channelId}:{messageId}";
-        var count = await _db.ListRightPushAsync(key, entry);
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var windowStart = now - windowSeconds * 1000L;
 
-        if (count == 1)
-            await _db.KeyExpireAsync(key, TimeSpan.FromSeconds(windowSeconds));
+        await _db.SortedSetRemoveRangeByScoreAsync(key, 0, windowStart);
+
+        var entry = $"{channelId}:{messageId}";
+        await _db.SortedSetAddAsync(key, entry, now);
+        await _db.KeyExpireAsync(key, TimeSpan.FromSeconds(windowSeconds + 1));
+
+        var count = await _db.SortedSetLengthAsync(key);
 
         if (count < threshold)
             return new DuplicateDetectionResult(false, []);
 
-        var entries = await _db.ListRangeAsync(key);
+        var entries = await _db.SortedSetRangeByScoreAsync(key, windowStart, now);
         var messagesToDelete = new List<(ulong ChannelId, ulong MessageId)>(entries.Length);
 
         foreach (var value in entries) {

@@ -127,7 +127,7 @@ public sealed class MessageHandler(
         List<(ulong ChannelId, ulong MessageId)>? duplicateMessagesToDelete = null;
 
         if (await spamDetectionService.IsRateLimitedAsync(
-                discordGuildId, discordUserId,
+                discordGuildId, discordUserId, message.Id,
                 config.MaxMessagesPerWindow, config.RateLimitWindowSeconds)) {
             violations.Add("rate_limit");
             triggeredModules.Add((config.RateLimitAction, config.RateLimitTimeoutMinutes, config.RateLimitMessageDeleteDays));
