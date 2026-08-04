@@ -67,6 +67,85 @@ If auto-timeout is disabled for a given level, moderators are alerted only and c
 
 All alerts are sent to the configured **audit log channel** as an embed containing the user, their score, account age, the specific risk factors that contributed, and the action taken.
 
+## AI Sentinel
+
+AI Sentinel is an **optional** AI-powered content moderation module that runs as the **last step** in the protection pipeline. Only messages that pass all other filters (rate limiting, duplicates, Content Guard, link blocking, etc.) are sent to the AI for analysis. It is **off by default** for every guild — each server must explicitly enable it and configure a provider.
+
+> **Optional module.** AI Sentinel is disabled by default. The global toggle `APP__AI_SENTINEL_ENABLED` (defaults to `true`) controls whether the feature is available at all. Even when globally available, each guild must turn it on individually from the dashboard.
+
+### Supported Providers
+
+| Provider | Requirement |
+|----------|-------------|
+| **OpenAI** | API key + model name (e.g. `gpt-4o-mini`) |
+| **Anthropic** | API key + model name (e.g. `claude-3-5-haiku-latest`) |
+| **Google Gemini** | API key + model name (e.g. `gemini-1.5-flash`) |
+| **Ollama** | Server URL + model name (self-hosted, no API key required) |
+
+### How It Works
+
+1. A message arrives and passes all built-in filters without triggering any violation.
+2. The message content (including embeds and attachment filenames) is sent to the configured AI provider with a moderation prompt.
+3. The AI returns a classification: **Clean**, or a malicious category (spam, scam, phishing, toxic, etc.).
+4. If classified as malicious, the configured action is applied (delete only, timeout, kick, or ban).
+
+### Training Mode
+
+When training mode is enabled, **all messages** are analysed and logged but **no actions are taken**. Results can be reviewed and marked as correct or incorrect. Activating AI Sentinel starts in training mode automatically so you can validate the model's behaviour before enforcing it.
+
+### Configuration
+
+| Setting | Description |
+|---------|-------------|
+| **Enable AI Sentinel** | Master toggle for the module. Off by default. |
+| **Dry run** | When enabled, no action is taken. When disabled, respects the global dry-run setting. |
+| **Training mode** | All messages are analysed and logged but no actions are taken. |
+| **Provider** | AI provider: OpenAI, Anthropic, Google Gemini, or Ollama. |
+| **Model** | The model to use for analysis. Auto-loaded when credentials are entered. |
+
+## NetWatchSnare
+
+NetWatchSnare provides **trap channels** — channels where any user who posts in them is automatically punished. This is useful for channels that should never receive messages, such as announcement channels where only admins post, or decoy channels designed to catch bots and spammers scanning the channel list.
+
+### How It Works
+
+- Each trap channel is configured individually with its own action, timeout duration, and message delete days.
+- When a user sends a message in a trap channel, the message is immediately deleted and the configured action is applied.
+- Trap channels are checked early in the message processing pipeline — before any other spam detection runs.
+- The action is applied even if the guild is in dry-run mode (the trap always fires).
+
+### Configuration
+
+Each trap channel has:
+
+| Setting | Description |
+|---------|-------------|
+| **Channel** | The Discord channel to monitor. |
+| **Action** | What happens to the user: delete only, timeout, kick, or ban. |
+| **Timeout duration** | How long the user is timed out (when action is timeout). |
+| **Message delete days** | Days of message history to prune when banning (0–7). |
+
+## Content Guard
+
+Content Guard is the advanced toxicity and evasion filtering layer. It goes beyond simple keyword matching by detecting intentional obfuscation, Unicode abuse, and coordinated copypasta attacks. Each algorithm can be toggled independently — if all algorithms are disabled, only the basic banned word list is enforced. Disabling Content Guard entirely turns off all filtering including the banned word list.
+
+### Algorithms
+
+| Algorithm | Settings | Description |
+|-----------|----------|-------------|
+| **Levenshtein fuzzy matching** | Edit distance threshold (1–5) | Uses fuzzy string matching to catch intentional misspellings and leetspeak (e.g. replacing `i` with `1` or `e` with `3`). Tokens within the edit distance threshold of a banned word are flagged. Leetspeak normalisation is always applied before comparison. |
+| **Invisible character scrubbing** | — | Strips zero-width spaces, zero-width joiners, word joiners, BOM, and left/right-to-right marks from messages before evaluating banned words. Prevents bypass via invisible Unicode injection. |
+| **Zalgo / clutter blocking** | Max consecutive combining marks (1–10) | Blocks messages containing excessive Unicode combining characters (Zalgo text) that lag mobile clients and visually destroy the chat window. |
+| **Copypasta hashing** | Min length (50–5000), distinct user threshold (≥2), time window (10–3600 s) | Calculates a SHA-256 hash of incoming large text blocks. If the same block is posted by multiple distinct users within the time window, all matching messages are flagged. Targets coordinated text spam during live streams. |
+
+### Banned Words
+
+A per-guild editable list of banned words. Words are matched case-insensitively after leetspeak normalisation. Add individual words or short phrases (spaces are preserved). When fuzzy matching is enabled, close variations of banned words are also caught.
+
+### Module Actions
+
+Content Guard has its own configurable action (delete only, timeout, kick, or ban), timeout duration, message delete days (when banning), and auto-lockdown toggle — independent from other detection filters.
+
 ## Architecture
 
 The solution is split into five projects:

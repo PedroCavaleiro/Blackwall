@@ -107,6 +107,9 @@
         ("fa-solid fa-lock", "Lockdown Protocol", "Denies SEND_MESSAGES, SEND_MESSAGES_IN_THREADS, and CREATE_PUBLIC_THREADS for @everyone across all text channels when a raid is detected."),
         ("fa-solid fa-clipboard-list", "Ban Synchronization", "Periodically syncs Discord guild ban lists into the database so enforcement state stays consistent across restarts."),
         ("fa-solid fa-gears", "Permission Sync", "Tracks guild-level bot permissions and role changes to ensure Blackwall always has the access it needs to enforce."),
+        ("fa-solid fa-shield-halved", "Content Guard", "Banned word filtering with Levenshtein fuzzy matching and leetspeak normalisation, Zalgo text blocking, copypasta hash detection, and invisible character scrubbing."),
+        ("fa-solid fa-bullseye", "NetWatchSnare", "Trap channels that automatically punish users who post in them. Configurable per-trap actions — useful for announcement channels and decoy bot-catchers."),
+        ("fa-solid fa-brain", "AI Sentinel (Optional)", "AI-powered content moderation as the last pipeline step. Supports OpenAI, Anthropic, Gemini, and Ollama. Off by default — must be enabled per guild."),
     ];
 
     protected override async Task OnInitializedAsync() {
