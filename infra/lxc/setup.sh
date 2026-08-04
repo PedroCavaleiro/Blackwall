@@ -28,7 +28,7 @@ if ! command -v dotnet &>/dev/null || [[ "$(dotnet --version 2>/dev/null | cut -
     dpkg -i /tmp/packages-microsoft-prod.deb
     rm /tmp/packages-microsoft-prod.deb
     apt-get update -qq
-    apt-get install -y aspnetcore-runtime-10.0
+    apt-get install -y aspnetcore-runtime-10.0 dotnet-sdk-10.0
     success ".NET 10 installed: $(dotnet --version)"
 else
     success ".NET already installed: $(dotnet --version)"

@@ -67,9 +67,9 @@ public sealed class ModuleInstallationService(
             if (csprojFiles.Length == 0)
                 throw new InvalidOperationException("No .csproj file found in src/ directory.");
 
-            var buildExitCode = await RunDotnetBuildAsync(srcDir, cancellationToken);
+            var (buildExitCode, buildOutput) = await RunDotnetBuildAsync(srcDir, cancellationToken);
             if (buildExitCode != 0)
-                throw new InvalidOperationException($"dotnet build failed with exit code {buildExitCode}.");
+                throw new InvalidOperationException($"dotnet build failed with exit code {buildExitCode}.\n{buildOutput}");
 
             var buildOutputDir = Path.Combine(srcDir, "bin", "Release", "net10.0");
             if (!Directory.Exists(buildOutputDir))
@@ -258,19 +258,33 @@ public sealed class ModuleInstallationService(
         return process.ExitCode;
     }
 
-    private static async Task<int> RunDotnetBuildAsync(string srcDir, CancellationToken ct) {
+    private static async Task<(int ExitCode, string Output)> RunDotnetBuildAsync(string srcDir, CancellationToken ct) {
+        var dotnetHome = Path.Combine(Path.GetTempPath(), $"dotnet-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dotnetHome);
+
         var psi = new ProcessStartInfo {
             FileName = "dotnet",
-            Arguments = $"build -c Release",
+            Arguments = "build -c Release",
             WorkingDirectory = srcDir,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardError = true,
             RedirectStandardOutput = true
         };
+        psi.Environment["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "true";
+        psi.Environment["DOTNET_CLI_HOME"] = dotnetHome;
+        psi.Environment["NUGET_PACKAGES"] = Path.Combine(dotnetHome, "nuget-cache");
 
         using var process = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start dotnet build process.");
+        var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
+        var stderrTask = process.StandardError.ReadToEndAsync(ct);
         await process.WaitForExitAsync(ct);
-        return process.ExitCode;
+        var stdout = await stdoutTask;
+        var stderr = await stderrTask;
+        var output = string.IsNullOrEmpty(stderr) ? stdout : $"{stdout}\n{stderr}";
+
+        try { if (Directory.Exists(dotnetHome)) Directory.Delete(dotnetHome, recursive: true); } catch { }
+
+        return (process.ExitCode, output);
     }
 }
