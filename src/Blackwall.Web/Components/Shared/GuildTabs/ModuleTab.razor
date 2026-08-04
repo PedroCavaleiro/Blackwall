@@ -1,0 +1,179 @@
+@inject BlackwallApiService Api
+@using System.Text.Json
+@using Blackwall.Core.DTOs
+@using Blackwall.Modules.Abstractions
+
+@{
+    var headerLabel = (Module.ReadableName ?? Module.ModuleName).ToUpperInvariant();
+}
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>@headerLabel</span>
+        <div class="d-flex align-items-center gap-3">
+            <span class="font-mono bw-meta">@Module.ModuleName@@@Module.ModuleVersion</span>
+            <div class="form-check form-switch">
+                <input type="checkbox" class="form-check-input bw-switch"
+                       id="mod-toggle-@Module.Id"
+                       checked="@_isEnabled"
+                       disabled="@_toggling"
+                       @onchange="@(e => ToggleEnabledAsync((bool)e.Value!))" />
+            </div>
+        </div>
+    </div>
+    <div class="p-4">
+        <p class="font-mono mb-1 bw-desc">
+            by @Module.ModuleAuthor
+            @if (Module.Description is not null) {
+                <br />@Module.Description
+            }
+        </p>
+    </div>
+</div>
+
+@if (Module.Manifest.SettingsSchema is not null) {
+    @foreach (var card in Module.Manifest.SettingsSchema.Cards) {
+        <div class="cut-corner border mb-4 bw-card">
+            <div class="card-header">@card.Title.ToUpperInvariant()</div>
+            <div class="p-4">
+                @if (card.Description is not null) {
+                    <p class="font-mono mb-4 bw-desc">@card.Description</p>
+                }
+                @foreach (var field in card.Fields) {
+                    <div class="bw-field @(field == card.Fields.Last() ? "bw-field-last" : "")">
+                        <div class="bw-field-label">
+                            <div class="form-label mb-1">@field.UiName</div>
+                            @if (field.HelpText is not null) {
+                                <div class="form-text">@field.HelpText</div>
+                            }
+                        </div>
+                        <div class="bw-field-control">
+                            @if (field.InputType == ModuleInputType.Dropdown && field.Options is not null) {
+                                <select class="form-select bw-input font-mono"
+                                        @bind="_settingsValues[field.Key]">
+                                    @foreach (var opt in field.Options) {
+                                        <option value="@opt.Value">@opt.Text</option>
+                                    }
+                                </select>
+                            } else if (field.InputType == ModuleInputType.Number) {
+                                <input type="number" class="form-control bw-input font-mono"
+                                       @bind="_settingsValues[field.Key]" />
+                            } else {
+                                <input type="text" class="form-control bw-input font-mono"
+                                       @bind="_settingsValues[field.Key]" />
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+
+@if (Module.CanPerformActions) {
+    <div class="cut-corner border mb-4 bw-card-danger">
+        <div class="card-header bw-header-danger">MODULE ACTIONS</div>
+        <div class="p-4">
+            <p class="font-mono mb-4 bw-desc">
+                Configure the action and lockdown behavior for this module.
+            </p>
+
+            <div class="bw-field">
+                <div class="bw-field-label">
+                    <div class="form-label mb-1">Action</div>
+                    <div class="form-text">Action taken when this module detects a violation.</div>
+                </div>
+                <select class="form-select bw-input-select" @bind="_action">
+                    <option value="deleteOnly">Delete only</option>
+                    <option value="timeout">Timeout</option>
+                    <option value="kick">Kick</option>
+                    <option value="softBan">Soft ban (ban + unban)</option>
+                    <option value="ban">Ban</option>
+                </select>
+            </div>
+            @if (_action == "timeout") {
+                <div class="bw-field">
+                    <div class="bw-field-label">
+                        <div class="form-label mb-1">Timeout (minutes)</div>
+                        <div class="form-text">How long the user is timed out. Minimum: 1 minute.</div>
+                    </div>
+                    <input type="number" class="form-control bw-input-narrow" min="1" @bind="_timeoutMinutes" />
+                </div>
+            }
+            @if (_action == "ban" || _action == "softBan") {
+                <div class="bw-field">
+                    <div class="bw-field-label">
+                        <div class="form-label mb-1">Delete messages (days)</div>
+                        <div class="form-text">Number of days of message history to purge when banning. Maximum is 7 days.</div>
+                    </div>
+                    <input type="number" class="form-control bw-input-narrow" min="0" max="7" @bind="_messageDeleteDays" />
+                </div>
+            }
+            <div class="bw-field bw-field-last">
+                <div class="bw-field-label">
+                    <div class="form-label mb-1">Auto-lockdown</div>
+                    <div class="form-text">Whether to trigger a server lockdown when this module fires.</div>
+                </div>
+                <div class="form-check form-switch">
+                    <input type="checkbox" class="form-check-input bw-switch" id="mod-autolockdown-@Module.Id"
+                           checked="@_autoLockdown" @onchange="@(e => _autoLockdown = (bool)e.Value!)" />
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_error is not null) {
+    <div class="alert alert-danger font-mono mb-4 bw-alert-text">@_error</div>
+}
+
+@code {
+    [Parameter] public GuildModuleInstallationDto Module { get; set; } = null!;
+    [Parameter] public long DiscordGuildId { get; set; }
+    [Parameter] public Action<string>? OnError { get; set; }
+
+    private Dictionary<string, string?> _settingsValues = [];
+    private string _action = "deleteOnly";
+    private int _timeoutMinutes = 5;
+    private int _messageDeleteDays = 0;
+    private bool _autoLockdown;
+    private bool _isEnabled;
+    private bool _toggling;
+    private string? _error;
+
+    protected override void OnInitialized() {
+        _settingsValues = JsonSerializer.Deserialize<Dictionary<string, string?>>(Module.SettingsJson) ?? new();
+        _action = _settingsValues.GetValueOrDefault("__action") ?? "deleteOnly";
+        _timeoutMinutes = int.TryParse(_settingsValues.GetValueOrDefault("__timeoutMinutes"), out var tm) ? tm : 5;
+        _messageDeleteDays = int.TryParse(_settingsValues.GetValueOrDefault("__messageDeleteDays"), out var dd) ? dd : 0;
+        _autoLockdown = bool.TryParse(_settingsValues.GetValueOrDefault("__autoLockdown"), out var al) && al;
+        _isEnabled = Module.IsEnabled;
+    }
+
+    private async Task ToggleEnabledAsync(bool isEnabled) {
+        _toggling = true;
+        try {
+            await Api.SetModuleEnabledAsync(DiscordGuildId, Module.ModuleName, isEnabled);
+            _isEnabled = isEnabled;
+        } catch (Exception ex) {
+            OnError?.Invoke($"Failed to toggle module: {ex.Message}");
+        } finally {
+            _toggling = false;
+        }
+    }
+
+    public async Task SaveSettingsAsync() {
+        _error = null;
+        try {
+            _settingsValues["__action"] = _action;
+            _settingsValues["__timeoutMinutes"] = _timeoutMinutes.ToString();
+            _settingsValues["__messageDeleteDays"] = _messageDeleteDays.ToString();
+            _settingsValues["__autoLockdown"] = _autoLockdown.ToString().ToLowerInvariant();
+            var json = JsonSerializer.Serialize(_settingsValues);
+            await Api.UpdateModuleSettingsAsync(DiscordGuildId, Module.ModuleName, json);
+        } catch (Exception ex) {
+            _error = ex.Message;
+            throw;
+        }
+    }
+}
