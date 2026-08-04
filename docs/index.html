@@ -119,6 +119,7 @@
       <a href="#account-scoring">Account Scoring</a>
       <a href="#ai-sentinel">AI Sentinel</a>
       <a href="#modules">Modules</a>
+      <a href="#custom-modules">Custom Modules</a>
       <a href="#api-docs">API Documentation</a>
       <a href="#project-structure">Project Structure</a>
     </div>
@@ -861,6 +862,358 @@ dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
           <strong>Module actions</strong>
           Most modules support the following action types: <strong>Delete only</strong> (removes the message), <strong>Timeout</strong> (temporarily mutes the user), <strong>Kick</strong> (removes the user from the server), and <strong>Ban</strong> (permanently bans the user, with optional message history purge up to 7 days). Each module can also independently trigger a server <strong>auto-lockdown</strong> when it fires.
         </div>
+      </section>
+
+      <!-- Custom Modules -->
+      <section class="content-section" id="custom-modules">
+        <h2>Custom Modules (3rd-Party)</h2>
+        <p>Blackwall supports loading external modules at runtime. A custom module is a .NET 10 assembly that implements the <code>IBlackwallModule</code> interface and is packaged as a Git repository with a manifest file. Modules are cloned, built, and installed per guild through the dashboard or API, then loaded into a collectible <code>AssemblyLoadContext</code> so they can be hot-reloaded without restarting the bot.</p>
+
+        <div class="callout callout-info">
+          <strong>How it works</strong>
+          When a message arrives, the bot fetches all enabled module installations for the guild from cache, loads each module's assembly (if not already cached), calls <code>EvaluateAsync</code> with a 5-second timeout, and collects verdicts. Each verdict is mapped to an infraction action and applied alongside the built-in filters. Modules stack with each other and with all built-in detection.
+        </div>
+
+        <h3>Module Lifecycle</h3>
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <h4>Install</h4>
+            <p>The dashboard or API provides a Git URL. Blackwall clones the repository, reads <code>blackwall-module.json</code> from the root, validates the manifest, runs <code>dotnet build -c Release</code> in the <code>src/</code> directory, and copies the output DLL (plus <code>.deps.json</code> and <code>.runtimeconfig.json</code> if present) into <code>modules/&lt;name&gt;/&lt;version&gt;/</code>. A database record is created with default settings derived from the manifest's settings schema.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <h4>Load</h4>
+            <p>On the first message after installation, the module assembly is loaded into a collectible <code>AssemblyLoadContext</code>. Blackwall scans the assembly for a type implementing <code>IBlackwallModule</code>, instantiates it, and calls <code>InitializeAsync</code> with the stored settings. The loaded instance is cached by <code>name:version</code> key for subsequent messages.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <h4>Evaluate</h4>
+            <p>For each incoming message, <code>EvaluateAsync</code> is called with a <code>ModuleMessageContext</code> containing the message content, author, channel, attachments, and embeds. The module returns a <code>ModuleVerdict</code> if the message violates its rules, or <code>null</code> to pass. A 5-second timeout is enforced per module.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <h4>Update / Uninstall</h4>
+            <p>Settings can be updated at any time through the dashboard &mdash; the module's <code>UpdateSettingsAsync</code> is called live without reloading the assembly. Updating a module re-clones the repository, rebuilds, and swaps the DLL. The old <code>AssemblyLoadContext</code> is unloaded so the new version loads on the next message. Uninstalling removes the database record and unloads the assembly.</p>
+          </div>
+        </div>
+
+        <h3>Repository Structure</h3>
+        <p>A module repository must have the following layout:</p>
+        <pre><code>my-module/
+├── blackwall-module.json          # Manifest (required, root)
+└── src/                           # Project directory (required)
+    ├── MyModule.csproj            # .NET 10 project targeting net10.0
+    ├── MyModule.cs                 # IBlackwallModule implementation
+    └── Blackwall.Modules.Abstractions.dll  # Reference assembly</code></pre>
+        <div class="callout callout-warning">
+          <strong>Build requirements</strong>
+          The <code>src/</code> directory must contain exactly one <code>.csproj</code> file targeting <code>net10.0</code>. The build is run with <code>dotnet build -c Release</code> in an isolated environment with a temporary NuGet cache. The <code>Blackwall.Modules.Abstractions.dll</code> reference assembly must be committed in <code>src/</code> alongside the project file.
+        </div>
+
+        <h3>The Manifest: <code>blackwall-module.json</code></h3>
+        <p>The manifest is a JSON file at the repository root that describes the module and its configurable settings. All fields are required unless marked optional.</p>
+        <table>
+          <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>name</code></td><td>string</td><td>Unique module identifier (lowercase, hyphen-separated). Used as the directory name and cache key.</td></tr>
+            <tr><td><code>readableName</code></td><td>string?</td><td>Human-friendly name shown in the dashboard. Optional.</td></tr>
+            <tr><td><code>version</code></td><td>string</td><td>Semantic version string (e.g. <code>1.0.0</code>).</td></tr>
+            <tr><td><code>author</code></td><td>string</td><td>Author name.</td></tr>
+            <tr><td><code>description</code></td><td>string?</td><td>Short description shown in the dashboard. Optional.</td></tr>
+            <tr><td><code>entryPoint</code></td><td>string</td><td>Filename of the compiled DLL (e.g. <code>MyModule.dll</code>). Must match the assembly name in the <code>.csproj</code>.</td></tr>
+            <tr><td><code>canPerformActions</code></td><td>bool</td><td>Declares whether the module is intended to return verdicts with actions. Stored on the installation record.</td></tr>
+            <tr><td><code>settingsSchema</code></td><td>object?</td><td>Defines the settings UI rendered in the dashboard. Optional &mdash; if omitted, the module receives an empty settings dictionary. See below.</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Settings Schema</h4>
+        <p>The <code>settingsSchema</code> is organised into cards, each containing fields. Fields define the UI input type and default value that Blackwall uses to build the initial settings JSON.</p>
+        <pre><code>"settingsSchema": {
+  "cards": [
+    {
+      "title": "Card Title",
+      "description": "Optional card description.",
+      "fields": [
+        {
+          "key": "settingKey",
+          "uiName": "Display Name",
+          "helpText": "Optional help text shown below the field.",
+          "inputType": "number",
+          "defaultValue": "5"
+        },
+        {
+          "key": "toggleKey",
+          "uiName": "Enable Feature",
+          "inputType": "dropdown",
+          "defaultValue": "true",
+          "options": [
+            { "text": "Yes", "value": "true" },
+            { "text": "No", "value": "false" }
+          ]
+        }
+      ]
+    }
+  ]
+}</code></pre>
+        <table>
+          <thead><tr><th>Field Property</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>key</code></td><td>string</td><td>Settings dictionary key. The module reads this via <code>ModuleSettings.Get()</code>, <code>GetInt32()</code>, or <code>GetBoolean()</code>.</td></tr>
+            <tr><td><code>uiName</code></td><td>string</td><td>Label shown in the dashboard.</td></tr>
+            <tr><td><code>helpText</code></td><td>string?</td><td>Help text displayed below the field. Optional.</td></tr>
+            <tr><td><code>inputType</code></td><td>string</td><td>One of <code>number</code>, <code>text</code>, or <code>dropdown</code>.</td></tr>
+            <tr><td><code>defaultValue</code></td><td>string</td><td>Initial value stored when the module is installed. All settings values are stored as strings.</td></tr>
+            <tr><td><code>options</code></td><td>array?</td><td>Required when <code>inputType</code> is <code>dropdown</code>. Each option has <code>text</code> (display label) and <code>value</code> (stored value).</td></tr>
+          </tbody>
+        </table>
+
+        <h3>The <code>IBlackwallModule</code> Interface</h3>
+        <p>Every module must implement this interface, defined in <code>Blackwall.Modules.Abstractions</code>:</p>
+        <pre><code>public interface IBlackwallModule {
+    string Name { get; }
+    string Version { get; }
+
+    Task InitializeAsync(ModuleSettings settings, CancellationToken ct);
+
+    Task&lt;ModuleVerdict?&gt; EvaluateAsync(ModuleMessageContext context, CancellationToken ct);
+
+    Task UpdateSettingsAsync(ModuleSettings settings, CancellationToken ct);
+}</code></pre>
+        <table>
+          <thead><tr><th>Member</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>Name</code></td><td>Module identifier string. Should match the <code>name</code> in the manifest.</td></tr>
+            <tr><td><code>Version</code></td><td>Version string. Should match the <code>version</code> in the manifest.</td></tr>
+            <tr><td><code>InitializeAsync</code></td><td>Called once when the module is first loaded. Read settings and cache them in fields.</td></tr>
+            <tr><td><code>EvaluateAsync</code></td><td>Called for every incoming message. Return a <code>ModuleVerdict</code> if the message violates the module's rules, or <code>null</code> to pass.</td></tr>
+            <tr><td><code>UpdateSettingsAsync</code></td><td>Called when settings are changed via the dashboard without reloading the assembly. Typically delegates to the same logic as <code>InitializeAsync</code>.</td></tr>
+          </tbody>
+        </table>
+
+        <h4>ModuleSettings</h4>
+        <p>Settings are passed as a <code>ModuleSettings</code> object wrapping a <code>Dictionary&lt;string, string?&gt;</code>. All values are strings &mdash; use the helper methods to parse them:</p>
+        <pre><code>public class ModuleSettings {
+    public string? Get(string key);
+    public int? GetInt32(string key);
+    public bool? GetBoolean(string key);
+    public IReadOnlyDictionary&lt;string, string?&gt; Values { get; }
+}</code></pre>
+
+        <h4>ModuleMessageContext</h4>
+        <p>The context passed to <code>EvaluateAsync</code> contains everything the module needs to evaluate a message:</p>
+        <table>
+          <thead><tr><th>Property</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>DiscordGuildId</code></td><td>long</td><td>Guild ID where the message was sent.</td></tr>
+            <tr><td><code>DiscordUserId</code></td><td>long</td><td>ID of the message author.</td></tr>
+            <tr><td><code>DiscordChannelId</code></td><td>long</td><td>Channel ID where the message was sent.</td></tr>
+            <tr><td><code>ChannelName</code></td><td>string</td><td>Name of the channel.</td></tr>
+            <tr><td><code>Username</code></td><td>string</td><td>Username of the author.</td></tr>
+            <tr><td><code>IsBot</code></td><td>bool</td><td>Whether the author is a bot account (note: allowed bots are already filtered out before evaluation).</td></tr>
+            <tr><td><code>Content</code></td><td>string</td><td>Full message content including embed descriptions and attachment filenames (extracted via <code>ExtractFullContent</code>).</td></tr>
+            <tr><td><code>Attachments</code></td><td>IReadOnlyList&lt;ModuleAttachment&gt;</td><td>Message attachments with filename, size, URL, and dimensions.</td></tr>
+            <tr><td><code>Embeds</code></td><td>IReadOnlyList&lt;ModuleEmbed&gt;</td><td>Message embeds with title, description, URL, type, image, and thumbnail URLs.</td></tr>
+            <tr><td><code>MessageTimestampUtc</code></td><td>DateTime</td><td>UTC timestamp of the message.</td></tr>
+          </tbody>
+        </table>
+
+        <h4>ModuleVerdict</h4>
+        <p>When a message violates the module's rules, return a <code>ModuleVerdict</code> record:</p>
+        <pre><code>public sealed record ModuleVerdict(
+    string ViolationType,
+    ModuleAction Action,
+    int TimeoutMinutes,
+    int DeleteDays,
+    bool AutoLockdown,
+    string? Reason
+);</code></pre>
+        <table>
+          <thead><tr><th>Property</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>ViolationType</code></td><td>string</td><td>Short identifier for the violation (e.g. <code>"emoji-spam"</code>). Logged as <code>module:&lt;type&gt;</code> in the infraction summary.</td></tr>
+            <tr><td><code>Action</code></td><td>ModuleAction</td><td>Action to take: <code>DeleteOnly</code>, <code>Timeout</code>, <code>Kick</code>, <code>Ban</code>, or <code>SoftBan</code>.</td></tr>
+            <tr><td><code>TimeoutMinutes</code></td><td>int</td><td>Timeout duration in minutes (used when <code>Action</code> is <code>Timeout</code>).</td></tr>
+            <tr><td><code>DeleteDays</code></td><td>int</td><td>Days of message history to prune when banning (0&ndash;7).</td></tr>
+            <tr><td><code>AutoLockdown</code></td><td>bool</td><td>If true, triggers a server lockdown when this verdict fires.</td></tr>
+            <tr><td><code>Reason</code></td><td>string?</td><td>Human-readable reason included in logs.</td></tr>
+          </tbody>
+        </table>
+
+        <h4>ModuleAction Enum</h4>
+        <table>
+          <thead><tr><th>Value</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>DeleteOnly</code> (0)</td><td>Deletes the message only. No action against the user.</td></tr>
+            <tr><td><code>Timeout</code> (1)</td><td>Temporarily mutes the user for <code>TimeoutMinutes</code> minutes.</td></tr>
+            <tr><td><code>Kick</code> (2)</td><td>Removes the user from the server.</td></tr>
+            <tr><td><code>Ban</code> (3)</td><td>Permanently bans the user, with optional message history purge.</td></tr>
+            <tr><td><code>SoftBan</code> (4)</td><td>Bans and immediately unbans, removing recent message history.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Project File</h3>
+        <p>The <code>.csproj</code> file must target <code>net10.0</code> and reference the abstractions assembly:</p>
+        <pre><code>&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
+
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net10.0&lt;/TargetFramework&gt;
+    &lt;Nullable&gt;enable&lt;/Nullable&gt;
+    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
+    &lt;AssemblyName&gt;MyModule&lt;/AssemblyName&gt;
+    &lt;RootNamespace&gt;MyModule&lt;/RootNamespace&gt;
+  &lt;/PropertyGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;Reference Include="Blackwall.Modules.Abstractions"&gt;
+      &lt;HintPath&gt;Blackwall.Modules.Abstractions.dll&lt;/HintPath&gt;
+    &lt;/Reference&gt;
+  &lt;/ItemGroup&gt;
+
+&lt;/Project&gt;</code></pre>
+        <div class="callout callout-warning">
+          <strong>Assembly isolation</strong>
+          At runtime, any assembly whose name starts with <code>Blackwall</code> is resolved from the host (not the module's directory). This means the module always uses the host's <code>Blackwall.Modules.Abstractions</code> types at runtime, ensuring interface compatibility. The <code>.dll</code> in <code>src/</code> is only needed for compilation.
+        </div>
+
+        <h3>Complete Example</h3>
+        <p>Here is a minimal module that flags messages containing more than a configurable number of emoji:</p>
+        <pre><code>using System.Text.RegularExpressions;
+using Blackwall.Modules.Abstractions;
+
+namespace MyModule;
+
+public sealed partial class EmojiSpamModule : IBlackwallModule
+{
+    private static readonly Regex UnicodeEmojiRegex = CreateUnicodeEmojiRegex();
+    private static readonly Regex CustomEmojiRegex = CreateCustomEmojiRegex();
+
+    private int _maxEmojiCount = 5;
+    private bool _countCustomEmoji = true;
+    private ModuleAction _action = ModuleAction.DeleteOnly;
+    private int _timeoutMinutes = 5;
+    private int _messageDeleteDays = 0;
+    private bool _autoLockdown = false;
+
+    public string Name =&gt; "emoji-spam";
+    public string Version =&gt; "1.0.0";
+
+    public Task InitializeAsync(ModuleSettings settings, CancellationToken ct)
+    {
+        _maxEmojiCount = settings.GetInt32("maxEmojiCount") ?? 5;
+        _countCustomEmoji = settings.GetBoolean("countCustomEmoji") ?? true;
+        _timeoutMinutes = settings.GetInt32("__timeoutMinutes") ?? 5;
+        _messageDeleteDays = settings.GetInt32("__messageDeleteDays") ?? 0;
+        _autoLockdown = settings.GetBoolean("__autoLockdown") ?? false;
+
+        var actionStr = settings.Get("__action");
+        if (!string.IsNullOrEmpty(actionStr)
+            &amp;&amp; Enum.TryParse&lt;ModuleAction&gt;(actionStr, true, out var action))
+            _action = action;
+
+        return Task.CompletedTask;
+    }
+
+    public Task&lt;ModuleVerdict?&gt; EvaluateAsync(ModuleMessageContext context, CancellationToken ct)
+    {
+        if (context.Content is null)
+            return Task.FromResult&lt;ModuleVerdict?&gt;(null);
+
+        var count = UnicodeEmojiRegex.Matches(context.Content).Count;
+
+        if (_countCustomEmoji)
+            count += CustomEmojiRegex.Matches(context.Content).Count;
+
+        if (count &gt; _maxEmojiCount)
+        {
+            return Task.FromResult&lt;ModuleVerdict?&gt;(new ModuleVerdict(
+                ViolationType: "emoji-spam",
+                Action: _action,
+                TimeoutMinutes: _timeoutMinutes,
+                DeleteDays: _messageDeleteDays,
+                AutoLockdown: _autoLockdown,
+                Reason: $"Message contains {count} emoji (limit: {_maxEmojiCount})"
+            ));
+        }
+
+        return Task.FromResult&lt;ModuleVerdict?&gt;(null);
+    }
+
+    public Task UpdateSettingsAsync(ModuleSettings settings, CancellationToken ct)
+        =&gt; InitializeAsync(settings, ct);
+
+    // Use surrogate-pair ranges for supplementary-plane emoji (U+1F000-U+1FAFF)
+    [GeneratedRegex(@"(?:\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDC00-\uDEFF])|[\u2600-\u27BF\uFE0F]", RegexOptions.CultureInvariant)]
+    private static partial Regex CreateUnicodeEmojiRegex();
+
+    [GeneratedRegex(@"&lt;a?:\w+:\d+&gt;", RegexOptions.CultureInvariant)]
+    private static partial Regex CreateCustomEmojiRegex();
+}</code></pre>
+        <p>With the corresponding manifest:</p>
+        <pre><code>{
+  "name": "emoji-spam",
+  "readableName": "Emoji Spam",
+  "version": "1.0.0",
+  "author": "My Author",
+  "description": "Detects messages with excessive emoji.",
+  "entryPoint": "MyModule.dll",
+  "canPerformActions": true,
+  "settingsSchema": {
+    "cards": [
+      {
+        "title": "Detection Threshold",
+        "description": "Configure how many emoji trigger a violation.",
+        "fields": [
+          {
+            "key": "maxEmojiCount",
+            "uiName": "Max Emoji Per Message",
+            "helpText": "Messages with more than this many emoji will be flagged.",
+            "inputType": "number",
+            "defaultValue": "5"
+          },
+          {
+            "key": "countCustomEmoji",
+            "uiName": "Count Custom Emoji",
+            "helpText": "When enabled, custom server emoji are also counted.",
+            "inputType": "dropdown",
+            "defaultValue": "true",
+            "options": [
+              { "text": "Yes", "value": "true" },
+              { "text": "No", "value": "false" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+
+        <div class="callout callout-tip">
+          <strong>Reference implementation</strong>
+          A complete working example is available in the <a href="https://github.com/pedrocavaleiro/Blackwall/tree/main/examples/Blackwall.EmojiSpamModule" target="_blank"><code>examples/Blackwall.EmojiSpamModule</code></a> directory of the Blackwall repository.
+        </div>
+
+        <h3>Installing a Custom Module</h3>
+        <p>Modules are installed per guild through the dashboard's Modules tab or via the API:</p>
+        <ul>
+          <li><strong>Dashboard</strong> &mdash; Navigate to your guild &rarr; Modules &rarr; Install, and paste the HTTPS Git URL of your module repository.</li>
+          <li><strong>API</strong> &mdash; <code>POST /guilds/{discordGuildId}/modules/install</code> with a JSON body <code>{ "gitUrl": "https://github.com/..." }</code>.</li>
+        </ul>
+        <p>The Git URL must be a valid HTTPS URL. Blackwall clones the repository with <code>--depth 1</code>, so no full history is needed. After installation, the module appears in the Modules tab where you can configure its settings, update it to the latest repository version, or uninstall it.</p>
+
+        <div class="callout callout-warning">
+          <strong>Security considerations</strong>
+          Custom modules run inside the bot's process with full .NET capabilities. Only install modules from sources you trust. The collectible <code>AssemblyLoadContext</code> provides assembly isolation and hot-reloading but is not a security sandbox. Modules are built server-side during installation, so the build environment must have the .NET 10 SDK available.
+        </div>
+
+        <h3>Settings Key Convention</h3>
+        <p>Keys without a prefix (e.g. <code>maxEmojiCount</code>) are user-configurable through the dashboard settings schema. Keys prefixed with <code>__</code> (e.g. <code>__action</code>, <code>__timeoutMinutes</code>, <code>__messageDeleteDays</code>, <code>__autoLockdown</code>) are conventionally used for internal or action-related settings that may be managed separately or injected by the system. This is a convention only &mdash; all keys are stored in the same flat dictionary.</p>
       </section>
 
       <!-- API Documentation -->
