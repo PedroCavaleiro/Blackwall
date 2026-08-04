@@ -26,6 +26,7 @@ public sealed class ModuleSettingsSchema {
 
 public sealed class BlackwallModuleManifest {
     public string Name { get; set; } = null!;
+    public string? ReadableName { get; set; }
     public string Version { get; set; } = null!;
     public string Author { get; set; } = null!;
     public string? Description { get; set; }

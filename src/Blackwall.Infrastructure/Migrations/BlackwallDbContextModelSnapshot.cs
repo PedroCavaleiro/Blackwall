@@ -8,7 +8,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Blackwall.Infrastructure.Migrations
+namespace Blackwall.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(BlackwallDbContext))]
     partial class BlackwallDbContextModelSnapshot : ModelSnapshot
@@ -537,6 +537,11 @@ namespace Blackwall.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("GitUrl")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<long>("GuildInstanceId")
                         .HasColumnType("bigint");

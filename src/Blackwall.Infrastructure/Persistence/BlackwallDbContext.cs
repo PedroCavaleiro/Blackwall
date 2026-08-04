@@ -670,6 +670,9 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .IsRequired()
                   .HasMaxLength(500);
 
+            entity.Property(e => e.GitUrl)
+                  .HasMaxLength(1000);
+
             entity.Property(e => e.CanPerformActions)
                   .IsRequired();
 

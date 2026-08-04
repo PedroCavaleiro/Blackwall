@@ -13,6 +13,7 @@ namespace Blackwall.Bot.Services;
 public sealed class ModuleInstallationService(
     BlackwallDbContext dbContext,
     ModuleInstallationCache cache,
+    ModuleRunnerService moduleRunnerService,
     ILogger<ModuleInstallationService> logger
 ) {
     private static readonly string ModulesBasePath = Path.Combine(AppContext.BaseDirectory, "modules");
@@ -98,6 +99,7 @@ public sealed class ModuleInstallationService(
                 ModuleVersion = manifest.Version,
                 ModuleAuthor = manifest.Author,
                 EntryPoint = manifest.EntryPoint,
+                GitUrl = gitUrl,
                 CanPerformActions = manifest.CanPerformActions,
                 IsEnabled = true,
                 SettingsJson = JsonSerializer.Serialize(defaultSettings, JsonOptions),
@@ -147,6 +149,100 @@ public sealed class ModuleInstallationService(
             moduleName, discordGuildId);
     }
 
+    public async Task<GuildModuleInstallation> UpdateAsync(
+        long discordGuildId,
+        string moduleName,
+        CancellationToken cancellationToken = default
+    ) {
+        var installation = await dbContext.GuildModuleInstallations
+            .FirstOrDefaultAsync(x =>
+                x.GuildInstance.DiscordGuildId == discordGuildId &&
+                x.GuildInstance.IsActive &&
+                x.ModuleName == moduleName, cancellationToken)
+            ?? throw new InvalidOperationException($"Module '{moduleName}' is not installed for this guild.");
+
+        if (string.IsNullOrWhiteSpace(installation.GitUrl))
+            throw new InvalidOperationException("Module does not have a stored Git URL — cannot update.");
+
+        var gitUrl = installation.GitUrl;
+        var tempDir = Path.Combine(Path.GetTempPath(), $"blackwall-module-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try {
+            var exitCode = await RunGitCloneAsync(gitUrl, tempDir, cancellationToken);
+            if (exitCode != 0)
+                throw new InvalidOperationException($"git clone failed with exit code {exitCode}");
+
+            var manifestPath = Path.Combine(tempDir, "blackwall-module.json");
+            if (!File.Exists(manifestPath))
+                throw new InvalidOperationException("blackwall-module.json not found in repository root.");
+
+            var manifestJson = await File.ReadAllTextAsync(manifestPath, cancellationToken);
+            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifest>(manifestJson, JsonOptions)
+                ?? throw new InvalidOperationException("Failed to parse blackwall-module.json");
+
+            ValidateManifest(manifest);
+
+            if (manifest.Name != moduleName)
+                throw new InvalidOperationException($"Module name mismatch: expected '{moduleName}', got '{manifest.Name}'.");
+
+            var srcDir = Path.Combine(tempDir, "src");
+            if (!Directory.Exists(srcDir))
+                throw new InvalidOperationException("Repository must contain a 'src' directory with the module project.");
+
+            var (buildExitCode, buildOutput) = await RunDotnetBuildAsync(srcDir, cancellationToken);
+            if (buildExitCode != 0)
+                throw new InvalidOperationException($"dotnet build failed with exit code {buildExitCode}.\n{buildOutput}");
+
+            var buildOutputDir = Path.Combine(srcDir, "bin", "Release", "net10.0");
+            if (!Directory.Exists(buildOutputDir))
+                throw new InvalidOperationException("Build output directory not found. Ensure the project targets net10.0.");
+
+            var sourceDllPath = Path.Combine(buildOutputDir, manifest.EntryPoint);
+            if (!File.Exists(sourceDllPath))
+                throw new InvalidOperationException($"Entry point DLL '{manifest.EntryPoint}' was not produced by the build.");
+
+            var moduleDir = Path.Combine(ModulesBasePath, manifest.Name, manifest.Version);
+            Directory.CreateDirectory(moduleDir);
+
+            var destDllPath = Path.Combine(moduleDir, manifest.EntryPoint);
+            File.Copy(sourceDllPath, destDllPath, overwrite: true);
+
+            var depsJsonPath = Path.ChangeExtension(sourceDllPath, ".deps.json");
+            if (File.Exists(depsJsonPath))
+                File.Copy(depsJsonPath, Path.ChangeExtension(destDllPath, ".deps.json"), overwrite: true);
+
+            var runtimeConfigPath = Path.ChangeExtension(sourceDllPath, ".runtimeconfig.json");
+            if (File.Exists(runtimeConfigPath))
+                File.Copy(runtimeConfigPath, Path.ChangeExtension(destDllPath, ".runtimeconfig.json"), overwrite: true);
+
+            installation.ModuleVersion = manifest.Version;
+            installation.ModuleAuthor = manifest.Author;
+            installation.EntryPoint = manifest.EntryPoint;
+            installation.CanPerformActions = manifest.CanPerformActions;
+            installation.ManifestJson = manifestJson;
+            installation.UpdatedAtUtc = DateTime.UtcNow;
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await cache.InvalidateAsync(discordGuildId);
+
+            moduleRunnerService.UnloadModule(moduleName, manifest.Version);
+
+            logger.LogInformation(
+                "Module {ModuleName} updated to v{Version} for guild {GuildId}",
+                manifest.Name, manifest.Version, discordGuildId);
+
+            return installation;
+        } finally {
+            try {
+                if (Directory.Exists(tempDir))
+                    Directory.Delete(tempDir, recursive: true);
+            } catch {
+                // ignored
+            }
+        }
+    }
+
     public async Task SetEnabledAsync(
         long discordGuildId,
         string moduleName,
@@ -185,6 +281,9 @@ public sealed class ModuleInstallationService(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await cache.InvalidateAsync(discordGuildId);
+
+        await moduleRunnerService.ReloadModuleSettingsAsync(
+            moduleName, installation.ModuleVersion, settingsJson, cancellationToken);
     }
 
     public async Task<IReadOnlyList<GuildModuleInstallation>> ListInstalledAsync(

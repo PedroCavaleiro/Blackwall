@@ -3028,14 +3028,16 @@ public sealed class GuildsController(
         var installations = await moduleInstallationService.ListInstalledAsync(discordGuildId, cancellationToken);
 
         var dtos = installations.Select(x => {
-            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(x.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", "", "", null, "", false, null);
+            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(x.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", null, "", "", null, "", false, null);
             return new GuildModuleInstallationDto(
                 x.Id,
                 discordGuildId,
                 x.ModuleName,
+                manifest.ReadableName,
                 x.ModuleVersion,
                 x.ModuleAuthor,
                 manifest.Description,
+                x.GitUrl,
                 x.CanPerformActions,
                 x.IsEnabled,
                 x.SettingsJson,
@@ -3070,14 +3072,16 @@ public sealed class GuildsController(
 
         try {
             var installation = await moduleInstallationService.InstallAsync(discordGuildId, request.GitUrl, cancellationToken);
-            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(installation.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", "", "", null, "", false, null);
+            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(installation.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", null, "", "", null, "", false, null);
             return Ok(new GuildModuleInstallationDto(
                 installation.Id,
                 discordGuildId,
                 installation.ModuleName,
+                manifest.ReadableName,
                 installation.ModuleVersion,
                 installation.ModuleAuthor,
                 manifest.Description,
+                installation.GitUrl,
                 installation.CanPerformActions,
                 installation.IsEnabled,
                 installation.SettingsJson,
@@ -3128,6 +3132,55 @@ public sealed class GuildsController(
                 Title = "Module not found.",
                 Detail = $"Module '{moduleName}' is not installed for this guild.",
                 Status = StatusCodes.Status404NotFound
+            });
+        }
+    }
+
+    [HttpPost("{discordGuildId:long}/modules/{moduleName}/update")]
+    [ProducesResponseType(typeof(GuildModuleInstallationDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<GuildModuleInstallationDto>> UpdateModule(
+        long discordGuildId,
+        string moduleName,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        try {
+            var installation = await moduleInstallationService.UpdateAsync(discordGuildId, moduleName, cancellationToken);
+            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(installation.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", null, "", "", null, "", false, null);
+            return Ok(new GuildModuleInstallationDto(
+                installation.Id,
+                discordGuildId,
+                installation.ModuleName,
+                manifest.ReadableName,
+                installation.ModuleVersion,
+                installation.ModuleAuthor,
+                manifest.Description,
+                installation.GitUrl,
+                installation.CanPerformActions,
+                installation.IsEnabled,
+                installation.SettingsJson,
+                manifest
+            ));
+        } catch (InvalidOperationException ex) {
+            return BadRequest(new ProblemDetails {
+                Title = "Module update failed.",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest
             });
         }
     }

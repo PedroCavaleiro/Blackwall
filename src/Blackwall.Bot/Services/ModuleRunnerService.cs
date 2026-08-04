@@ -87,13 +87,6 @@ public sealed class ModuleRunnerService(
         var results = new List<ModuleEvaluationResult>();
 
         foreach (var installation in installations) {
-            if (!installation.CanPerformActions) {
-                logger.LogDebug(
-                    "Module {ModuleName} cannot perform actions — skipping evaluation",
-                    installation.ModuleName);
-                continue;
-            }
-
             try {
                 var loaded = await GetOrLoadModuleAsync(installation, cancellationToken);
                 if (loaded is null)
@@ -132,6 +125,26 @@ public sealed class ModuleRunnerService(
         var key = $"{moduleName}:{version}";
         if (_loadedModules.TryRemove(key, out var loaded))
             loaded.Dispose();
+    }
+
+    public async Task ReloadModuleSettingsAsync(
+        string moduleName,
+        string version,
+        string settingsJson,
+        CancellationToken cancellationToken = default
+    ) {
+        var key = $"{moduleName}:{version}";
+        if (!_loadedModules.TryGetValue(key, out var loaded))
+            return;
+
+        try {
+            var settings = ParseSettings(settingsJson);
+            await loaded.Instance.UpdateSettingsAsync(settings, cancellationToken);
+        } catch (Exception ex) {
+            logger.LogError(ex,
+                "Failed to update settings for module {ModuleName}",
+                moduleName);
+        }
     }
 
     public void UnloadAllModules() {

@@ -3,6 +3,7 @@ using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Blackwall.Infrastructure.Cache;
 
@@ -14,7 +15,9 @@ public sealed class ModuleInstallationCache(
     private const string SettingsKeyPrefix = "module:settings:";
     private static readonly TimeSpan Ttl = TimeSpan.FromMinutes(15);
     private readonly IDatabase _db = redis.GetDatabase();
-    private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web) {
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+    };
 
     public async Task<IReadOnlyList<GuildModuleInstallationDto>> GetByDiscordGuildIdAsync(
         long discordGuildId,
@@ -32,9 +35,11 @@ public sealed class ModuleInstallationCache(
                 x.Id,
                 x.GuildInstance.DiscordGuildId,
                 x.ModuleName,
+                null,
                 x.ModuleVersion,
                 x.ModuleAuthor,
                 null,
+                x.GitUrl,
                 x.CanPerformActions,
                 x.IsEnabled,
                 x.SettingsJson,

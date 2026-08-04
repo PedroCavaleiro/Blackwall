@@ -28,6 +28,7 @@ public sealed record ModuleSettingsSchemaDto(
 
 public sealed record BlackwallModuleManifestDto(
     string Name,
+    string? ReadableName,
     string Version,
     string Author,
     string? Description,
@@ -40,9 +41,11 @@ public sealed record GuildModuleInstallationDto(
     long Id,
     long DiscordGuildId,
     string ModuleName,
+    string? ReadableName,
     string ModuleVersion,
     string ModuleAuthor,
     string? Description,
+    string GitUrl,
     bool CanPerformActions,
     bool IsEnabled,
     string SettingsJson,

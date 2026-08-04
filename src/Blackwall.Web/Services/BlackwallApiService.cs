@@ -518,6 +518,17 @@ public sealed class BlackwallApiService(
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task<GuildModuleInstallationDto?> UpdateModuleAsync(long discordGuildId, string moduleName, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/modules/{Uri.EscapeDataString(moduleName)}/update");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct);
+            throw new Exception(problem?.Detail ?? problem?.Title ?? $"HTTP {response.StatusCode}");
+        }
+        return await response.Content.ReadFromJsonAsync<GuildModuleInstallationDto>(ct);
+    }
+
     public async Task SetModuleEnabledAsync(long discordGuildId, string moduleName, bool isEnabled, CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Put, $"api/guilds/{discordGuildId}/modules/{Uri.EscapeDataString(moduleName)}/enabled");
         ApplyAuth(request);

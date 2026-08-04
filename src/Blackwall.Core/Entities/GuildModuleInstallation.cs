@@ -10,6 +10,7 @@ public sealed class GuildModuleInstallation : EntityBase {
     public string ModuleVersion { get; set; } = null!;
     public string ModuleAuthor { get; set; } = null!;
     public string EntryPoint { get; set; } = null!;
+    public string GitUrl { get; set; } = "";
     public bool CanPerformActions { get; set; }
     public bool IsEnabled { get; set; }
     public string SettingsJson { get; set; } = "{}";
