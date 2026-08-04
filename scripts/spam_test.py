@@ -179,4 +179,4 @@ async def channel_error(ctx, error):
         await ctx.send("Please provide 3 valid channel mentions. Example: `!test2 #channel1 #channel2 #channel3`")
 
 
-bot.run('MTUyMjUxNjk1NzU0NTYyNzY4MQ.G02dTg.H7T7eV3WdkFB6v7GTq9xYOkkY-AB_EETXnq5qw')
+bot.run('<bot token>')
