@@ -6,6 +6,7 @@
 @inject IJSRuntime Js
 @inject IOptions<AppConfiguration> AppCfg
 @implements IDisposable
+@using Blackwall.Core.DTOs
 
 <PageTitle>@(_settings?.Name ?? "Config") — Blackwall</PageTitle>
 
@@ -72,6 +73,11 @@
                         <button type="button" class="bw-sidebar-btn @(_activeTab == "aisentinel" ? "active" : "")" @onclick='() => _activeTab = "aisentinel"'>AI SENTINEL</button>
                     }
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "audit" ? "active" : "")" @onclick='() => _activeTab = "audit"'>AUDIT</button>
+                    @foreach (var mod in _installedModules) {
+                        var tabLabel = (mod.ReadableName ?? mod.ModuleName).ToUpperInvariant();
+                        <button type="button" class="bw-sidebar-btn @(_activeTab == $"mod:{mod.ModuleName}" ? "active" : "")" @onclick='() => _activeTab = $"mod:{mod.ModuleName}"'>@tabLabel</button>
+                    }
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "modules" ? "active" : "")" @onclick='() => _activeTab = "modules"'>MODULES</button>
                 </nav>
 
                 <div class="bw-sidebar-content">
@@ -105,6 +111,14 @@
                     }
                     @if (_activeTab == "audit") {
                         <AuditTab Form="Form" DiscordGuildId="DiscordGuildId" />
+                    }
+                    @if (_activeTab == "modules") {
+                        <ModulesTab DiscordGuildId="DiscordGuildId" OnError="HandleError" OnModulesChanged="ReloadModulesAsync" />
+                    }
+                    @foreach (var mod in _installedModules) {
+                        @if (_activeTab == $"mod:{mod.ModuleName}") {
+                            <ModuleTab @ref="_activeModuleTab" Module="mod" DiscordGuildId="DiscordGuildId" OnError="HandleError" />
+                        }
                     }
 
                     <div class="d-flex align-items-center gap-3 mt-2">
@@ -171,6 +185,8 @@
     private bool _lockdownBusy;
     private bool _isDirty;
     private EditContext _editContext = default!;
+    private IReadOnlyList<GuildModuleInstallationDto> _installedModules = [];
+    private Blackwall.Web.Components.Shared.GuildTabs.ModuleTab? _activeModuleTab;
 
     protected override async Task OnInitializedAsync() {
         _editContext = new EditContext(Form);
@@ -267,6 +283,12 @@
             } catch {
                 // AI sentinel config not available yet — defaults are fine
             }
+
+            try {
+                _installedModules = await Api.GetModulesAsync(DiscordGuildId);
+            } catch {
+                // modules not available — defaults are fine
+            }
         } catch {
             _settings = null;
         } finally {
@@ -281,6 +303,15 @@
 
     private void HandleError(string error) {
         _error = error;
+    }
+
+    private async void ReloadModulesAsync() {
+        try {
+            _installedModules = await Api.GetModulesAsync(DiscordGuildId);
+            await InvokeAsync(StateHasChanged);
+        } catch {
+            // ignored — modules list will be empty
+        }
     }
 
     private async Task SaveAsync() {
@@ -378,6 +409,14 @@
                 ));
             } catch (Exception ex) {
                 _error = $"Failed to save AI Sentinel settings: {ex.Message}";
+            }
+
+            if (_activeModuleTab is not null) {
+                try {
+                    await _activeModuleTab.SaveSettingsAsync();
+                } catch (Exception ex) {
+                    _error = $"Failed to save module settings: {ex.Message}";
+                }
             }
         } catch (Exception ex) {
             _error = $"Failed to save settings: {ex.Message}";

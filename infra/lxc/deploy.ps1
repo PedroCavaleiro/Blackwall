@@ -67,8 +67,8 @@ try {
         # Ensure the target directory exists
         mkdir -p $AppDir
 
-        # Clear out the target directory but preserve the .env file
-        find $AppDir -mindepth 1 -maxdepth 1 ! -name '.env' -exec rm -rf {} + 2>/dev/null || true
+        # Clear out the target directory but preserve the .env file and modules directory
+        find $AppDir -mindepth 1 -maxdepth 1 ! -name '.env' ! -name 'modules' -exec rm -rf {} + 2>/dev/null || true
 
         # Extract the new payload
         tar -xzf /tmp/publish.tar.gz -C $AppDir/
@@ -78,6 +78,17 @@ try {
 
         # Fix ownership
         chown -R blackwall:blackwall $AppDir/api $AppDir/web
+
+        # Ensure modules directory exists with correct permissions
+        mkdir -p $AppDir/modules
+        chown blackwall:blackwall $AppDir/modules
+        chmod 700 $AppDir/modules
+
+        # Secure .env if it exists
+        if [ -f $AppDir/.env ]; then
+            chown root:root $AppDir/.env
+            chmod 600 $AppDir/.env
+        fi
 
         # Restart and verify services
     systemctl restart blackwall-api blackwall-web

@@ -1,0 +1,37 @@
+{
+  "name": "emoji-spam",
+  "readableName": "Emoji Spam",
+  "version": "1.0.0",
+  "author": "Blackwall Example",
+  "description": "Detects messages with excessive emoji and optionally performs infraction actions.",
+  "entryPoint": "Blackwall.EmojiSpamModule.dll",
+  "canPerformActions": true,
+  "settingsSchema": {
+    "cards": [
+      {
+        "title": "Detection Threshold",
+        "description": "Configure how many emoji trigger a violation and what counts as an emoji.",
+        "fields": [
+          {
+            "key": "maxEmojiCount",
+            "uiName": "Max Emoji Per Message",
+            "helpText": "Messages with more than this many emoji will be flagged.",
+            "inputType": "number",
+            "defaultValue": "5"
+          },
+          {
+            "key": "countCustomEmoji",
+            "uiName": "Count Custom Emoji",
+            "helpText": "When enabled, custom server emoji (<:name:id>) are also counted.",
+            "inputType": "dropdown",
+            "defaultValue": "true",
+            "options": [
+              { "text": "Yes", "value": "true" },
+              { "text": "No", "value": "false" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -2,6 +2,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 COPY src/Blackwall.Core/Blackwall.Core.csproj  src/Blackwall.Core/
+COPY src/Blackwall.Modules.Abstractions/Blackwall.Modules.Abstractions.csproj  src/Blackwall.Modules.Abstractions/
 COPY src/Blackwall.Web/Blackwall.Web.csproj    src/Blackwall.Web/
 RUN dotnet restore src/Blackwall.Web/Blackwall.Web.csproj
 
@@ -11,6 +12,12 @@ RUN dotnet publish src/Blackwall.Web/Blackwall.Web.csproj \
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
+
+RUN groupadd -r blackwall && useradd -r -g blackwall -s /bin/false blackwall
+
 COPY --from=build /app/publish .
+RUN chown -R blackwall:blackwall /app
+
+USER blackwall
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Blackwall.Web.dll"]

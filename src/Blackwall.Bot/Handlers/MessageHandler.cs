@@ -22,6 +22,7 @@ public sealed class MessageHandler(
     MessageAuditService messageAuditService,
     NetWatchSnareService netWatchSnareService,
     AiSentinelService aiSentinelService,
+    ModuleRunnerService moduleRunnerService,
     DiscordSocketClient discordClient,
     IOptions<AppConfiguration> appConfiguration,
     ILogger<MessageHandler> logger
@@ -205,6 +206,16 @@ public sealed class MessageHandler(
                         shouldLockdown = true;
                 }
             }
+        }
+
+        var moduleResults = await moduleRunnerService.EvaluateAsync(
+            discordGuildId, message, guildChannel, config.IsDryRun, CancellationToken.None);
+
+        foreach (var result in moduleResults) {
+            violations.Add($"module:{result.ViolationType}");
+            triggeredModules.Add((result.Action, result.TimeoutMinutes, result.DeleteDays));
+            if (result.AutoLockdown && !config.IsLockedDown)
+                shouldLockdown = true;
         }
 
         if (violations.Count == 0 && appConfiguration.Value.AiSentinelEnabled) {

@@ -8,7 +8,8 @@ using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
-Env.TraversePath().Load();
+if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("POSTGRES__CONNECTION_STRING")))
+    try { Env.TraversePath().Load(); } catch { /* .env not readable — vars injected by systemd */ }
 
 var builder = WebApplication.CreateBuilder(args);
 

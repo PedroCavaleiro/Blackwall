@@ -28,7 +28,7 @@ if ! command -v dotnet &>/dev/null || [[ "$(dotnet --version 2>/dev/null | cut -
     dpkg -i /tmp/packages-microsoft-prod.deb
     rm /tmp/packages-microsoft-prod.deb
     apt-get update -qq
-    apt-get install -y aspnetcore-runtime-10.0
+    apt-get install -y aspnetcore-runtime-10.0 dotnet-sdk-10.0
     success ".NET 10 installed: $(dotnet --version)"
 else
     success ".NET already installed: $(dotnet --version)"
@@ -86,8 +86,9 @@ if ! id -u "$APP_USER" &>/dev/null; then
     useradd --system --shell /usr/sbin/nologin \
             --home-dir "$APP_DIR" --create-home "$APP_USER"
 fi
-mkdir -p "$APP_DIR/api" "$APP_DIR/web"
+mkdir -p "$APP_DIR/api" "$APP_DIR/web" "$APP_DIR/modules"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
+chmod 700 "$APP_DIR/modules"
 success "User '$APP_USER' and directories ready at $APP_DIR."
 
 # ─── PostgreSQL: create DB and user ──────────────────────────────────────────
@@ -136,13 +137,16 @@ echo " Blackwall LXC provisioning complete."
 echo ""
 echo " Next steps:"
 echo "   1. Place your .env at:    $APP_DIR/.env"
-echo "      (chown blackwall:blackwall $APP_DIR/.env && chmod 640 $APP_DIR/.env)"
+echo "      Secure it with:"
+echo "        chown root:root $APP_DIR/.env && chmod 600 $APP_DIR/.env"
+echo "      (systemd reads it as root via EnvironmentFile=; the blackwall user cannot read it)"
 echo "   2. Deploy API build to:   $APP_DIR/api/"
 echo "   3. Deploy Web build to:   $APP_DIR/web/"
-echo "   4. Run Entity Framework migrations (as blackwall-api)"
-echo "   5. Start services:"
+echo "   4. Module directory:      $APP_DIR/modules/ (chmod 700, owned by blackwall)"
+echo "   5. Run Entity Framework migrations (as blackwall-api)"
+echo "   6. Start services:"
 echo "        systemctl start blackwall-api blackwall-web"
-echo "   6. Check logs:"
+echo "   7. Check logs:"
 echo "        journalctl -u blackwall-api -f"
 echo "        journalctl -u blackwall-web -f"
 echo "═══════════════════════════════════════════════════════════════"

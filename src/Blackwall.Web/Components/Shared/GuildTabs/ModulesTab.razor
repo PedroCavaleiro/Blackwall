@@ -1,0 +1,150 @@
+@inject BlackwallApiService Api
+@using Blackwall.Core.DTOs
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">INSTALL MODULE</div>
+    <div class="p-4">
+        <p class="font-mono mb-3 bw-desc">
+            Install a module from a public HTTPS Git repository. The repository must contain a <code>blackwall-module.json</code> manifest at the root and a <code>src/</code> directory with the module project.
+        </p>
+        <div class="d-flex gap-2">
+            <input type="text" class="form-control bw-input font-mono" placeholder="https://github.com/user/blackwall-module.git"
+                   value="@_gitUrl" @oninput="OnGitUrlInput" disabled="@_installing" />
+            <button type="button" class="btn btn-primary cut-corner font-display bw-btn-sm"
+                    disabled="@(_installing || string.IsNullOrWhiteSpace(_gitUrl))"
+                    @onclick="InstallAsync">
+                @(_installing ? "INSTALLING..." : "INSTALL")
+            </button>
+        </div>
+        @if (_installError is not null) {
+            <div class="alert alert-danger font-mono mt-3 bw-alert-text">@_installError</div>
+        }
+    </div>
+</div>
+
+@if (_loading) {
+    <div class="font-mono bw-loading bw-typewriter">&gt; Loading modules...</div>
+} else if (!_modules.Any()) {
+    <div class="cut-corner border mb-4 bw-card">
+        <div class="card-header">INSTALLED MODULES</div>
+        <div class="p-4">
+            <p class="font-mono bw-desc">No modules installed. Install a module above to extend Blackwall's capabilities. Each installed module gets its own tab in the sidebar.</p>
+        </div>
+    </div>
+} else {
+    <div class="cut-corner border mb-4 bw-card">
+        <div class="card-header">INSTALLED MODULES</div>
+        <div class="p-4">
+            <p class="font-mono mb-3 bw-desc">
+                @(_modules.Count) module(s) installed. Each module has its own tab in the sidebar for configuration.
+            </p>
+            @foreach (var module in _modules) {
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <div>
+                        <span class="font-display">@(module.ReadableName ?? module.ModuleName)</span>
+                        <span class="font-mono bw-meta ms-2">@module.ModuleName@@@module.ModuleVersion</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" class="form-check-input bw-switch"
+                                   id="mod-enabled-@module.Id"
+                                   checked="@module.IsEnabled"
+                                   @onchange="@(e => ToggleEnabledAsync(module, (bool)e.Value!))" />
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary cut-corner font-display bw-btn-xs"
+                                @onclick="@(async () => await UpdateAsync(module))">
+                            @(_updatingId == module.Id ? "UPDATING..." : "UPDATE")
+                        </button>
+                        <button type="button" class="btn btn-outline-danger cut-corner font-display bw-btn-xs"
+                                @onclick="@(async () => await UninstallAsync(module))">
+                            @(_uninstallingId == module.Id ? "REMOVING..." : "UNINSTALL")
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public long DiscordGuildId { get; set; }
+    [Parameter] public Action<string>? OnError { get; set; }
+    [Parameter] public Action? OnModulesChanged { get; set; }
+
+    private IReadOnlyList<GuildModuleInstallationDto> _modules = [];
+    private bool _loading = true;
+    private string _gitUrl { get; set; } = "";
+    private bool _installing;
+    private string? _installError;
+    private long? _togglingId;
+    private long? _uninstallingId;
+    private long? _updatingId;
+
+    protected override async Task OnInitializedAsync() {
+        try {
+            _modules = await Api.GetModulesAsync(DiscordGuildId);
+        } catch (Exception ex) {
+            OnError?.Invoke($"Failed to load modules: {ex.Message}");
+        } finally {
+            _loading = false;
+        }
+    }
+
+    private void OnGitUrlInput(ChangeEventArgs e) {
+        _gitUrl = e.Value?.ToString() ?? "";
+    }
+
+    private async Task InstallAsync() {
+        _installing = true;
+        _installError = null;
+        try {
+            await Api.InstallModuleAsync(DiscordGuildId, _gitUrl);
+            _gitUrl = "";
+            _modules = await Api.GetModulesAsync(DiscordGuildId);
+            OnModulesChanged?.Invoke();
+        } catch (Exception ex) {
+            _installError = ex.Message;
+        } finally {
+            _installing = false;
+        }
+    }
+
+    private async Task ToggleEnabledAsync(GuildModuleInstallationDto module, bool isEnabled) {
+        _togglingId = module.Id;
+        try {
+            await Api.SetModuleEnabledAsync(DiscordGuildId, module.ModuleName, isEnabled);
+            _modules = await Api.GetModulesAsync(DiscordGuildId);
+            OnModulesChanged?.Invoke();
+        } catch (Exception ex) {
+            OnError?.Invoke($"Failed to toggle module: {ex.Message}");
+        } finally {
+            _togglingId = null;
+        }
+    }
+
+    private async Task UninstallAsync(GuildModuleInstallationDto module) {
+        _uninstallingId = module.Id;
+        try {
+            await Api.UninstallModuleAsync(DiscordGuildId, module.ModuleName);
+            _modules = await Api.GetModulesAsync(DiscordGuildId);
+            OnModulesChanged?.Invoke();
+        } catch (Exception ex) {
+            OnError?.Invoke($"Failed to uninstall module: {ex.Message}");
+        } finally {
+            _uninstallingId = null;
+        }
+    }
+
+    private async Task UpdateAsync(GuildModuleInstallationDto module) {
+        _updatingId = module.Id;
+        try {
+            await Api.UpdateModuleAsync(DiscordGuildId, module.ModuleName);
+            _modules = await Api.GetModulesAsync(DiscordGuildId);
+            OnModulesChanged?.Invoke();
+        } catch (Exception ex) {
+            OnError?.Invoke($"Failed to update module: {ex.Message}");
+        } finally {
+            _updatingId = null;
+        }
+    }
+}
