@@ -35,6 +35,9 @@ public sealed class TwitchChannelService(BlackwallDbContext dbContext) {
     public async Task<TwitchChannelInstance> CreateOrUpdateChannelInstanceAsync(
         long appUserId,
         TwitchUserDto twitchUser,
+        string? encryptedAccessToken = null,
+        string? encryptedRefreshToken = null,
+        DateTime? tokenExpiresAtUtc = null,
         CancellationToken cancellationToken = default
     ) {
         var twitchUserId = long.Parse(twitchUser.Id);
@@ -50,6 +53,11 @@ public sealed class TwitchChannelService(BlackwallDbContext dbContext) {
             existing.UpdatedAtUtc = DateTime.UtcNow;
             if (existing.OwnerUserId is null)
                 existing.OwnerUserId = appUserId;
+            if (encryptedAccessToken is not null) {
+                existing.BotAccessToken = encryptedAccessToken;
+                existing.BotRefreshToken = encryptedRefreshToken;
+                existing.BotTokenExpiresAtUtc = tokenExpiresAtUtc;
+            }
 
             await dbContext.SaveChangesAsync(cancellationToken);
             return existing;
@@ -62,7 +70,10 @@ public sealed class TwitchChannelService(BlackwallDbContext dbContext) {
             ProfileImageUrl = twitchUser.ProfileImageUrl,
             IsActive = true,
             OwnerUserId = appUserId,
-            UpdatedAtUtc = DateTime.UtcNow
+            UpdatedAtUtc = DateTime.UtcNow,
+            BotAccessToken = encryptedAccessToken,
+            BotRefreshToken = encryptedRefreshToken,
+            BotTokenExpiresAtUtc = tokenExpiresAtUtc
         };
 
         dbContext.TwitchChannelInstances.Add(instance);

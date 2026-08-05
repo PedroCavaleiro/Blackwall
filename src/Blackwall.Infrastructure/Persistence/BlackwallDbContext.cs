@@ -24,6 +24,8 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<GuildModuleInstallation> GuildModuleInstallations => Set<GuildModuleInstallation>();
     public DbSet<TwitchChannelInstance> TwitchChannelInstances => Set<TwitchChannelInstance>();
     public DbSet<TwitchChannelManager> TwitchChannelManagers => Set<TwitchChannelManager>();
+    public DbSet<TwitchChannelConfiguration> TwitchChannelConfigurations => Set<TwitchChannelConfiguration>();
+    public DbSet<TwitchAllowedBot> TwitchAllowedBots => Set<TwitchAllowedBot>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -698,6 +700,39 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .WithOne(e => e.TwitchChannelInstance)
                   .HasForeignKey(e => e.TwitchChannelInstanceId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Configuration)
+                  .WithOne(e => e.TwitchChannelInstance)
+                  .HasForeignKey<TwitchChannelConfiguration>(e => e.TwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TwitchChannelConfiguration>(entity => {
+            entity.Property(e => e.CommandTrigger)
+                  .IsRequired()
+                  .HasMaxLength(2);
+
+            entity.Property(e => e.IsEnabled)
+                  .IsRequired();
+
+            entity.Property(e => e.IsDryRun)
+                  .IsRequired();
+
+            entity.Property(e => e.UpdatedAtUtc);
+
+            entity.HasMany(e => e.AllowedBots)
+                  .WithOne(e => e.TwitchChannelConfiguration)
+                  .HasForeignKey(e => e.TwitchChannelConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TwitchAllowedBot>(entity => {
+            entity.Property(e => e.BotUsername)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.HasIndex(e => new { e.TwitchChannelConfigurationId, e.BotUsername })
+                  .IsUnique();
         });
 
         modelBuilder.Entity<TwitchChannelManager>(entity => {

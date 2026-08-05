@@ -7,10 +7,13 @@ using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
 using Blackwall.Infrastructure.Persistence;
+using Blackwall.TwitchBot;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using TwitchLib.Api;
 
 namespace Blackwall.Api.Controllers;
 
@@ -24,10 +27,13 @@ public sealed class AuthController(
     AccountLinkingService accountLinkingService,
     DiscordGuildCacheService guildCache,
     TwitchChannelService twitchChannelService,
+    TwitchBotService twitchBotService,
     BlackwallDbContext dbContext,
     IOptions<WebOptions> webOptions,
     IOptions<AppConfiguration> appConfiguration,
-    IConfiguration configuration
+    IOptions<TwitchOptions> twitchOptions,
+    IConfiguration configuration,
+    ILogger<AuthController> logger
 ) : ControllerBase {
     /// <summary>
     /// Builds and returns the Discord OAuth2 authorization URL to initiate login.
@@ -218,6 +224,11 @@ public sealed class AuthController(
             });
         }
 
+        var botInstallUserId = await twitchOAuthService.ConsumeBotInstallStateAsync(state);
+        if (botInstallUserId.HasValue) {
+            return await HandleBotInstallCallback(code, botInstallUserId.Value, cancellationToken);
+        }
+
         var linkToUserId = await twitchOAuthService.ConsumeWithLinkAsync(state);
         var validState = await twitchOAuthService.ConsumeAsync(state);
 
@@ -362,32 +373,60 @@ public sealed class AuthController(
             });
         }
 
-        var user = await dbContext.AppUsers
-            .FirstOrDefaultAsync(x => x.Id == appUserId.Value, cancellationToken);
+        return await HandleBotInstallCallback(code, appUserId.Value, cancellationToken);
+    }
 
-        if (user is null || !user.TwitchUserId.HasValue) {
-            return BadRequest(new ProblemDetails {
-                Title = "User not found or Twitch not linked.",
-                Detail = "The authenticated user no longer exists or has no linked Twitch account.",
-                Status = StatusCodes.Status400BadRequest
-            });
+    private async Task<IActionResult> HandleBotInstallCallback(string code, long appUserId, CancellationToken cancellationToken) {
+        try {
+            var user = await dbContext.AppUsers
+                .FirstOrDefaultAsync(x => x.Id == appUserId, cancellationToken);
+
+            if (user is null || !user.TwitchUserId.HasValue) {
+                logger.LogWarning("Bot install callback: user {UserId} not found or Twitch not linked", appUserId);
+                return BadRequest(new ProblemDetails {
+                    Title = "User not found or Twitch not linked.",
+                    Detail = "The authenticated user no longer exists or has no linked Twitch account.",
+                    Status = StatusCodes.Status400BadRequest
+                });
+            }
+
+            var tokens = await twitchOAuthService.ExchangeBotCodeAsync(code, cancellationToken);
+            var twitchUser = await twitchOAuthService.GetCurrentUserAsync(tokens.AccessToken, cancellationToken);
+
+            if (!long.TryParse(twitchUser.Id, out var twitchUserId) || twitchUserId != user.TwitchUserId.Value) {
+                logger.LogWarning("Bot install callback: channel mismatch — authorized {AuthId}, expected {ExpectedId}", twitchUser.Id, user.TwitchUserId.Value);
+                return BadRequest(new ProblemDetails {
+                    Title = "Channel mismatch.",
+                    Detail = "The authorized Twitch channel does not match your linked Twitch account.",
+                    Status = StatusCodes.Status400BadRequest
+                });
+            }
+
+            var key = AesCrypto.GetBytes(appConfiguration.Value.EncryptionKey);
+            var iv = AesCrypto.GetBytes(appConfiguration.Value.EncryptionIv);
+            var encryptedAccessToken = AesCrypto.EncryptString(tokens.AccessToken, key, iv);
+            var encryptedRefreshToken = AesCrypto.EncryptString(tokens.RefreshToken, key, iv);
+
+            await twitchChannelService.CreateOrUpdateChannelInstanceAsync(
+                user.Id,
+                twitchUser,
+                encryptedAccessToken,
+                encryptedRefreshToken,
+                tokens.ExpiresAt,
+                cancellationToken
+            );
+
+            await TryAddBotAsModeratorAsync(twitchUser.Id, tokens.AccessToken);
+
+            await twitchBotService.RefreshChannelsAsync();
+
+            var redirectUrl = $"{webOptions.Value.BaseUrl.TrimEnd('/')}/dashboard";
+            return Redirect(redirectUrl);
+        } catch (Exception ex) {
+            logger.LogError(ex, "Bot install callback failed for user {UserId}", appUserId);
+            var errorUrl = $"{webOptions.Value.BaseUrl.TrimEnd('/')}/dashboard?error=install_failed";
+            return Redirect(errorUrl);
         }
-
-        var tokens = await twitchOAuthService.ExchangeBotCodeAsync(code, cancellationToken);
-        var twitchUser = await twitchOAuthService.GetCurrentUserAsync(tokens.AccessToken, cancellationToken);
-
-        if (!long.TryParse(twitchUser.Id, out var twitchUserId) || twitchUserId != user.TwitchUserId.Value) {
-            return BadRequest(new ProblemDetails {
-                Title = "Channel mismatch.",
-                Detail = "The authorized Twitch channel does not match your linked Twitch account.",
-                Status = StatusCodes.Status400BadRequest
-            });
-        }
-
-        await twitchChannelService.CreateOrUpdateChannelInstanceAsync(user.Id, twitchUser, cancellationToken);
-
-        var redirectUrl = $"{webOptions.Value.BaseUrl.TrimEnd('/')}/dashboard";
-        return Redirect(redirectUrl);
     }
 
     [Authorize]
@@ -523,5 +562,29 @@ public sealed class AuthController(
         return long.TryParse(userIdClaim, out var appUserId)
             ? appUserId
             : null;
+    }
+
+    private async Task TryAddBotAsModeratorAsync(string broadcasterId, string accessToken) {
+        var opts = twitchOptions.Value;
+        if (string.IsNullOrWhiteSpace(opts.BotUsername))
+            return;
+
+        try {
+            var api = new TwitchAPI();
+            api.Settings.ClientId = opts.ClientId;
+            api.Settings.AccessToken = accessToken;
+
+            var botUserResponse = await api.Helix.Users.GetUsersAsync(logins: [opts.BotUsername]);
+            if (botUserResponse.Users.Length == 0) {
+                logger.LogWarning("Bot account '{BotUser}' not found on Twitch — skipping mod assignment", opts.BotUsername);
+                return;
+            }
+
+            var botUserId = botUserResponse.Users[0].Id;
+            await api.Helix.Moderation.AddChannelModeratorAsync(broadcasterId, botUserId);
+            logger.LogInformation("Added bot account '{BotUser}' (ID: {BotUserId}) as moderator in channel {BroadcasterId}", opts.BotUsername, botUserId, broadcasterId);
+        } catch (Exception ex) {
+            logger.LogWarning(ex, "Failed to add bot as moderator in channel {BroadcasterId} — the bot can still function if manually modded", broadcasterId);
+        }
     }
 }

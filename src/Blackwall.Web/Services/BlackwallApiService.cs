@@ -622,4 +622,52 @@ public sealed class BlackwallApiService(
         var result = await response.Content.ReadFromJsonAsync<TwitchBotInstallResponse>(ct);
         return result?.Url;
     }
+
+    public async Task<TwitchChannelSettingsResponse?> GetTwitchChannelSettingsAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/settings");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<TwitchChannelSettingsResponse>(ct);
+    }
+
+    public async Task<TwitchChannelSettingsResponse?> UpdateTwitchChannelSettingsAsync(long twitchUserId, UpdateTwitchChannelSettingsRequest body, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/twitchchannels/{twitchUserId}/settings");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(body);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TwitchChannelSettingsResponse>(ct);
+    }
+
+    public async Task<IReadOnlyList<TwitchAllowedBotResponse>> GetTwitchAllowedBotsAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/allowed-bots");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchAllowedBotResponse>>(ct) ?? [];
+    }
+
+    public async Task<TwitchAllowedBotResponse?> AddTwitchAllowedBotAsync(long twitchUserId, string botUsername, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/allowed-bots");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddTwitchAllowedBotRequest(botUsername));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TwitchAllowedBotResponse>(ct);
+    }
+
+    public async Task RemoveTwitchAllowedBotAsync(long twitchUserId, long botId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/allowed-bots/{botId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task RemoveTwitchBotAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

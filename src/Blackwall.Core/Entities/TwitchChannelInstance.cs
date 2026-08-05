@@ -12,5 +12,11 @@ public sealed class TwitchChannelInstance : EntityBase {
     public AppUser? OwnerUser { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 
+    public string? BotAccessToken { get; set; }
+    public string? BotRefreshToken { get; set; }
+    public DateTime? BotTokenExpiresAtUtc { get; set; }
+
+    public TwitchChannelConfiguration? Configuration { get; set; }
+
     public ICollection<TwitchChannelManager> Managers { get; set; } = [];
 }

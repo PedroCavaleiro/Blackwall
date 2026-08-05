@@ -11,6 +11,7 @@ public sealed class ApiKeyMiddleware(
     private static readonly string[] ExemptPaths = [
         "/api/auth/discord/callback",
         "/api/auth/twitch/callback",
+        "/api/auth/twitch/bot/callback",
         "/api/system/health",
         "/health"
     ];

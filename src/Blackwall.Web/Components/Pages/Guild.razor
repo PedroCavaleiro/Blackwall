@@ -17,8 +17,8 @@
         <div class="font-mono mb-4 bw-err bw-typewriter">&gt; SIGNAL LOST: Guild not found or access denied.</div>
         <a href="/dashboard" class="btn btn-primary cut-corner font-display bw-btn-sm">RETURN TO GRID</a>
     } else {
-        <a href="/dashboard" class="d-inline-flex align-items-center gap-2 mb-4 font-mono text-decoration-none bw-status bw-text-muted">
-            &#8592; BACK TO GRID
+        <a href="/dashboard?tab=discord" class="d-inline-flex align-items-center gap-2 mb-4 font-mono text-decoration-none bw-status bw-text-muted">
+            &#8592; BACK TO SERVER OVERVIEW
         </a>
 
         <div class="d-flex align-items-center gap-3 mb-5">
@@ -125,7 +125,7 @@
                         <button type="submit" class="btn btn-primary cut-corner font-display bw-btn-md">
                             COMMIT CHANGES
                         </button>
-                        <a href="/dashboard" class="btn btn-outline-secondary font-display bw-btn-md">
+                        <a href="/dashboard?tab=discord" class="btn btn-outline-secondary font-display bw-btn-md">
                             CANCEL
                         </a>
                     </div>
@@ -431,7 +431,7 @@
 
         try {
             await Api.RemoveBotAsync(DiscordGuildId);
-            Nav.NavigateTo("/dashboard", forceLoad: true);
+            Nav.NavigateTo("/dashboard?tab=discord", forceLoad: true);
         } catch (Exception ex) {
             _error = $"Failed to remove bot: {ex.Message}";
             _confirmRemove = false;

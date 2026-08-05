@@ -1,0 +1,483 @@
+using System.Collections.Concurrent;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Blackwall.Core.Configuration;
+using Blackwall.Core.Entities;
+using Blackwall.Core.Services;
+using Blackwall.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using TwitchLib.Api;
+using TwitchLib.Client;
+using TwitchLib.Client.Events;
+using TwitchLib.Client.Models;
+using TwitchLib.Api.Helix.Models.Moderation.BanUser;
+
+namespace Blackwall.TwitchBot;
+
+public sealed class TwitchBotService : IAsyncDisposable {
+    private readonly BlackwallDbContext _dbContext;
+    private readonly TwitchOptions _twitchOptions;
+    private readonly AppConfiguration _appConfig;
+    private readonly ILogger<TwitchBotService> _logger;
+
+    private TwitchClient? _client;
+    private TwitchAPI? _botApi;
+    private string? _botUserId;
+    private string? _botAccessToken;
+    private readonly ConcurrentDictionary<string, long> _channelNameToUserId = new();
+    private byte[]? _encKey;
+    private byte[]? _encIv;
+
+    private readonly ConcurrentDictionary<long, ChannelRecord> _channels = new();
+    private readonly HttpClient _tokenHttp = new();
+    private Timer? _tokenRefreshTimer;
+    private Timer? _channelTokenRefreshTimer;
+    private static readonly string TokenFilePath = Path.Combine(AppContext.BaseDirectory, "twitch-bot-tokens.json");
+
+    public event EventHandler<OnMessageReceivedArgs>? OnMessageReceived;
+
+    private record ChannelRecord(long TwitchUserId, string Username, string AccessToken, string CommandTrigger, bool IsEnabled, bool IsDryRun);
+
+    private record TwitchTokenResponse(
+        [property: System.Text.Json.Serialization.JsonPropertyName("access_token")] string AccessToken,
+        [property: System.Text.Json.Serialization.JsonPropertyName("refresh_token")] string RefreshToken,
+        [property: System.Text.Json.Serialization.JsonPropertyName("expires_in")] int ExpiresIn
+    );
+
+    private record PersistedBotTokens(
+        [property: System.Text.Json.Serialization.JsonPropertyName("access_token")] string AccessToken,
+        [property: System.Text.Json.Serialization.JsonPropertyName("refresh_token")] string RefreshToken
+    );
+
+    public TwitchBotService(
+        BlackwallDbContext dbContext,
+        IOptions<TwitchOptions> twitchOptions,
+        IOptions<AppConfiguration> appConfig,
+        ILogger<TwitchBotService> logger
+    ) {
+        _dbContext = dbContext;
+        _twitchOptions = twitchOptions.Value;
+        _appConfig = appConfig.Value;
+        _logger = logger;
+    }
+
+    public async Task InitializeAsync(CancellationToken cancellationToken = default) {
+        _encKey = AesCrypto.GetBytes(_appConfig.EncryptionKey);
+        _encIv = AesCrypto.GetBytes(_appConfig.EncryptionIv);
+
+        var channels = await LoadActiveChannelsAsync(cancellationToken);
+
+        if (channels.Count == 0) {
+            _logger.LogInformation("No active Twitch channels found — bot will connect when channels are added");
+            return;
+        }
+
+        var firstChannel = channels[0];
+
+        string ircUsername;
+        string ircToken;
+
+        if (!string.IsNullOrWhiteSpace(_twitchOptions.BotUsername) && !string.IsNullOrWhiteSpace(_twitchOptions.BotAccessToken)) {
+            ircUsername = _twitchOptions.BotUsername;
+
+            var (persistedAccess, persistedRefresh) = LoadPersistedTokens();
+            var refreshToken = persistedRefresh ?? _twitchOptions.BotRefreshToken;
+
+            if (!string.IsNullOrWhiteSpace(refreshToken)) {
+                _twitchOptions.BotRefreshToken = refreshToken;
+                _botAccessToken = await RefreshBotTokenAsync();
+                _logger.LogInformation("Refreshed bot access token via refresh token");
+            } else {
+                _botAccessToken = persistedAccess
+                    ?? (_twitchOptions.BotAccessToken.StartsWith("oauth:")
+                        ? _twitchOptions.BotAccessToken["oauth:".Length..]
+                        : _twitchOptions.BotAccessToken);
+                _logger.LogWarning("No bot refresh token configured — using static access token. It will expire and the bot will disconnect. Set TWITCH__BOT_REFRESH_TOKEN for auto-refresh.");
+            }
+
+            ircToken = $"oauth:{_botAccessToken}";
+            _logger.LogInformation("Connecting to IRC as dedicated bot account: {BotUser}", ircUsername);
+
+            _botApi = new TwitchAPI();
+            _botApi.Settings.ClientId = _twitchOptions.ClientId;
+            _botApi.Settings.AccessToken = _botAccessToken;
+
+            var botUserResponse = await _botApi.Helix.Users.GetUsersAsync(logins: [_twitchOptions.BotUsername]);
+            _botUserId = botUserResponse.Users[0].Id;
+            _logger.LogInformation("Bot account user ID: {BotUserId}", _botUserId);
+
+            if (!string.IsNullOrWhiteSpace(_twitchOptions.BotRefreshToken)) {
+                _tokenRefreshTimer = new Timer(_ => _ = RefreshBotTokenPeriodicAsync(), null, TimeSpan.FromHours(3), TimeSpan.FromHours(3));
+            }
+
+            _channelTokenRefreshTimer = new Timer(_ => _ = RefreshChannelTokensPeriodicAsync(), null, TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(30));
+        } else {
+            ircUsername = firstChannel.Username;
+            ircToken = $"oauth:{DecryptToken(firstChannel.BotAccessToken!)}";
+            _logger.LogWarning("No dedicated bot account configured — connecting as channel owner {Owner}. Set TWITCH__BOT_USERNAME and TWITCH__BOT_ACCESS_TOKEN.", ircUsername);
+
+            var fallbackToken = DecryptToken(firstChannel.BotAccessToken!);
+            _botApi = new TwitchAPI();
+            _botApi.Settings.ClientId = _twitchOptions.ClientId;
+            _botApi.Settings.AccessToken = fallbackToken;
+            _botUserId = firstChannel.TwitchUserId.ToString();
+        }
+
+        var credentials = new ConnectionCredentials(ircUsername, ircToken);
+        _client = new TwitchClient();
+        _client.Initialize(credentials, firstChannel.Username);
+
+        _client.OnConnected += OnConnected;
+        _client.OnJoinedChannel += OnJoinedChannel;
+        _client.OnMessageReceived += OnMessageReceivedInternal;
+        _client.OnDisconnected += OnDisconnected;
+
+        foreach (var ch in channels) {
+            var decryptedToken = DecryptToken(ch.BotAccessToken!);
+            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch));
+            _channelNameToUserId[ch.Username.ToLowerInvariant()] = ch.TwitchUserId;
+        }
+
+        await _client.ConnectAsync();
+
+        foreach (var ch in channels) {
+            if (ch.TwitchUserId != firstChannel.TwitchUserId) {
+                await _client.JoinChannelAsync(ch.Username);
+            }
+        }
+
+        _logger.LogInformation("TwitchBot connected to {Count} channel(s)", channels.Count);
+    }
+
+    public async Task RefreshChannelsAsync(CancellationToken cancellationToken = default) {
+        if (_client is null || !_client.IsConnected) {
+            await InitializeAsync(cancellationToken);
+            return;
+        }
+
+        var dbChannels = await LoadActiveChannelsAsync(cancellationToken);
+        var dbChannelIds = dbChannels.Select(c => c.TwitchUserId).ToHashSet();
+        var currentIds = _channels.Keys.ToHashSet();
+
+        var toJoin = dbChannels.Where(c => !currentIds.Contains(c.TwitchUserId)).ToList();
+        var toLeave = currentIds.Except(dbChannelIds).ToList();
+
+        foreach (var ch in toJoin) {
+            var decryptedToken = DecryptToken(ch.BotAccessToken!);
+            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch));
+            _channelNameToUserId[ch.Username.ToLowerInvariant()] = ch.TwitchUserId;
+
+            await _client.JoinChannelAsync(ch.Username);
+            _logger.LogInformation("Joined Twitch channel: {Channel}", ch.Username);
+        }
+
+        foreach (var id in toLeave) {
+            if (_channels.TryGetValue(id, out var record)) {
+                await _client.LeaveChannelAsync(record.Username);
+                _channels.TryRemove(id, out _);
+                _channelNameToUserId.TryRemove(record.Username.ToLowerInvariant(), out _);
+                _logger.LogInformation("Left Twitch channel: {Channel}", record.Username);
+            }
+        }
+    }
+
+    public async Task SendMessageAsync(string channelUsername, string message) {
+        if (_client is null || !_client.IsConnected) {
+            _logger.LogWarning("Cannot send message — Twitch client not connected");
+            return;
+        }
+
+        await _client.SendMessageAsync(channelUsername, message);
+    }
+
+    public async Task DeleteMessageAsync(long broadcasterId, string messageId) {
+        if (_botApi is null || _botUserId is null) {
+            _logger.LogWarning("No bot API instance available");
+            return;
+        }
+
+        await _botApi.Helix.Moderation.DeleteChatMessagesAsync(broadcasterId.ToString(), messageId);
+        _logger.LogInformation("Deleted message {MessageId} in channel {BroadcasterId}", messageId, broadcasterId);
+    }
+
+    public async Task TimeoutUserAsync(long broadcasterId, long userId, int durationSeconds, string? reason = null) {
+        if (_botApi is null || _botUserId is null) {
+            _logger.LogWarning("No bot API instance available");
+            return;
+        }
+
+        await _botApi.Helix.Moderation.BanUserAsync(
+            broadcasterId.ToString(),
+            _botUserId,
+            new BanUserRequest {
+                UserId = userId.ToString(),
+                Reason = reason ?? "Timed out by moderator",
+                Duration = durationSeconds
+            }
+        );
+        _logger.LogInformation("Timed out user {UserId} in channel {BroadcasterId} for {Duration}s", userId, broadcasterId, durationSeconds);
+    }
+
+    public async Task BanUserAsync(long broadcasterId, long userId, string? reason = null) {
+        if (_botApi is null || _botUserId is null) {
+            _logger.LogWarning("No bot API instance available");
+            return;
+        }
+
+        await _botApi.Helix.Moderation.BanUserAsync(
+            broadcasterId.ToString(),
+            _botUserId,
+            new BanUserRequest {
+                UserId = userId.ToString(),
+                Reason = reason ?? "Banned by moderator"
+            }
+        );
+        _logger.LogInformation("Banned user {UserId} in channel {BroadcasterId}", userId, broadcasterId);
+    }
+
+    public async Task UnbanUserAsync(long broadcasterId, long userId) {
+        if (_botApi is null || _botUserId is null) {
+            _logger.LogWarning("No bot API instance available");
+            return;
+        }
+
+        await _botApi.Helix.Moderation.UnbanUserAsync(broadcasterId.ToString(), _botUserId, userId.ToString());
+        _logger.LogInformation("Unbanned user {UserId} in channel {BroadcasterId}", userId, broadcasterId);
+    }
+
+    public async Task GetBannedUsersAsync(long broadcasterId) {
+        if (_botApi is null || _botUserId is null) {
+            _logger.LogWarning("No bot API instance available");
+            return;
+        }
+
+        var result = await _botApi.Helix.Moderation.GetBannedUsersAsync(broadcasterId.ToString());
+        _logger.LogInformation("Retrieved {Count} banned users for channel {BroadcasterId}", result.Data.Length, broadcasterId);
+    }
+
+    private Task OnConnected(object? sender, EventArgs e) {
+        _logger.LogInformation("TwitchBot connected to IRC");
+        return Task.CompletedTask;
+    }
+
+    private Task OnJoinedChannel(object? sender, OnJoinedChannelArgs e) {
+        _logger.LogInformation("Joined Twitch channel: {Channel}", e.Channel);
+        return Task.CompletedTask;
+    }
+
+    private async Task OnMessageReceivedInternal(object? sender, OnMessageReceivedArgs e) {
+        OnMessageReceived?.Invoke(sender, e);
+
+        var channelName = e.ChatMessage.Channel.ToLowerInvariant();
+        if (!_channelNameToUserId.TryGetValue(channelName, out var broadcasterId))
+            return;
+
+        if (!_channels.TryGetValue(broadcasterId, out var record) || !record.IsEnabled)
+            return;
+
+        var trigger = record.CommandTrigger;
+        if (!e.ChatMessage.Message.StartsWith(trigger, StringComparison.Ordinal))
+            return;
+
+        var body = e.ChatMessage.Message[trigger.Length..];
+        var parts = body.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
+            return;
+
+        var command = parts[0].ToLowerInvariant();
+
+        if (command == "echo") {
+            if (e.ChatMessage.UserId != broadcasterId.ToString())
+                return;
+
+            if (record.IsDryRun) {
+                _logger.LogInformation("[DRY RUN] echo command from owner in #{Channel} — not sending", e.ChatMessage.Channel);
+                return;
+            }
+
+            await _client!.SendMessageAsync(e.ChatMessage.Channel, "echo");
+            _logger.LogInformation("echo command executed by owner in #{Channel}", e.ChatMessage.Channel);
+        }
+    }
+
+    private Task OnDisconnected(object? sender, EventArgs e) {
+        _logger.LogWarning("TwitchBot disconnected from IRC");
+        return Task.CompletedTask;
+    }
+
+    private async Task<List<TwitchChannelInstance>> LoadActiveChannelsAsync(CancellationToken cancellationToken) {
+        return await _dbContext.TwitchChannelInstances
+            .Include(c => c.Configuration)
+            .Where(c => c.IsActive && c.BotAccessToken != null)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static string GetCommandTrigger(TwitchChannelInstance ch) =>
+        ch.Configuration?.CommandTrigger ?? "!";
+
+    private static bool GetIsEnabled(TwitchChannelInstance ch) =>
+        ch.Configuration?.IsEnabled ?? true;
+
+    private static bool GetIsDryRun(TwitchChannelInstance ch) =>
+        ch.Configuration?.IsDryRun ?? false;
+
+    private string DecryptToken(string encrypted) {
+        return AesCrypto.DecryptString(encrypted, _encKey!, _encIv!);
+    }
+
+    private (string? AccessToken, string? RefreshToken) LoadPersistedTokens() {
+        try {
+            if (!File.Exists(TokenFilePath))
+                return (null, null);
+
+            var json = File.ReadAllText(TokenFilePath);
+            var tokens = JsonSerializer.Deserialize<PersistedBotTokens>(json);
+            if (tokens is null)
+                return (null, null);
+
+            var access = string.IsNullOrEmpty(tokens.AccessToken) ? null : AesCrypto.DecryptString(tokens.AccessToken, _encKey!, _encIv!);
+            var refresh = string.IsNullOrEmpty(tokens.RefreshToken) ? null : AesCrypto.DecryptString(tokens.RefreshToken, _encKey!, _encIv!);
+            return (access, refresh);
+        } catch {
+            return (null, null);
+        }
+    }
+
+    private void PersistBotTokens(string accessToken, string refreshToken) {
+        try {
+            var encAccess = AesCrypto.EncryptString(accessToken, _encKey!, _encIv!);
+            var encRefresh = AesCrypto.EncryptString(refreshToken, _encKey!, _encIv!);
+            var json = JsonSerializer.Serialize(new PersistedBotTokens(encAccess, encRefresh), new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(TokenFilePath, json);
+        } catch {
+            // Best-effort persistence — non-fatal if it fails
+        }
+    }
+
+    private async Task<string> RefreshBotTokenAsync() {
+        var content = new FormUrlEncodedContent(new Dictionary<string, string> {
+            ["client_id"] = _twitchOptions.ClientId,
+            ["client_secret"] = _twitchOptions.ClientSecret,
+            ["grant_type"] = "refresh_token",
+            ["refresh_token"] = _twitchOptions.BotRefreshToken!
+        });
+
+        var response = await _tokenHttp.PostAsync("https://id.twitch.tv/oauth2/token", content);
+
+        if (!response.IsSuccessStatusCode) {
+            var errorBody = await response.Content.ReadAsStringAsync();
+            _logger.LogError("Bot token refresh failed: {StatusCode} {ErrorBody}", response.StatusCode, errorBody);
+
+            var fallback = _twitchOptions.BotAccessToken;
+            if (!string.IsNullOrWhiteSpace(fallback)) {
+                _botAccessToken = fallback.StartsWith("oauth:")
+                    ? fallback["oauth:".Length..]
+                    : fallback;
+                _logger.LogWarning("Falling back to static bot access token — it may be expired");
+                return _botAccessToken;
+            }
+
+            throw new InvalidOperationException($"Bot token refresh failed ({response.StatusCode}) and no fallback access token is configured");
+        }
+
+        var token = await response.Content.ReadFromJsonAsync<TwitchTokenResponse>();
+        if (token is null)
+            throw new InvalidOperationException("Failed to deserialize token refresh response");
+
+        _botAccessToken = token.AccessToken;
+        _twitchOptions.BotRefreshToken = token.RefreshToken;
+
+        if (_botApi is not null)
+            _botApi.Settings.AccessToken = _botAccessToken;
+
+        PersistBotTokens(token.AccessToken, token.RefreshToken);
+
+        _logger.LogInformation("Bot token refreshed and persisted successfully (expires in {ExpiresIn}s)", token.ExpiresIn);
+        return token.AccessToken;
+    }
+
+    private async Task RefreshBotTokenPeriodicAsync() {
+        try {
+            await RefreshBotTokenAsync();
+        } catch (Exception ex) {
+            _logger.LogError(ex, "Failed to refresh bot token periodically");
+        }
+    }
+
+    private async Task RefreshChannelTokensPeriodicAsync() {
+        try {
+            await RefreshChannelTokensAsync();
+        } catch (Exception ex) {
+            _logger.LogError(ex, "Failed to refresh channel tokens periodically");
+        }
+    }
+
+    private async Task RefreshChannelTokensAsync() {
+        var now = DateTime.UtcNow;
+        var channels = await _dbContext.TwitchChannelInstances
+            .Where(c => c.IsActive && c.BotRefreshToken != null)
+            .ToListAsync();
+
+        int refreshed = 0;
+        foreach (var ch in channels) {
+            if (ch.BotTokenExpiresAtUtc is not null && ch.BotTokenExpiresAtUtc.Value > now.AddHours(1))
+                continue;
+
+            try {
+                var refreshToken = AesCrypto.DecryptString(ch.BotRefreshToken!, _encKey!, _encIv!);
+                var content = new FormUrlEncodedContent(new Dictionary<string, string> {
+                    ["client_id"] = _twitchOptions.ClientId,
+                    ["client_secret"] = _twitchOptions.ClientSecret,
+                    ["grant_type"] = "refresh_token",
+                    ["refresh_token"] = refreshToken
+                });
+
+                var response = await _tokenHttp.PostAsync("https://id.twitch.tv/oauth2/token", content);
+                if (!response.IsSuccessStatusCode) {
+                    _logger.LogWarning("Failed to refresh token for channel {Channel} ({UserId}): {StatusCode}", ch.Username, ch.TwitchUserId, response.StatusCode);
+                    continue;
+                }
+
+                var token = await response.Content.ReadFromJsonAsync<TwitchTokenResponse>();
+                if (token is null)
+                    continue;
+
+                ch.BotAccessToken = AesCrypto.EncryptString(token.AccessToken, _encKey!, _encIv!);
+                ch.BotRefreshToken = AesCrypto.EncryptString(token.RefreshToken, _encKey!, _encIv!);
+                ch.BotTokenExpiresAtUtc = now.AddSeconds(token.ExpiresIn);
+                ch.UpdatedAtUtc = now;
+
+                if (_channels.TryGetValue(ch.TwitchUserId, out var record)) {
+                    _channels[ch.TwitchUserId] = record with { AccessToken = token.AccessToken };
+                }
+
+                refreshed++;
+            } catch (Exception ex) {
+                _logger.LogError(ex, "Error refreshing token for channel {Channel} ({UserId})", ch.Username, ch.TwitchUserId);
+            }
+        }
+
+        if (refreshed > 0) {
+            await _dbContext.SaveChangesAsync();
+            _logger.LogInformation("Refreshed tokens for {Count} channel(s)", refreshed);
+        }
+    }
+
+    public async ValueTask DisposeAsync() {
+        _tokenRefreshTimer?.Dispose();
+        _channelTokenRefreshTimer?.Dispose();
+
+        if (_client is not null && _client.IsConnected) {
+            try {
+                await _client.DisconnectAsync();
+            } catch {
+                // Ignore errors during shutdown
+            }
+        }
+
+        _client = null;
+        _tokenHttp.Dispose();
+    }
+}

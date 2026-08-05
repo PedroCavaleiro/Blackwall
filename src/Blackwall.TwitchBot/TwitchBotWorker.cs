@@ -4,16 +4,25 @@ using Microsoft.Extensions.Logging;
 namespace Blackwall.TwitchBot;
 
 public sealed class TwitchBotWorker(
+    TwitchBotService twitchBotService,
     ILogger<TwitchBotWorker> logger
 ) : IHostedService {
 
-    public Task StartAsync(CancellationToken cancellationToken) {
-        logger.LogInformation("TwitchBot worker starting — Twitch IRC/EventSub connection will be implemented in a future phase");
-        return Task.CompletedTask;
+    public async Task StartAsync(CancellationToken cancellationToken) {
+        try {
+            await twitchBotService.InitializeAsync(cancellationToken);
+            logger.LogInformation("TwitchBot worker started successfully");
+        } catch (Exception ex) {
+            logger.LogError(ex, "Failed to initialize TwitchBot worker");
+        }
     }
 
-    public Task StopAsync(CancellationToken cancellationToken) {
-        logger.LogInformation("TwitchBot worker stopping");
-        return Task.CompletedTask;
+    public async Task StopAsync(CancellationToken cancellationToken) {
+        try {
+            await twitchBotService.DisposeAsync();
+            logger.LogInformation("TwitchBot worker stopped");
+        } catch (Exception ex) {
+            logger.LogError(ex, "Error during TwitchBot worker shutdown");
+        }
     }
 }

@@ -3,17 +3,20 @@ using System;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Blackwall.Infrastructure.Persistence.Migrations
+namespace Blackwall.Infrastructure.Migrations
 {
     [DbContext(typeof(BlackwallDbContext))]
-    partial class BlackwallDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260805120050_AddTwitchChannelBotTokens")]
+    partial class AddTwitchChannelBotTokens
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1085,71 +1088,6 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.ToTable("SpamConfigurations");
                 });
 
-            modelBuilder.Entity("Blackwall.Core.Entities.TwitchAllowedBot", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("BotUsername")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("TwitchChannelConfigurationId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TwitchChannelConfigurationId", "BotUsername")
-                        .IsUnique();
-
-                    b.ToTable("TwitchAllowedBots");
-                });
-
-            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelConfiguration", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("CommandTrigger")
-                        .IsRequired()
-                        .HasMaxLength(2)
-                        .HasColumnType("character varying(2)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDryRun")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<long>("TwitchChannelInstanceId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TwitchChannelInstanceId")
-                        .IsUnique();
-
-                    b.ToTable("TwitchChannelConfigurations");
-                });
-
             modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelInstance", b =>
                 {
                     b.Property<long>("Id")
@@ -1410,28 +1348,6 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.Navigation("GuildInstance");
                 });
 
-            modelBuilder.Entity("Blackwall.Core.Entities.TwitchAllowedBot", b =>
-                {
-                    b.HasOne("Blackwall.Core.Entities.TwitchChannelConfiguration", "TwitchChannelConfiguration")
-                        .WithMany("AllowedBots")
-                        .HasForeignKey("TwitchChannelConfigurationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("TwitchChannelConfiguration");
-                });
-
-            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelConfiguration", b =>
-                {
-                    b.HasOne("Blackwall.Core.Entities.TwitchChannelInstance", "TwitchChannelInstance")
-                        .WithOne("Configuration")
-                        .HasForeignKey("Blackwall.Core.Entities.TwitchChannelConfiguration", "TwitchChannelInstanceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("TwitchChannelInstance");
-                });
-
             modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelInstance", b =>
                 {
                     b.HasOne("Blackwall.Core.Entities.AppUser", "OwnerUser")
@@ -1510,15 +1426,8 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.Navigation("NetWatchSnareChannels");
                 });
 
-            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelConfiguration", b =>
-                {
-                    b.Navigation("AllowedBots");
-                });
-
             modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelInstance", b =>
                 {
-                    b.Navigation("Configuration");
-
                     b.Navigation("Managers");
                 });
 #pragma warning restore 612, 618

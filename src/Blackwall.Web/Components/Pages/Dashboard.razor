@@ -1,7 +1,7 @@
 @page "/dashboard"
 @attribute [Authorize]
 @inject BlackwallApiService Api
-@inject IJSRuntime JS
+@inject NavigationManager Nav
 
 <PageTitle>Grid — Blackwall</PageTitle>
 
@@ -84,7 +84,7 @@
                     <div class="row g-3">
                         @foreach (var guild in _available) {
                             <div class="col-sm-6 col-lg-4">
-                                <a href="/bot/invite?guildId=@guild.DiscordGuildId" target="_blank" class="bw-guild-card cut-corner d-block text-decoration-none">
+                                <a href="/bot/invite?guildId=@guild.DiscordGuildId" class="bw-guild-card cut-corner d-block text-decoration-none">
                                     <div class="d-flex align-items-start gap-3">
                                         <GuildAvatar Name="@guild.Name" Icon="@guild.Icon" GuildId="@guild.DiscordGuildId" />
                                         <div class="min-w-0 flex-grow-1">
@@ -128,7 +128,7 @@
                     <div class="row g-3">
                         @foreach (var channel in _twitchDeployed) {
                             <div class="col-sm-6 col-lg-4">
-                                <div class="bw-guild-card cut-corner d-block">
+                                <a href="/channel/@channel.TwitchUserId" class="bw-guild-card cut-corner d-block text-decoration-none">
                                     <div class="d-flex align-items-start gap-3">
                                         <TwitchAvatar DisplayName="@channel.DisplayName" ProfileImageUrl="@channel.ProfileImageUrl" />
                                         <div class="min-w-0 flex-grow-1">
@@ -140,7 +140,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                </a>
                             </div>
                         }
                     </div>
@@ -243,6 +243,11 @@
     private bool _twitchLoading = true;
 
     protected override async Task OnInitializedAsync() {
+        var query = System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query);
+        var tab = query["tab"];
+        if (tab == "twitch" || tab == "discord")
+            _activeTab = tab;
+
         await LoadDiscordAsync();
         await LoadTwitchAsync();
     }
@@ -284,7 +289,7 @@
         try {
             var url = await Api.GetTwitchBotInstallUrlAsync();
             if (!string.IsNullOrWhiteSpace(url)) {
-                await JS.InvokeVoidAsync("open", url, "_blank");
+                Nav.NavigateTo(url, forceLoad: true);
             }
         } catch {
             // Silently fail
