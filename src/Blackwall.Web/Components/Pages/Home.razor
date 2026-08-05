@@ -43,14 +43,11 @@
             }
 
             <div style="position:relative">
-                <div class="d-flex flex-column align-items-center gap-3">
-                    <a href="/auth/login" class="btn btn-primary btn-lg cut-corner font-display" style="letter-spacing:0.12em;padding:0.75rem 2.5rem">
-                        DEPLOY BLACKWALL
-                    </a>
-                    <a href="/auth/login/twitch" class="btn btn-outline-primary btn-sm cut-corner font-display" style="letter-spacing:0.1em;padding:0.4rem 1.5rem">
-                        LOGIN WITH TWITCH
-                    </a>
-                </div>
+                <button type="button" class="btn btn-primary btn-lg cut-corner font-display"
+                        style="letter-spacing:0.12em;padding:0.75rem 2.5rem"
+                        @onclick="ToggleLoginModal">
+                    DEPLOY BLACKWALL
+                </button>
             </div>
         </section>
 
@@ -107,8 +104,17 @@
     </footer>
 </div>
 
+@if (_loginModalOpen) {
+    <LoginModal OnClose="CloseLoginModal" />
+}
+
 @code {
     private string? _error;
+    private bool _loginModalOpen;
+
+    private void ToggleLoginModal() => _loginModalOpen = true;
+
+    private void CloseLoginModal() => _loginModalOpen = false;
 
     private static readonly (string Icon, string Title, string Desc, bool IsOptional)[] Features = [
         ("fa-solid fa-bolt", "Spam Detection", "Rolling-window rate limiting, invite-link blocking, and suspicious-URL detection with redirect following. Tunable per-server thresholds.", false),

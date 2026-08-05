@@ -26,14 +26,10 @@
                     </div>
                 </Authorized>
                 <NotAuthorized>
-                    <div class="d-flex align-items-center gap-2">
-                        <a href="/auth/login" class="btn btn-primary btn-sm cut-corner font-display" style="font-size:0.62rem;padding:0.25rem 0.9rem">
-                            JACK IN
-                        </a>
-                        <a href="/auth/login/twitch" class="btn btn-outline-primary btn-sm cut-corner font-display" style="font-size:0.62rem;padding:0.25rem 0.9rem">
-                            TWITCH
-                        </a>
-                    </div>
+                    <button type="button" class="btn btn-primary btn-sm cut-corner font-display" style="font-size:0.62rem;padding:0.25rem 0.9rem"
+                            @onclick="ToggleLoginModal">
+                        JACK IN
+                    </button>
                 </NotAuthorized>
             </AuthorizeView>
         </div>
@@ -48,10 +44,19 @@
     <AccountsModal OnClose="CloseAccountsModal" />
 }
 
+@if (_loginModalOpen) {
+    <LoginModal OnClose="CloseLoginModal" />
+}
+
 @code {
     private bool _accountsModalOpen;
+    private bool _loginModalOpen;
 
     private void ToggleAccountsModal() => _accountsModalOpen = true;
 
     private void CloseAccountsModal() => _accountsModalOpen = false;
+
+    private void ToggleLoginModal() => _loginModalOpen = true;
+
+    private void CloseLoginModal() => _loginModalOpen = false;
 }

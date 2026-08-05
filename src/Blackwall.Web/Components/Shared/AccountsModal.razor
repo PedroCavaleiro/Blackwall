@@ -1,0 +1,284 @@
+@inject BlackwallApiService Api
+@inject NavigationManager Nav
+
+<div class="bw-modal-overlay" @onclick="OnClose">
+    <div class="bw-modal cut-corner" @onclick:stopPropagation="true" style="max-width:600px">
+        <div class="bw-modal-header">
+            <span class="font-mono bw-text-primary">// ACCOUNT MANAGEMENT</span>
+            <button type="button" class="bw-modal-close" @onclick="OnClose">&times;</button>
+        </div>
+        <div class="bw-modal-body" style="overflow-y:auto;padding:1.5rem">
+            @if (_loading) {
+                <div class="font-mono bw-loading bw-typewriter">&gt; Loading accounts...</div>
+            } else if (_accounts is null) {
+                <div class="font-mono bw-err bw-typewriter">&gt; SIGNAL LOST: Could not load account data.</div>
+            } else {
+                @if (_error is not null) {
+                    <div class="alert alert-danger font-mono mb-3 bw-alert-text">
+                        // ERROR: @_error
+                    </div>
+                }
+                @if (_success is not null) {
+                    <div class="alert alert-success font-mono mb-3 bw-alert-text">
+                        // @_success
+                    </div>
+                }
+
+                <div class="cut-corner border mb-4 bw-card">
+                    <div class="card-header">DISCORD</div>
+                    <div class="p-4">
+                        @if (_accounts.HasDiscord) {
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="font-display" style="font-size:1.1rem">@(_accounts.DiscordDisplayName ?? _accounts.DiscordUsername)</div>
+                                    <div class="font-mono bw-meta">@_accounts.DiscordUserId</div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="font-mono bw-status" style="color:var(--bw-success)">CONNECTED</span>
+                                    @if (!_confirmUnlinkDiscord) {
+                                        <button type="button" class="btn btn-outline-danger cut-corner font-display bw-btn-sm"
+                                                @onclick="StartUnlinkDiscord">
+                                            UNLINK
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                            @if (_confirmUnlinkDiscord) {
+                                <div class="mt-3 pt-3" style="border-top:1px solid var(--bw-border)">
+                                    @if (_unlinkWarning?.HasOrphanGuilds == true) {
+                                        <div class="font-mono mb-3" style="font-size:0.8rem;color:var(--bw-danger)">
+                                            // WARNING: Unlinking Discord will automatically remove the bot from the following servers
+                                            because no other registered mods or owners exist:
+                                            <ul class="mt-2">
+                                                @foreach (var guild in _unlinkWarning.OrphanGuilds) {
+                                                    <li>@guild.Name (@guild.DiscordGuildId)</li>
+                                                }
+                                            </ul>
+                                        </div>
+                                    } else {
+                                        <div class="font-mono mb-3" style="font-size:0.8rem;color:var(--bw-danger)">
+                                            // WARNING: Unlinking your Discord account will remove all Discord-related data. Are you sure?
+                                        </div>
+                                    }
+                                    <div class="d-flex gap-3">
+                                        <button type="button" class="btn btn-danger cut-corner font-display bw-btn-sm"
+                                                disabled="@_unliking"
+                                                @onclick="ConfirmUnlinkDiscord">
+                                            @(_unliking ? "UNLINKING..." : "CONFIRM UNLINK")
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary font-display bw-btn-sm"
+                                                @onclick="CancelUnlinkDiscord">
+                                            CANCEL
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        } else {
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="font-mono bw-meta">Not connected</div>
+                                <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-sm"
+                                        disabled="@_linkingDiscord"
+                                        @onclick="LinkDiscord">
+                                    @(_linkingDiscord ? "LINKING..." : "LINK DISCORD")
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="cut-corner border mb-4 bw-card">
+                    <div class="card-header">TWITCH</div>
+                    <div class="p-4">
+                        @if (_accounts.HasTwitch) {
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="font-display" style="font-size:1.1rem">@(_accounts.TwitchDisplayName ?? _accounts.TwitchUsername)</div>
+                                    <div class="font-mono bw-meta">@_accounts.TwitchUserId</div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="font-mono bw-status" style="color:var(--bw-success)">CONNECTED</span>
+                                    @if (!_confirmUnlinkTwitch) {
+                                        <button type="button" class="btn btn-outline-danger cut-corner font-display bw-btn-sm"
+                                                @onclick="() => _confirmUnlinkTwitch = true">
+                                            UNLINK
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                            @if (_confirmUnlinkTwitch) {
+                                <div class="mt-3 pt-3" style="border-top:1px solid var(--bw-border)">
+                                    <div class="font-mono mb-3" style="font-size:0.8rem;color:var(--bw-danger)">
+                                        // WARNING: Unlinking your Twitch account will remove all Twitch-related data. Are you sure?
+                                    </div>
+                                    <div class="d-flex gap-3">
+                                        <button type="button" class="btn btn-danger cut-corner font-display bw-btn-sm"
+                                                disabled="@_unliking"
+                                                @onclick="ConfirmUnlinkTwitch">
+                                            @(_unliking ? "UNLINKING..." : "CONFIRM UNLINK")
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary font-display bw-btn-sm"
+                                                @onclick="() => _confirmUnlinkTwitch = false">
+                                            CANCEL
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        } else {
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="font-mono bw-meta">Not connected</div>
+                                <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-sm"
+                                        disabled="@_linkingTwitch"
+                                        @onclick="LinkTwitch">
+                                    @(_linkingTwitch ? "LINKING..." : "LINK TWITCH")
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @if (_accounts.HasDiscord && _accounts.HasTwitch) {
+                    <div class="cut-corner border mb-4 bw-card">
+                        <div class="card-header">DISPLAY NAME</div>
+                        <div class="p-4">
+                            <p class="font-mono mb-3 bw-desc">
+                                Choose which name appears in the top bar.
+                            </p>
+                            <div class="d-flex gap-3">
+                                <button type="button"
+                                        class="btn cut-corner font-display bw-btn-sm @(_accounts.ActiveDisplayNameProvider == "discord" ? "btn-primary" : "btn-outline-secondary")"
+                                        @onclick="SetDisplayNameDiscord">
+                                    @(_accounts.DiscordDisplayName ?? _accounts.DiscordUsername)
+                                </button>
+                                <button type="button"
+                                        class="btn cut-corner font-display bw-btn-sm @(_accounts.ActiveDisplayNameProvider == "twitch" ? "btn-primary" : "btn-outline-secondary")"
+                                        @onclick="SetDisplayNameTwitch">
+                                    @(_accounts.TwitchDisplayName ?? _accounts.TwitchUsername)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public required EventCallback OnClose { get; set; }
+
+    private LinkedAccountsResponse? _accounts;
+    private UnlinkAccountWarningResponse? _unlinkWarning;
+    private bool _loading = true;
+    private bool _linkingDiscord;
+    private bool _linkingTwitch;
+    private bool _confirmUnlinkDiscord;
+    private bool _confirmUnlinkTwitch;
+    private bool _unliking;
+    private string? _error;
+    private string? _success;
+
+    protected override async Task OnInitializedAsync() {
+        await LoadAccountsAsync();
+    }
+
+    private async Task LoadAccountsAsync() {
+        _loading = true;
+        _error = null;
+        _success = null;
+        try {
+            _accounts = await Api.GetLinkedAccountsAsync();
+        } catch (Exception ex) {
+            _error = ex.Message;
+        } finally {
+            _loading = false;
+        }
+    }
+
+    private async Task LinkTwitch() {
+        _linkingTwitch = true;
+        _error = null;
+        try {
+            var response = await Api.GetTwitchLinkUrlAsync();
+            if (response?.Url is not null)
+                Nav.NavigateTo(response.Url, forceLoad: true);
+        } catch (Exception ex) {
+            _error = ex.Message;
+            _linkingTwitch = false;
+        }
+    }
+
+    private async Task LinkDiscord() {
+        _linkingDiscord = true;
+        _error = null;
+        try {
+            var response = await Api.GetDiscordLinkUrlAsync();
+            if (response?.Url is not null)
+                Nav.NavigateTo(response.Url, forceLoad: true);
+        } catch (Exception ex) {
+            _error = ex.Message;
+            _linkingDiscord = false;
+        }
+    }
+
+    private async Task StartUnlinkDiscord() {
+        _confirmUnlinkDiscord = true;
+        _error = null;
+        try {
+            _unlinkWarning = await Api.CheckUnlinkDiscordAsync();
+        } catch (Exception ex) {
+            _error = ex.Message;
+        }
+    }
+
+    private void CancelUnlinkDiscord() {
+        _confirmUnlinkDiscord = false;
+        _unlinkWarning = null;
+    }
+
+    private async Task ConfirmUnlinkDiscord() {
+        _unliking = true;
+        _error = null;
+        try {
+            await Api.UnlinkDiscordAsync();
+            _confirmUnlinkDiscord = false;
+            _unlinkWarning = null;
+            _success = "Discord account unlinked.";
+            await LoadAccountsAsync();
+        } catch (Exception ex) {
+            _error = ex.Message;
+        } finally {
+            _unliking = false;
+        }
+    }
+
+    private async Task ConfirmUnlinkTwitch() {
+        _unliking = true;
+        _error = null;
+        try {
+            await Api.UnlinkTwitchAsync();
+            _confirmUnlinkTwitch = false;
+            _success = "Twitch account unlinked.";
+            await LoadAccountsAsync();
+        } catch (Exception ex) {
+            _error = ex.Message;
+        } finally {
+            _unliking = false;
+        }
+    }
+
+    private async Task SetDisplayName(string provider) {
+        _error = null;
+        _success = null;
+        try {
+            await Api.UpdateDisplayNameProviderAsync(provider);
+            await LoadAccountsAsync();
+            _success = "Display name updated.";
+        } catch (Exception ex) {
+            _error = ex.Message;
+        }
+    }
+
+    private Task SetDisplayNameDiscord() => SetDisplayName("discord");
+
+    private Task SetDisplayNameTwitch() => SetDisplayName("twitch");
+}
