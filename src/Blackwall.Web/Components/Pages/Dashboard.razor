@@ -161,8 +161,9 @@
                     <div class="row g-3">
                         @foreach (var channel in _twitchAvailable) {
                             <div class="col-sm-6 col-lg-4">
-                                <button type="button" class="bw-guild-card cut-corner d-block text-decoration-none w-100 text-start border-0 bg-transparent p-0"
-                                        @onclick="() => InstallTwitchBot(channel)">
+                                <div role="button" tabindex="0" class="bw-guild-card cut-corner d-block"
+                                        @onclick="() => InstallTwitchBot(channel)"
+                                        @onkeypress="() => InstallTwitchBot(channel)">
                                     <div class="d-flex align-items-start gap-3">
                                         <TwitchAvatar DisplayName="@channel.DisplayName" ProfileImageUrl="@channel.ProfileImageUrl" />
                                         <div class="min-w-0 flex-grow-1">
@@ -173,7 +174,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                </button>
+                                </div>
                             </div>
                         }
                     </div>
