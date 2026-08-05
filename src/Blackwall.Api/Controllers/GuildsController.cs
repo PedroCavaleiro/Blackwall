@@ -1,13 +1,13 @@
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Blackwall.Api.Services;
-using Blackwall.Bot.Services;
+using Blackwall.Api.Services.Discord;
+using Blackwall.DiscordBot.Services;
 using Blackwall.Core.Configuration;
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
-using Blackwall.Infrastructure.Cache;
+using Blackwall.Infrastructure.Cache.Discord;
 using Blackwall.Infrastructure.Persistence;
 using Discord.WebSocket;
 using Microsoft.AspNetCore.Authorization;

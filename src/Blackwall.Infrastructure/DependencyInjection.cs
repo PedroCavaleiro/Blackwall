@@ -1,4 +1,4 @@
-using Blackwall.Infrastructure.Cache;
+using Blackwall.Infrastructure.Cache.Discord;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

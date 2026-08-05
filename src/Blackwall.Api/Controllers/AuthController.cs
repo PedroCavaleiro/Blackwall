@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Blackwall.Api.Services;
+using Blackwall.Api.Services.Discord;
 using Blackwall.Core.Configuration;
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;

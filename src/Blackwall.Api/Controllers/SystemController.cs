@@ -1,7 +1,7 @@
-using Blackwall.Bot.Services;
+using Blackwall.DiscordBot.Services;
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
-using Blackwall.Infrastructure.Cache;
+using Blackwall.Infrastructure.Cache.Discord;
 using Blackwall.Infrastructure.Persistence;
 using Discord;
 using Discord.WebSocket;
