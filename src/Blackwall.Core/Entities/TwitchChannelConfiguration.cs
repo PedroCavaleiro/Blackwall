@@ -8,6 +8,7 @@ public sealed class TwitchChannelConfiguration : EntityBase {
 
     public bool IsEnabled { get; set; } = true;
     public bool IsDryRun { get; set; } = false;
+    public bool AutoAddManagers { get; set; } = true;
     public string CommandTrigger { get; set; } = "!";
 
     public DateTime UpdatedAtUtc { get; set; }

@@ -56,6 +56,17 @@ public sealed class TwitchChannelsController(
         if (!user.TwitchUserId.HasValue)
             return Ok(new List<ManageableTwitchChannelResponse>());
 
+        try {
+            if (!string.IsNullOrWhiteSpace(user.TwitchAccessToken)) {
+                var key = AesCrypto.GetBytes(appConfiguration.Value.EncryptionKey);
+                var iv = AesCrypto.GetBytes(appConfiguration.Value.EncryptionIv);
+                var accessToken = AesCrypto.DecryptString(user.TwitchAccessToken, key, iv);
+                await twitchChannelService.AutoAddManagersAsync(appUserId.Value, accessToken, cancellationToken);
+            }
+        } catch {
+            // Best-effort — don't block dashboard load
+        }
+
         var channels = await twitchChannelService.GetManageableChannelsAsync(appUserId.Value, cancellationToken);
         return Ok(channels);
     }
@@ -155,6 +166,7 @@ public sealed class TwitchChannelsController(
             isOwner,
             config.IsEnabled,
             config.IsDryRun,
+            config.AutoAddManagers,
             config.CommandTrigger
         ));
     }
@@ -212,6 +224,7 @@ public sealed class TwitchChannelsController(
 
         config.IsEnabled = request.IsEnabled;
         config.IsDryRun = request.IsDryRun;
+        config.AutoAddManagers = request.AutoAddManagers;
         config.CommandTrigger = request.CommandTrigger;
         config.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
@@ -229,6 +242,7 @@ public sealed class TwitchChannelsController(
             isOwner,
             config.IsEnabled,
             config.IsDryRun,
+            config.AutoAddManagers,
             config.CommandTrigger
         ));
     }
@@ -476,6 +490,207 @@ public sealed class TwitchChannelsController(
 
         config.AllowedBots.Remove(entry);
         config.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    [HttpGet("{twitchUserId:long}/managers")]
+    [ProducesResponseType(typeof(IReadOnlyList<TwitchChannelManagerResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<TwitchChannelManagerResponse>>> GetManagers(
+        long twitchUserId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var managers = await dbContext.TwitchChannelManagers
+            .Include(m => m.User)
+            .Where(m => m.TwitchChannelInstanceId == instance.Id)
+            .Select(m => new TwitchChannelManagerResponse(
+                m.Id,
+                m.UserId,
+                m.User.TwitchUsername ?? m.User.Username,
+                m.User.TwitchDisplayName ?? m.User.DisplayName,
+                m.User.TwitchProfileImageUrl,
+                m.IsAdmin
+            ))
+            .ToListAsync(cancellationToken);
+
+        return Ok(managers);
+    }
+
+    [HttpPost("{twitchUserId:long}/managers")]
+    [ProducesResponseType(typeof(TwitchChannelManagerResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<TwitchChannelManagerResponse>> AddManager(
+        long twitchUserId,
+        [FromBody] AddTwitchChannelManagerRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(request.Username))
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid username.",
+                Detail = "Username cannot be empty.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        var instance = await dbContext.TwitchChannelInstances
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var normalizedUsername = request.Username.Trim().ToLowerInvariant();
+
+        var existingManager = await dbContext.TwitchChannelManagers
+            .Include(m => m.User)
+            .FirstOrDefaultAsync(m => m.TwitchChannelInstanceId == instance.Id
+                && (m.User.TwitchUsername != null && m.User.TwitchUsername.ToLowerInvariant() == normalizedUsername),
+                cancellationToken);
+
+        if (existingManager is not null)
+            return Conflict(new ProblemDetails {
+                Title = "Manager already exists.",
+                Detail = "This user is already a manager for this channel.",
+                Status = StatusCodes.Status409Conflict
+            });
+
+        var user = await dbContext.AppUsers
+            .FirstOrDefaultAsync(u => u.TwitchUsername != null && u.TwitchUsername.ToLowerInvariant() == normalizedUsername,
+                cancellationToken);
+
+        if (user is null)
+            return BadRequest(new ProblemDetails {
+                Title = "User not found.",
+                Detail = "No Blackwall account found with this Twitch username. The user must create an account first.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        var entry = new TwitchChannelManager {
+            TwitchChannelInstanceId = instance.Id,
+            UserId = user.Id,
+            IsAdmin = false
+        };
+
+        dbContext.TwitchChannelManagers.Add(entry);
+
+        var priorRemoval = await dbContext.TwitchRemovedManagers
+            .FirstOrDefaultAsync(r => r.TwitchChannelInstanceId == instance.Id && r.UserId == user.Id, cancellationToken);
+        if (priorRemoval is not null)
+            dbContext.TwitchRemovedManagers.Remove(priorRemoval);
+
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new TwitchChannelManagerResponse(
+            entry.Id,
+            user.Id,
+            user.TwitchUsername ?? user.Username,
+            user.TwitchDisplayName ?? user.DisplayName,
+            user.TwitchProfileImageUrl,
+            entry.IsAdmin
+        ));
+    }
+
+    [HttpDelete("{twitchUserId:long}/managers/{managerId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveManager(
+        long twitchUserId,
+        long managerId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var entry = await dbContext.TwitchChannelManagers
+            .FirstOrDefaultAsync(m => m.Id == managerId && m.TwitchChannelInstanceId == instance.Id, cancellationToken);
+
+        if (entry is null)
+            return NotFound(new ProblemDetails {
+                Title = "Manager not found.",
+                Detail = "No manager with this ID exists for this channel.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        dbContext.TwitchChannelManagers.Remove(entry);
+
+        var alreadyRemoved = await dbContext.TwitchRemovedManagers
+            .AnyAsync(r => r.TwitchChannelInstanceId == instance.Id && r.UserId == entry.UserId, cancellationToken);
+        if (!alreadyRemoved) {
+            dbContext.TwitchRemovedManagers.Add(new TwitchRemovedManager {
+                TwitchChannelInstanceId = instance.Id,
+                UserId = entry.UserId
+            });
+        }
+
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);

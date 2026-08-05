@@ -3,17 +3,20 @@ using System;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Blackwall.Infrastructure.Persistence.Migrations
+namespace Blackwall.Infrastructure.Migrations
 {
     [DbContext(typeof(BlackwallDbContext))]
-    partial class BlackwallDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260805171055_AddAutoAddManagers")]
+    partial class AddAutoAddManagers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1239,32 +1242,6 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("TwitchChannelManagers");
-                });
-
-            modelBuilder.Entity("Blackwall.Core.Entities.TwitchRemovedManager", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("TwitchChannelInstanceId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TwitchChannelInstanceId", "UserId")
-                        .IsUnique();
-
-                    b.ToTable("TwitchRemovedManagers");
                 });
 
             modelBuilder.Entity("Blackwall.Core.Entities.AiSentinelConfiguration", b =>

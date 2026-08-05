@@ -57,11 +57,14 @@
                 <nav class="bw-sidebar-nav">
                     <div class="bw-sidebar-header font-mono">MODULES</div>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "general" ? "active" : "")" @onclick='() => _activeTab = "general"'>GENERAL</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "managers" ? "active" : "")" @onclick='() => _activeTab = "managers"'>MANAGERS</button>
                 </nav>
 
                 <div class="bw-sidebar-content">
                     @if (_activeTab == "general") {
                         <TwitchGeneralTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
+                    } else if (_activeTab == "managers") {
+                        <TwitchManagersTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
                     }
 
                     <div class="d-flex align-items-center gap-3 mt-2">
@@ -138,6 +141,7 @@
             if (_settings is not null) {
                 Form.IsEnabled = _settings.IsEnabled;
                 Form.IsDryRun = _settings.IsDryRun;
+                Form.AutoAddManagers = _settings.AutoAddManagers;
                 Form.CommandTrigger = _settings.CommandTrigger;
             }
         } catch {
@@ -164,6 +168,7 @@
             await Api.UpdateTwitchChannelSettingsAsync(TwitchUserId, new UpdateTwitchChannelSettingsRequest(
                 Form.IsEnabled,
                 Form.IsDryRun,
+                Form.AutoAddManagers,
                 Form.CommandTrigger
             ));
             _saved = true;

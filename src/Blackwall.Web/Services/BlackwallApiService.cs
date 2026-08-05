@@ -670,4 +670,31 @@ public sealed class BlackwallApiService(
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<IReadOnlyList<TwitchChannelManagerResponse>> GetTwitchChannelManagersAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/managers");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchChannelManagerResponse>>(ct) ?? [];
+    }
+
+    public async Task<TwitchChannelManagerResponse?> AddTwitchChannelManagerAsync(long twitchUserId, string username, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/managers");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddTwitchChannelManagerRequest(username));
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct);
+            throw new Exception(problem?.Detail ?? problem?.Title ?? $"HTTP {response.StatusCode}");
+        }
+        return await response.Content.ReadFromJsonAsync<TwitchChannelManagerResponse>(ct);
+    }
+
+    public async Task RemoveTwitchChannelManagerAsync(long twitchUserId, long managerId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/managers/{managerId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

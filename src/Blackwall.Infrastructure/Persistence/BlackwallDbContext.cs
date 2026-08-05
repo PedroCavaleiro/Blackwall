@@ -26,6 +26,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<TwitchChannelManager> TwitchChannelManagers => Set<TwitchChannelManager>();
     public DbSet<TwitchChannelConfiguration> TwitchChannelConfigurations => Set<TwitchChannelConfiguration>();
     public DbSet<TwitchAllowedBot> TwitchAllowedBots => Set<TwitchAllowedBot>();
+    public DbSet<TwitchRemovedManager> TwitchRemovedManagers => Set<TwitchRemovedManager>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -718,6 +719,9 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.Property(e => e.IsDryRun)
                   .IsRequired();
 
+            entity.Property(e => e.AutoAddManagers)
+                  .IsRequired();
+
             entity.Property(e => e.UpdatedAtUtc);
 
             entity.HasMany(e => e.AllowedBots)
@@ -749,6 +753,11 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasIndex(e => new { e.TwitchChannelInstanceId, e.UserId })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<TwitchRemovedManager>(entity => {
             entity.HasIndex(e => new { e.TwitchChannelInstanceId, e.UserId })
                   .IsUnique();
         });

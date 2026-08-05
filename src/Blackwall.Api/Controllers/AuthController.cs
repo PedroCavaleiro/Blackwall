@@ -282,6 +282,12 @@ public sealed class AuthController(
 
                 await dbContext.SaveChangesAsync(cancellationToken);
 
+                try {
+                    await twitchChannelService.AutoAddUserToExistingChannelsAsync(user.Id, cancellationToken);
+                } catch {
+                    // Best-effort
+                }
+
                 var handoffCode = await authHandoffService.CreateAsync(user);
                 var redirectUrl =
                     $"{webOptions.Value.BaseUrl.TrimEnd('/')}/auth/callback?code={Uri.EscapeDataString(handoffCode)}";
@@ -331,6 +337,12 @@ public sealed class AuthController(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        try {
+            await twitchChannelService.AutoAddUserToExistingChannelsAsync(user.Id, cancellationToken);
+        } catch {
+            // Best-effort
+        }
 
         var handoffCode2 = await authHandoffService.CreateAsync(user);
         var redirectUrl2 =
@@ -419,6 +431,12 @@ public sealed class AuthController(
             await TryAddBotAsModeratorAsync(twitchUser.Id, tokens.AccessToken);
 
             await twitchBotService.RefreshChannelsAsync();
+
+            try {
+                await twitchChannelService.AutoAddManagersAsync(user.Id, tokens.AccessToken, cancellationToken);
+            } catch {
+                // Best-effort
+            }
 
             var redirectUrl = $"{webOptions.Value.BaseUrl.TrimEnd('/')}/dashboard";
             return Redirect(redirectUrl);
