@@ -13,6 +13,7 @@ public sealed class AppUser: EntityBase {
     public long? TwitchUserId { get; set; }
     public string? TwitchUsername { get; set; }
     public string? TwitchDisplayName { get; set; }
+    public string? TwitchProfileImageUrl { get; set; }
     public string? TwitchAccessToken { get; set; }
     public string? TwitchRefreshToken { get; set; }
     public DateTime? TwitchTokenExpiresAtUtc { get; set; }

@@ -130,7 +130,7 @@ public sealed class TwitchChannelService(BlackwallDbContext dbContext) {
                 twitchUserId,
                 user.TwitchUsername ?? "",
                 user.TwitchDisplayName ?? user.TwitchUsername ?? "",
-                null,
+                user.TwitchProfileImageUrl,
                 IsOwner: true,
                 BotInstalled: false,
                 CanOpen: false

@@ -262,6 +262,7 @@ public sealed class AuthController(
                 user.TwitchUserId = twitchUserId;
                 user.TwitchUsername = twitchUser.Login;
                 user.TwitchDisplayName = twitchUser.DisplayName;
+                user.TwitchProfileImageUrl = twitchUser.ProfileImageUrl;
                 user.TwitchAccessToken = encryptedAccessToken;
                 user.TwitchRefreshToken = encryptedRefreshToken;
                 user.TwitchTokenExpiresAtUtc = tokens.ExpiresAt;
@@ -292,6 +293,7 @@ public sealed class AuthController(
                 TwitchUserId = twitchUserId,
                 TwitchUsername = twitchUser.Login,
                 TwitchDisplayName = twitchUser.DisplayName,
+                TwitchProfileImageUrl = twitchUser.ProfileImageUrl,
                 Username = twitchUser.Login,
                 DisplayName = twitchUser.DisplayName,
                 TwitchAccessToken = encryptedAccessToken,
@@ -305,6 +307,7 @@ public sealed class AuthController(
             user.TwitchUserId = twitchUserId;
             user.TwitchUsername = twitchUser.Login;
             user.TwitchDisplayName = twitchUser.DisplayName;
+            user.TwitchProfileImageUrl = twitchUser.ProfileImageUrl;
             user.TwitchAccessToken = encryptedAccessToken;
             user.TwitchRefreshToken = encryptedRefreshToken;
             user.TwitchTokenExpiresAtUtc = tokens.ExpiresAt;
