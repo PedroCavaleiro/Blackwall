@@ -115,6 +115,7 @@
       <a href="#proxmox-lxc">Proxmox LXC</a>
       <a href="#bare-metal">Bare Metal / VM</a>
       <div class="nav-section">Reference</div>
+      <a href="#account-linking">Account Linking</a>
       <a href="#discord-permissions">Discord Permissions</a>
       <a href="#account-scoring">Account Scoring</a>
       <a href="#content-guard">Content Guard</a>
@@ -168,7 +169,7 @@
           <div class="card"><h4><span class="card-icon">&#9989;</span> Bot Allowlist</h4><p>Only trusted bots bypass spam detection. All other bot-flagged accounts &mdash; including attack tools disguised as bots &mdash; are scanned.</p></div>
           <div class="card"><h4><span class="card-icon">&#129514;</span> Dry Run Mode</h4><p>Test detection rules without taking action against users. Detections are logged only.</p></div>
           <div class="card"><h4><span class="card-icon">&#127760;</span> Per-guild Configuration</h4><p>Each server gets its own spam thresholds, module toggles, and actions managed through the web dashboard.</p></div>
-          <div class="card"><h4><span class="card-icon">&#128273;</span> Discord OAuth2 Login</h4><p>Users authenticate via Discord. JWT tokens are issued for API and Web access.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128273;</span> Discord &amp; Twitch OAuth2 Login</h4><p>Users authenticate via Discord or Twitch. Accounts can be linked, unlinked, and merged. JWT tokens are issued for API and Web access.</p></div>
           <div class="card"><h4><span class="card-icon">&#128260;</span> Guild Permission Sync</h4><p>A background service periodically synchronises guild manager permissions from Discord.</p></div>
           <div class="card"><h4><span class="card-icon">&#128187;</span> Web Dashboard</h4><p>Blazor Server UI for guild owners and managers to configure spam rules visually.</p></div>
           <div class="card"><h4><span class="card-icon">&#129504;</span> AI Sentinel</h4><p>AI-powered content moderation that runs as the last step in the protection pipeline. Supports OpenAI, Anthropic, Google Gemini, and self-hosted Ollama with training mode and per-guild configuration.</p></div>
@@ -203,6 +204,7 @@
           <li><strong>PostgreSQL 17+</strong> &mdash; for persistent data storage</li>
           <li><strong>Redis 7+</strong> &mdash; for caching</li>
           <li><strong>A Discord application</strong> with bot and OAuth2 credentials &mdash; create one at the <a href="https://discord.com/developers/applications" target="_blank">Discord Developer Portal</a></li>
+          <li><strong>A Twitch application</strong> (optional) for Twitch login support &mdash; create one at the <a href="https://dev.twitch.tv/console" target="_blank">Twitch Developer Console</a></li>
         </ul>
         <div class="callout callout-tip">
           <strong>Docker users</strong>
@@ -294,6 +296,21 @@ cd Blackwall</code></pre>
           </tbody>
         </table>
 
+        <h3>Twitch OAuth (Optional)</h3>
+        <table>
+          <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>TWITCH__CLIENT_ID</code></td><td>No</td><td>&mdash;</td><td>Twitch OAuth2 client ID. Create an application at the <a href="https://dev.twitch.tv/console" target="_blank">Twitch Developer Console</a>. Leave blank to disable Twitch login</td></tr>
+            <tr><td><code>TWITCH__CLIENT_SECRET</code></td><td>No</td><td>&mdash;</td><td>Twitch OAuth2 client secret</td></tr>
+            <tr><td><code>TWITCH__REDIRECT_URI</code></td><td>No</td><td>&mdash;</td><td>OAuth2 callback URL (e.g. <code>https://your-domain.tld/api/auth/twitch/callback</code>)</td></tr>
+            <tr><td><code>TWITCH__LOGIN_SCOPES</code></td><td>No</td><td><code>openid user:read:email</code></td><td>Scopes for the Twitch OAuth2 user login flow</td></tr>
+          </tbody>
+        </table>
+        <div class="callout callout-info">
+          <strong>Optional provider</strong>
+          Twitch login is entirely optional. If <code>TWITCH__CLIENT_ID</code> is left blank, the Twitch login button is not shown and all Twitch endpoints return a disabled response. Users who logged in with Discord can link their Twitch account later from the dashboard.
+        </div>
+
         <h3>Google Safe Browsing</h3>
         <table>
           <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
@@ -333,7 +350,7 @@ cd Blackwall</code></pre>
           <tbody>
             <tr><td><code>API__BASE_URL</code></td><td>No</td><td><code>https://localhost:7001</code></td><td>Base URL of the API. Used by the Web project to call the API. If updating the port also update the URL.</td></tr>
             <tr><td><code>API__PORT</code></td><td>No</td><td><code>7001</code></td><td>Port the API listens on</td></tr>
-            <tr><td><code>API__PROTECTION_ENABLED</code></td><td>No</td><td><code>true</code></td><td>When <code>true</code>, all API endpoints require an <code>X-API-Key</code> header. Exempt endpoints: <code>/api/auth/discord/callback</code>, <code>/api/system/health</code>, and <code>/health</code>.</td></tr>
+            <tr><td><code>API__PROTECTION_ENABLED</code></td><td>No</td><td><code>true</code></td><td>When <code>true</code>, all API endpoints require an <code>X-API-Key</code> header. Exempt endpoints: <code>/api/auth/discord/callback</code>, <code>/api/auth/twitch/callback</code>, <code>/api/system/health</code>, and <code>/health</code>.</td></tr>
             <tr><td><code>API__KEY</code></td><td>Yes*</td><td>&mdash;</td><td>The API key sent via the <code>X-API-Key</code> header. Required when <code>API__PROTECTION_ENABLED</code> is <code>true</code>. Must match between API and Web. Format: <code>bw_k_</code> followed by 64 alphanumeric characters (<code>a-zA-Z0-9</code>).</td></tr>
           </tbody>
         </table>
@@ -539,6 +556,54 @@ dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
           Set <code>ASPNETCORE_FORWARDEDHEADERS_ENABLED=true</code> so the app correctly respects proxy headers (X-Forwarded-For, X-Forwarded-Proto).
         </div>
       </section>
+      <!-- Account Linking -->
+      <section class="content-section" id="account-linking">
+        <h2>Account Linking &amp; Multi-Provider Login</h2>
+        <p>Blackwall supports login via both Discord and Twitch. Users can link both providers to a single account, switch their display name between providers, and unlink providers when no longer needed.</p>
+
+        <h3>Login Flow</h3>
+        <p>When both Discord and Twitch are configured, the login modal shows two buttons: <strong>Discord</strong> and <strong>Twitch</strong>. Users choose their provider at login. If only Discord is configured (Twitch credentials are blank), only the Discord button is shown.</p>
+
+        <h3>Account Linking</h3>
+        <p>After logging in with one provider, users can link the other provider from the <strong>Accounts</strong> modal in the navigation bar. The flow:</p>
+        <ol>
+          <li>User clicks <strong>ACCOUNTS</strong> in the nav bar.</li>
+          <li>The Accounts modal shows linked providers and a <strong>LINK</strong> button for unlinked providers.</li>
+          <li>Clicking <strong>LINK</strong> initiates the OAuth flow for the missing provider. The <code>linkTo</code> user ID is stored in Redis alongside the OAuth state.</li>
+          <li>On callback, if a <code>linkTo</code> value is found, the provider is linked to the existing account instead of creating a new one.</li>
+          <li>If the OAuth provider's user ID already exists on a different account, the two accounts are <strong>merged</strong> &mdash; guild ownership, manager roles, and tokens are consolidated into the primary account.</li>
+        </ol>
+
+        <h3>Account Merging</h3>
+        <p>When a user who already has an account logs in with a second provider and a different account already exists for that provider's user ID, Blackwall merges the two accounts:</p>
+        <ul>
+          <li>Guild ownership and manager roles from the duplicate account are transferred to the primary account.</li>
+          <li>Missing provider tokens (Discord or Twitch) are copied from the duplicate to the primary.</li>
+          <li>The duplicate account is deleted.</li>
+          <li>The display name provider is set automatically if the primary account didn't have one.</li>
+        </ul>
+
+        <h3>Unlinking</h3>
+        <p>Users can unlink a provider from the Accounts modal. When unlinking Discord:</p>
+        <ul>
+          <li>If the user owns guilds with no other managers, those guilds are orphaned &mdash; the bot leaves them and the guild instances are deactivated.</li>
+          <li>A warning is shown before unlinking if orphan guilds would be created.</li>
+          <li>The display name provider is automatically switched to Twitch if available.</li>
+        </ul>
+        <p>Unlinking Twitch simply removes the Twitch credentials and switches the display name provider to Discord if available.</p>
+
+        <h3>Display Name Selection</h3>
+        <p>When both providers are linked, users can choose which provider's display name to use in the dashboard. The selected name appears in the navigation bar and is updated live without a page reload.</p>
+
+        <h3>Link Accounts Warning Banner</h3>
+        <p>When a user has only one provider linked, a banner appears below the header suggesting they link the other provider. The banner can be dismissed permanently &mdash; the dismissal is stored server-side on the user entity, so it persists across devices and sessions.</p>
+
+        <div class="callout callout-info">
+          <strong>Twitch setup</strong>
+          To enable Twitch login, set <code>TWITCH__CLIENT_ID</code>, <code>TWITCH__CLIENT_SECRET</code>, and <code>TWITCH__REDIRECT_URI</code> in your <code>.env</code>. The redirect URI must be <code>https://your-domain.tld/api/auth/twitch/callback</code> and must match the OAuth Redirect URL configured in the <a href="https://dev.twitch.tv/console" target="_blank">Twitch Developer Console</a>.
+        </div>
+      </section>
+
       <!-- Discord Permissions -->
       <section class="content-section" id="discord-permissions">
         <h2>Discord Permissions</h2>
