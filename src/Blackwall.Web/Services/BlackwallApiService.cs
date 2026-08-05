@@ -605,4 +605,21 @@ public sealed class BlackwallApiService(
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<IReadOnlyList<ManageableTwitchChannelResponse>?> GetTwitchChannelsAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/twitchchannels");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<ManageableTwitchChannelResponse>>(ct);
+    }
+
+    public async Task<string?> GetTwitchBotInstallUrlAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/twitchchannels/install");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        var result = await response.Content.ReadFromJsonAsync<TwitchBotInstallResponse>(ct);
+        return result?.Url;
+    }
 }

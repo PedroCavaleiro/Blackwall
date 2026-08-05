@@ -17,4 +17,10 @@ public sealed record TwitchOptions {
 
     [ConfigurationKeyName("LOGIN_SCOPES")]
     public string LoginScopes { get; set; } = "openid user:read:email";
+
+    [ConfigurationKeyName("BOT_SCOPES")]
+    public string BotScopes { get; set; } = "channel:moderate channel:read:redemption channel:manage:redemption moderator:manage:automod chat:read chat:edit";
+
+    [ConfigurationKeyName("BOT_REDIRECT_URI")]
+    public string? BotRedirectUri { get; set; }
 }

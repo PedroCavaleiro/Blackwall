@@ -12,6 +12,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Web", "src\Blackw
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Modules.Abstractions", "src\Blackwall.Modules.Abstractions\Blackwall.Modules.Abstractions.csproj", "{D1A3B4C5-6D7E-8F90-A1B2-C3D4E5F60718}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.TwitchBot", "src\Blackwall.TwitchBot\Blackwall.TwitchBot.csproj", "{E2F4A5B6-7C8D-9E01-A2B3-C4D5E6F70829}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,5 +44,9 @@ Global
 		{D1A3B4C5-6D7E-8F90-A1B2-C3D4E5F60718}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D1A3B4C5-6D7E-8F90-A1B2-C3D4E5F60718}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D1A3B4C5-6D7E-8F90-A1B2-C3D4E5F60718}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E2F4A5B6-7C8D-9E01-A2B3-C4D5E6F70829}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E2F4A5B6-7C8D-9E01-A2B3-C4D5E6F70829}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E2F4A5B6-7C8D-9E01-A2B3-C4D5E6F70829}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E2F4A5B6-7C8D-9E01-A2B3-C4D5E6F70829}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

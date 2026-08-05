@@ -22,6 +22,8 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<AiSentinelConfiguration> AiSentinelConfigurations => Set<AiSentinelConfiguration>();
     public DbSet<AiSentinelLog> AiSentinelLogs => Set<AiSentinelLog>();
     public DbSet<GuildModuleInstallation> GuildModuleInstallations => Set<GuildModuleInstallation>();
+    public DbSet<TwitchChannelInstance> TwitchChannelInstances => Set<TwitchChannelInstance>();
+    public DbSet<TwitchChannelManager> TwitchChannelManagers => Set<TwitchChannelManager>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -667,6 +669,53 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.HasIndex(e => e.AiSentinelConfigurationId);
             entity.HasIndex(e => e.ExpiresAtUtc);
             entity.HasIndex(e => new { e.AiSentinelConfigurationId, e.CreatedAtUtc });
+        });
+
+        modelBuilder.Entity<TwitchChannelInstance>(entity => {
+            entity.HasIndex(e => e.TwitchUserId)
+                  .IsUnique();
+
+            entity.Property(e => e.Username)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(e => e.DisplayName)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(e => e.ProfileImageUrl)
+                  .HasMaxLength(500);
+
+            entity.Property(e => e.UpdatedAtUtc);
+
+            entity.HasOne(e => e.OwnerUser)
+                  .WithMany(e => e.OwnedTwitchChannels)
+                  .HasForeignKey(e => e.OwnerUserId)
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasMany(e => e.Managers)
+                  .WithOne(e => e.TwitchChannelInstance)
+                  .HasForeignKey(e => e.TwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TwitchChannelManager>(entity => {
+            entity.Property(e => e.IsAdmin)
+                  .IsRequired();
+
+            entity.HasOne(e => e.TwitchChannelInstance)
+                  .WithMany(e => e.Managers)
+                  .HasForeignKey(e => e.TwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                  .WithMany(e => e.ManagedTwitchChannels)
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.TwitchChannelInstanceId, e.UserId })
+                  .IsUnique();
         });
 
         modelBuilder.Entity<GuildModuleInstallation>(entity => {

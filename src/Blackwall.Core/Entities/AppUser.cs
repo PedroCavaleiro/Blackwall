@@ -22,5 +22,7 @@ public sealed class AppUser: EntityBase {
 
     public ICollection<GuildInstance> OwnedGuilds { get; set; } = [];
     public ICollection<GuildManager> ManagedGuilds { get; set; } = [];
+    public ICollection<TwitchChannelInstance> OwnedTwitchChannels { get; set; } = [];
+    public ICollection<TwitchChannelManager> ManagedTwitchChannels { get; set; } = [];
 
 }

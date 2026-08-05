@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Blackwall.Api.Services;
 using Blackwall.Api.Services.Discord;
+using Blackwall.Api.Services.Twitch;
 using Blackwall.Core.Configuration;
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
@@ -22,6 +23,7 @@ public sealed class AuthController(
     GuildClaimService guildClaimService,
     AccountLinkingService accountLinkingService,
     DiscordGuildCacheService guildCache,
+    TwitchChannelService twitchChannelService,
     BlackwallDbContext dbContext,
     IOptions<WebOptions> webOptions,
     IOptions<AppConfiguration> appConfiguration,
@@ -321,6 +323,68 @@ public sealed class AuthController(
             $"{webOptions.Value.BaseUrl.TrimEnd('/')}/auth/callback?code={Uri.EscapeDataString(handoffCode2)}";
 
         return Redirect(redirectUrl2);
+    }
+
+    [HttpGet("twitch/bot/callback")]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> TwitchBotCallback(
+        [FromQuery] string? code,
+        [FromQuery] string? state,
+        CancellationToken cancellationToken
+    ) {
+        if (string.IsNullOrWhiteSpace(code)) {
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid authorization code.",
+                Detail = "The OAuth callback did not include a valid code.",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(state)) {
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid OAuth state.",
+                Detail = "The OAuth callback did not include a valid state.",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        var appUserId = await twitchOAuthService.ConsumeBotInstallStateAsync(state);
+
+        if (appUserId is null) {
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid or expired OAuth state.",
+                Detail = "The OAuth state was invalid, expired, or already used.",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        var user = await dbContext.AppUsers
+            .FirstOrDefaultAsync(x => x.Id == appUserId.Value, cancellationToken);
+
+        if (user is null || !user.TwitchUserId.HasValue) {
+            return BadRequest(new ProblemDetails {
+                Title = "User not found or Twitch not linked.",
+                Detail = "The authenticated user no longer exists or has no linked Twitch account.",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        var tokens = await twitchOAuthService.ExchangeBotCodeAsync(code, cancellationToken);
+        var twitchUser = await twitchOAuthService.GetCurrentUserAsync(tokens.AccessToken, cancellationToken);
+
+        if (!long.TryParse(twitchUser.Id, out var twitchUserId) || twitchUserId != user.TwitchUserId.Value) {
+            return BadRequest(new ProblemDetails {
+                Title = "Channel mismatch.",
+                Detail = "The authorized Twitch channel does not match your linked Twitch account.",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        await twitchChannelService.CreateOrUpdateChannelInstanceAsync(user.Id, twitchUser, cancellationToken);
+
+        var redirectUrl = $"{webOptions.Value.BaseUrl.TrimEnd('/')}/dashboard";
+        return Redirect(redirectUrl);
     }
 
     [Authorize]

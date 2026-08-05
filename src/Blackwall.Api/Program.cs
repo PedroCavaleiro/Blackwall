@@ -8,6 +8,8 @@ using Blackwall.DiscordBot;
 using Blackwall.DiscordBot.Background;
 using Blackwall.DiscordBot.Handlers;
 using Blackwall.DiscordBot.Services;
+using Blackwall.TwitchBot;
+using Blackwall.Api.Services.Twitch;
 using Blackwall.Core.Configuration;
 using Blackwall.Infrastructure;
 using Discord;
@@ -114,6 +116,7 @@ builder.Services.AddScoped<SafeBrowsingSyncService>();
 builder.Services.AddScoped<MessageAuditService>();
 builder.Services.AddSingleton<ModuleRunnerService>();
 builder.Services.AddScoped<ModuleInstallationService>();
+builder.Services.AddScoped<TwitchChannelService>();
 builder.Services.AddHostedService<SafeBrowsingSyncBackgroundService>();
 builder.Services.AddHostedService<MessageAuditPurgeBackgroundService>();
 builder.Services.AddHostedService<AiSentinelPurgeBackgroundService>();
@@ -121,6 +124,7 @@ builder.Services.AddHostedService<BotWorker>();
 builder.Services.AddHostedService<GuildPermissionSyncBackgroundService>();
 builder.Services.AddHostedService<BlacklistRefreshBackgroundService>();
 builder.Services.AddHostedService<BanSyncBackgroundService>();
+builder.Services.AddHostedService<TwitchBotWorker>();
 
 builder.Services.AddAuthorization();
 
