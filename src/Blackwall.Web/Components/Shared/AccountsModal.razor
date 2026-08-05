@@ -165,6 +165,7 @@
 
 @code {
     [Parameter] public required EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnAccountsChanged { get; set; }
 
     private LinkedAccountsResponse? _accounts;
     private UnlinkAccountWarningResponse? _unlinkWarning;
@@ -244,6 +245,7 @@
             _unlinkWarning = null;
             _success = "Discord account unlinked.";
             await LoadAccountsAsync();
+            await OnAccountsChanged.InvokeAsync();
         } catch (Exception ex) {
             _error = ex.Message;
         } finally {
@@ -259,6 +261,7 @@
             _confirmUnlinkTwitch = false;
             _success = "Twitch account unlinked.";
             await LoadAccountsAsync();
+            await OnAccountsChanged.InvokeAsync();
         } catch (Exception ex) {
             _error = ex.Message;
         } finally {
@@ -273,6 +276,7 @@
             await Api.UpdateDisplayNameProviderAsync(provider);
             await LoadAccountsAsync();
             _success = "Display name updated.";
+            await OnAccountsChanged.InvokeAsync();
         } catch (Exception ex) {
             _error = ex.Message;
         }

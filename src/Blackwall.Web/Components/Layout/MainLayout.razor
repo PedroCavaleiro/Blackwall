@@ -14,7 +14,8 @@
                 <Authorized>
                     <div class="d-flex align-items-center gap-3">
                         <span class="font-mono" style="font-size:0.68rem;letter-spacing:0.1em;color:var(--bw-muted)">
-                            @(context.User.FindFirst("display_name")?.Value?.ToUpperInvariant()
+                            @(_accounts?.DisplayName?.ToUpperInvariant()
+                              ?? context.User.FindFirst("display_name")?.Value?.ToUpperInvariant()
                               ?? context.User.Identity?.Name?.ToUpperInvariant())
                         </span>
                         <button type="button" class="btn btn-outline-secondary btn-sm font-display"
@@ -67,7 +68,7 @@
 </div>
 
 @if (_accountsModalOpen) {
-    <AccountsModal OnClose="CloseAccountsModal" />
+    <AccountsModal OnClose="CloseAccountsModal" OnAccountsChanged="RefreshAccounts" />
 }
 
 @if (_loginModalOpen) {
@@ -113,6 +114,16 @@
             if (_accounts is not null)
                 _accounts = _accounts with { LinkAccountsWarningDismissed = true };
             UpdateLinkWarning();
+        } catch {
+            // Silently fail
+        }
+    }
+
+    private async Task RefreshAccounts() {
+        try {
+            _accounts = await Api.GetLinkedAccountsAsync();
+            UpdateLinkWarning();
+            StateHasChanged();
         } catch {
             // Silently fail
         }
