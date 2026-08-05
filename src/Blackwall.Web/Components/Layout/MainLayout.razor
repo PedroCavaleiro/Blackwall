@@ -38,22 +38,24 @@
     </header>
 
     @if (_showLinkWarning) {
-        <div class="bw-container" style="padding:0.5rem 1.5rem;background:rgba(34,211,238,0.06);border-bottom:1px solid rgba(34,211,238,0.2)">
-            <div class="d-flex align-items-center justify-content-between gap-3">
-                <span class="font-mono" style="font-size:0.72rem;color:var(--bw-primary)">
-                    // LINK YOUR @_missingProvider ACCOUNT
-                </span>
-                <div class="d-flex align-items-center gap-2">
-                    <button type="button" class="btn btn-outline-primary btn-sm font-display"
-                            style="font-size:0.58rem;padding:0.2rem 0.6rem"
-                            @onclick="ToggleAccountsModal">
-                        LINK NOW
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm font-display"
-                            style="font-size:0.58rem;padding:0.2rem 0.6rem"
-                            @onclick="DismissLinkWarning">
-                        DISMISS
-                    </button>
+        <div class="d-flex justify-content-center">
+            <div style="padding:0.5rem 2.5rem;background:rgba(34,211,238,0.06);border-bottom:1px solid rgba(34,211,238,0.2);clip-path:polygon(0 0, 100% 0, calc(100% - 28px) 100%, 28px 100%)">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="font-mono" style="font-size:0.72rem;color:var(--bw-primary)">
+                        // LINK YOUR @_missingProvider ACCOUNT
+                    </span>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-outline-primary btn-sm font-display"
+                                style="font-size:0.58rem;padding:0.2rem 0.6rem"
+                                @onclick="ToggleAccountsModal">
+                            LINK NOW
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm font-display"
+                                style="font-size:0.58rem;padding:0.2rem 0.6rem"
+                                @onclick="DismissLinkWarning">
+                            DISMISS
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
