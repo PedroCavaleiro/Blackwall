@@ -8,9 +8,9 @@
 <div style="max-width:1200px;margin:0 auto;padding:2.5rem 1.5rem">
 
     <div class="mb-5">
-        <div class="font-mono mb-2" style="font-size:0.68rem;letter-spacing:0.18em;color:var(--bw-primary)">// GRID OVERVIEW</div>
-        <h1 class="font-display mb-1" style="font-size:2.2rem;letter-spacing:0.04em">YOUR SERVERS</h1>
-        <p class="font-mono mb-0 bw-alert-text bw-text-muted">Servers where you hold MANAGE_GUILD authority.</p>
+        <div class="font-mono mb-2" style="font-size:0.68rem;letter-spacing:0.18em;color:var(--bw-primary)">// @(_activeTab == "discord" ? "SERVER OVERVIEW" : "CHANNEL OVERVIEW")</div>
+        <h1 class="font-display mb-1" style="font-size:2.2rem;letter-spacing:0.04em">YOUR @(_activeTab == "discord" ? "SERVERS" : "CHANNELS")</h1>
+        <p class="font-mono mb-0 bw-alert-text bw-text-muted">@(_activeTab == "discord" ? "Servers where you hold MANAGE_GUILD authority." : "Channels where you are the owner or a manager.")</p>
     </div>
 
     <!-- Tab selector -->
