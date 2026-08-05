@@ -46,15 +46,31 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
         modelBuilder.Entity<AppUser>(entity => {
 
             entity.Property(e => e.DiscordUserId)
-                  .IsRequired()
                   .HasMaxLength(32);
 
             entity.HasIndex(e => e.DiscordUserId)
-                  .IsUnique();
+                  .IsUnique()
+                  .HasFilter("\"DiscordUserId\" IS NOT NULL");
+
+            entity.Property(e => e.TwitchUserId)
+                  .HasMaxLength(20);
+
+            entity.HasIndex(e => e.TwitchUserId)
+                  .IsUnique()
+                  .HasFilter("\"TwitchUserId\" IS NOT NULL");
 
             entity.Property(e => e.Username)
                   .IsRequired()
                   .HasMaxLength(100);
+
+            entity.Property(e => e.TwitchUsername)
+                  .HasMaxLength(100);
+
+            entity.Property(e => e.TwitchDisplayName)
+                  .HasMaxLength(100);
+
+            entity.Property(e => e.ActiveDisplayNameProvider)
+                  .HasMaxLength(20);
         });
 
         modelBuilder.Entity<GuildInstance>(entity => {

@@ -232,6 +232,22 @@ public sealed class DiscordOAuthService(
         return state;
     }
 
+    public async Task<string> CreateWithLinkAsync(long linkToUserId) {
+        var state = await CreateAsync();
+        await _db.StringSetAsync(
+            $"{OAuthStateKeyPrefix}{state}:linkTo",
+            linkToUserId.ToString(),
+            TimeSpan.FromMinutes(10)
+        );
+        return state;
+    }
+
+    public async Task<long?> ConsumeWithLinkAsync(string state) {
+        var linkKey = $"{OAuthStateKeyPrefix}{state}:linkTo";
+        var linkValue = await _db.StringGetDeleteAsync(linkKey);
+        return linkValue.HasValue ? long.TryParse((string?)linkValue, out var id) ? id : null : null;
+    }
+
     /// <summary>
     /// Validates and consumes an OAuth2 state parameter by removing it from Redis.
     /// </summary>

@@ -27,8 +27,10 @@ public sealed class AuthHandoffService(IConnectionMultiplexer redis) {
         var payload = JsonSerializer.Serialize(new HandoffPayload(
                                                    user.Id,
                                                    user.DiscordUserId,
+                                                   user.TwitchUserId,
                                                    user.Username,
-                                                   user.DisplayName), _jsonOptions);
+                                                   user.DisplayName,
+                                                   user.TwitchDisplayName), _jsonOptions);
 
         await _db.StringSetAsync(
             $"{Prefix}{code}",
@@ -58,7 +60,9 @@ public sealed class AuthHandoffService(IConnectionMultiplexer redis) {
     public sealed record HandoffPayload(
         long UserId,
         long DiscordUserId,
+        long? TwitchUserId,
         string Username,
-        string? DisplayName
+        string? DisplayName,
+        string? TwitchDisplayName
     );
 }

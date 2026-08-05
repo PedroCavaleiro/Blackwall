@@ -10,6 +10,7 @@ public sealed class ApiKeyMiddleware(
     private const string ApiKeyHeader = "X-API-Key";
     private static readonly string[] ExemptPaths = [
         "/api/auth/discord/callback",
+        "/api/auth/twitch/callback",
         "/api/system/health",
         "/health"
     ];

@@ -351,6 +351,48 @@ const sections = [
     ]
   },
   {
+    title: "Twitch OAuth",
+    icon: "&#128250;",
+    fields: [
+      {
+        key: "TWITCH__CLIENT_ID",
+        label: "TWITCH__CLIENT_ID",
+        required: false,
+        type: "text",
+        placeholder: "ab1c2d3e4f5g6h7i8j9k0l1m2n3o4p",
+        desc: "Twitch OAuth2 client ID for Twitch login support.",
+        help: "Create an application at the <a href='https://dev.twitch.tv/console' target='_blank'>Twitch Developer Console</a>. Found on the <strong>Applications</strong> tab. Leave blank to disable Twitch login."
+      },
+      {
+        key: "TWITCH__CLIENT_SECRET",
+        label: "TWITCH__CLIENT_SECRET",
+        required: false,
+        type: "password",
+        placeholder: "abcdefghijklmnopqrstuvwxyz0123456789",
+        desc: "Twitch OAuth2 client secret.",
+        help: "Found on the <strong>Applications</strong> tab in the <a href='https://dev.twitch.tv/console' target='_blank'>Twitch Developer Console</a> &rarr; click <strong>New Secret</strong>. Keep this secret."
+      },
+      {
+        key: "TWITCH__REDIRECT_URI",
+        label: "TWITCH__REDIRECT_URI",
+        required: false,
+        type: "text",
+        placeholder: "https://your-domain.tld/api/auth/twitch/callback",
+        desc: "OAuth2 callback URL for Twitch login redirects.",
+        help: "Must match the redirect URI configured in your Twitch application under <strong>OAuth Redirect URLs</strong>. The path is <code>/api/auth/twitch/callback</code> on your API base URL."
+      },
+      {
+        key: "TWITCH__LOGIN_SCOPES",
+        label: "TWITCH__LOGIN_SCOPES",
+        required: false,
+        type: "text",
+        default: "openid user:read:email",
+        desc: "Scopes for the Twitch OAuth2 user login flow.",
+        help: "Default <code>openid user:read:email</code> &mdash; allows reading the user's profile and email."
+      }
+    ]
+  },
+  {
     title: "Discord OAuth & Bot",
     icon: "&#129302;",
     fields: [
@@ -574,7 +616,7 @@ const sections = [
         type: "bool",
         default: true,
         desc: "When true, all API endpoints require an X-API-Key header.",
-        help: "Exempt endpoints: <code>/api/auth/discord/callback</code>, <code>/api/system/health</code>, and <code>/health</code>. The Web project automatically sends the key when enabled."
+        help: "Exempt endpoints: <code>/api/auth/discord/callback</code>, <code>/api/auth/twitch/callback</code>, <code>/api/system/health</code>, and <code>/health</code>. The Web project automatically sends the key when enabled."
       },
       {
         key: "API__KEY",

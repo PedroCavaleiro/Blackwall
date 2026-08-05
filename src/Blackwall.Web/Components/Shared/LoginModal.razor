@@ -1,0 +1,27 @@
+<div class="bw-modal-overlay" @onclick="OnClose">
+    <div class="bw-modal cut-corner" @onclick:stopPropagation="true" style="max-width:400px">
+        <div class="bw-modal-header">
+            <span class="font-mono bw-text-primary">// SELECT PROVIDER</span>
+            <button type="button" class="bw-modal-close" @onclick="OnClose">&times;</button>
+        </div>
+        <div class="bw-modal-body" style="padding:1.5rem">
+            <p class="font-mono mb-4 bw-desc" style="font-size:0.8rem">
+                Choose how you want to jack in.
+            </p>
+            <div class="d-flex flex-column gap-3">
+                <a href="/auth/login" class="btn btn-primary cut-corner font-display"
+                   style="letter-spacing:0.1em;padding:0.6rem 1.5rem;text-align:center">
+                    DISCORD
+                </a>
+                <a href="/auth/login/twitch" class="btn btn-outline-primary cut-corner font-display"
+                   style="letter-spacing:0.1em;padding:0.6rem 1.5rem;text-align:center">
+                    TWITCH
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public required EventCallback OnClose { get; set; }
+}

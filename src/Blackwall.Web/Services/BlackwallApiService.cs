@@ -544,4 +544,65 @@ public sealed class BlackwallApiService(
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<LinkedAccountsResponse?> GetLinkedAccountsAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/users/accounts");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<LinkedAccountsResponse>(ct);
+    }
+
+    public async Task UpdateDisplayNameProviderAsync(string provider, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, "api/users/accounts/display-name");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new UpdateDisplayNameProviderRequest(provider));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<UnlinkAccountWarningResponse?> CheckUnlinkDiscordAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/users/accounts/unlink/discord/check");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<UnlinkAccountWarningResponse>(ct);
+    }
+
+    public async Task UnlinkDiscordAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, "api/users/accounts/discord");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task UnlinkTwitchAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, "api/users/accounts/twitch");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<LoginResponse?> GetTwitchLinkUrlAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/auth/twitch/link");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<LoginResponse>(ct);
+    }
+
+    public async Task<LoginResponse?> GetDiscordLinkUrlAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/auth/discord/link");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<LoginResponse>(ct);
+    }
+
+    public async Task DismissLinkAccountsWarningAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/users/accounts/link-warning/dismiss");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

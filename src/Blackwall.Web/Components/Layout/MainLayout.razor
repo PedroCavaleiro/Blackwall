@@ -1,4 +1,6 @@
 @inherits LayoutComponentBase
+@inject BlackwallApiService Api
+@inject AuthenticationStateProvider AuthStateProvider
 
 <div class="bw-scanlines"></div>
 
@@ -12,23 +14,130 @@
                 <Authorized>
                     <div class="d-flex align-items-center gap-3">
                         <span class="font-mono" style="font-size:0.68rem;letter-spacing:0.1em;color:var(--bw-muted)">
-                            @context.User.Identity?.Name?.ToUpperInvariant()
+                            @(_accounts?.DisplayName?.ToUpperInvariant()
+                              ?? context.User.FindFirst("display_name")?.Value?.ToUpperInvariant()
+                              ?? context.User.Identity?.Name?.ToUpperInvariant())
                         </span>
+                        <button type="button" class="btn btn-outline-secondary btn-sm font-display"
+                                style="font-size:0.62rem;padding:0.25rem 0.75rem"
+                                @onclick="ToggleAccountsModal">
+                            ACCOUNTS
+                        </button>
                         <a href="/auth/logout" class="btn btn-outline-secondary btn-sm font-display" style="font-size:0.62rem;padding:0.25rem 0.75rem">
                             DISCONNECT
                         </a>
                     </div>
                 </Authorized>
                 <NotAuthorized>
-                    <a href="/auth/login" class="btn btn-primary btn-sm cut-corner font-display" style="font-size:0.62rem;padding:0.25rem 0.9rem">
+                    <button type="button" class="btn btn-primary btn-sm cut-corner font-display" style="font-size:0.62rem;padding:0.25rem 0.9rem"
+                            @onclick="ToggleLoginModal">
                         JACK IN
-                    </a>
+                    </button>
                 </NotAuthorized>
             </AuthorizeView>
         </div>
     </header>
 
+    @if (_showLinkWarning) {
+        <div class="d-flex justify-content-center">
+            <div style="padding:0.5rem 2.5rem;background:rgba(34,211,238,0.06);border-bottom:1px solid rgba(34,211,238,0.2);clip-path:polygon(0 0, 100% 0, calc(100% - 28px) 100%, 28px 100%)">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="font-mono" style="font-size:0.72rem;color:var(--bw-primary)">
+                        // LINK YOUR @_missingProvider ACCOUNT
+                    </span>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-outline-primary btn-sm font-display"
+                                style="font-size:0.58rem;padding:0.2rem 0.6rem"
+                                @onclick="ToggleAccountsModal">
+                            LINK NOW
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm font-display"
+                                style="font-size:0.58rem;padding:0.2rem 0.6rem"
+                                @onclick="DismissLinkWarning">
+                            DISMISS
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
     <main class="flex-grow-1">
         @Body
     </main>
 </div>
+
+@if (_accountsModalOpen) {
+    <AccountsModal OnClose="CloseAccountsModal" OnAccountsChanged="RefreshAccounts" />
+}
+
+@if (_loginModalOpen) {
+    <LoginModal OnClose="CloseLoginModal" />
+}
+
+@code {
+    private bool _accountsModalOpen;
+    private bool _loginModalOpen;
+    private LinkedAccountsResponse? _accounts;
+    private bool _showLinkWarning;
+    private string _missingProvider = "DISCORD";
+
+    protected override async Task OnInitializedAsync() {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated != true)
+            return;
+
+        try {
+            _accounts = await Api.GetLinkedAccountsAsync();
+            UpdateLinkWarning();
+        } catch {
+            // Silently fail — banner is non-critical
+        }
+    }
+
+    private void UpdateLinkWarning() {
+        if (_accounts is null) {
+            _showLinkWarning = false;
+            return;
+        }
+
+        var hasBoth = _accounts.HasDiscord && _accounts.HasTwitch;
+        var hasNeither = !_accounts.HasDiscord && !_accounts.HasTwitch;
+
+        _showLinkWarning = !hasBoth && !hasNeither && !_accounts.LinkAccountsWarningDismissed;
+        _missingProvider = _accounts.HasDiscord ? "TWITCH" : "DISCORD";
+    }
+
+    private async Task DismissLinkWarning() {
+        try {
+            await Api.DismissLinkAccountsWarningAsync();
+            if (_accounts is not null)
+                _accounts = _accounts with { LinkAccountsWarningDismissed = true };
+            UpdateLinkWarning();
+        } catch {
+            // Silently fail
+        }
+    }
+
+    private async Task RefreshAccounts() {
+        try {
+            _accounts = await Api.GetLinkedAccountsAsync();
+            UpdateLinkWarning();
+            StateHasChanged();
+        } catch {
+            // Silently fail
+        }
+    }
+
+    private void ToggleAccountsModal() => _accountsModalOpen = true;
+
+    private void CloseAccountsModal() {
+        _accountsModalOpen = false;
+        if (_accounts is not null)
+            UpdateLinkWarning();
+    }
+
+    private void ToggleLoginModal() => _loginModalOpen = true;
+
+    private void CloseLoginModal() => _loginModalOpen = false;
+}
