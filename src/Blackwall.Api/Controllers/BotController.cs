@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using Blackwall.Api.Services;
+using Blackwall.Api.Services.Discord;
 using Blackwall.Core.DTOs;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;

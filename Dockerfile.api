@@ -3,7 +3,7 @@ WORKDIR /src
 
 COPY src/Blackwall.Core/Blackwall.Core.csproj                         src/Blackwall.Core/
 COPY src/Blackwall.Infrastructure/Blackwall.Infrastructure.csproj     src/Blackwall.Infrastructure/
-COPY src/Blackwall.Bot/Blackwall.Bot.csproj                           src/Blackwall.Bot/
+COPY src/Blackwall.DiscordBot/Blackwall.DiscordBot.csproj               src/Blackwall.DiscordBot/
 COPY src/Blackwall.Api/Blackwall.Api.csproj                           src/Blackwall.Api/
 COPY src/Blackwall.Modules.Abstractions/Blackwall.Modules.Abstractions.csproj src/Blackwall.Modules.Abstractions/
 RUN dotnet restore src/Blackwall.Api/Blackwall.Api.csproj
