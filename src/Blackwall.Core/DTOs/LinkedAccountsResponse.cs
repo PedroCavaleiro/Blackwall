@@ -10,7 +10,8 @@ public sealed record LinkedAccountsResponse(
     string? TwitchDisplayName,
     long? TwitchUserId,
     string? ActiveDisplayNameProvider,
-    string DisplayName
+    string DisplayName,
+    bool LinkAccountsWarningDismissed
 );
 
 public sealed record UpdateDisplayNameProviderRequest(string Provider);

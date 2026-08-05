@@ -598,4 +598,11 @@ public sealed class BlackwallApiService(
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<LoginResponse>(ct);
     }
+
+    public async Task DismissLinkAccountsWarningAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/users/accounts/link-warning/dismiss");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

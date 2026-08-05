@@ -164,6 +164,31 @@ public sealed class UsersController(
         }
     }
 
+    [Authorize]
+    [HttpPost("accounts/link-warning/dismiss")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> DismissLinkWarning(CancellationToken cancellationToken) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        try {
+            await accountLinkingService.DismissLinkAccountsWarningAsync(appUserId.Value, cancellationToken);
+            return NoContent();
+        } catch (InvalidOperationException ex) {
+            return NotFound(new ProblemDetails {
+                Title = "User not found.",
+                Detail = ex.Message,
+                Status = StatusCodes.Status404NotFound
+            });
+        }
+    }
+
     private long? GetCurrentUserId() {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
                           ?? User.FindFirstValue("sub");

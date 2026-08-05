@@ -33,8 +33,20 @@ public sealed class AccountLinkingService(
             TwitchDisplayName: hasTwitch ? user.TwitchDisplayName : null,
             TwitchUserId: hasTwitch ? user.TwitchUserId : null,
             ActiveDisplayNameProvider: user.ActiveDisplayNameProvider,
-            DisplayName: displayName
+            DisplayName: displayName,
+            LinkAccountsWarningDismissed: user.LinkAccountsWarningDismissed
         );
+    }
+
+    public async Task DismissLinkAccountsWarningAsync(long appUserId, CancellationToken cancellationToken = default) {
+        var user = await dbContext.AppUsers
+            .FirstOrDefaultAsync(x => x.Id == appUserId, cancellationToken);
+
+        if (user is null)
+            throw new InvalidOperationException("User not found.");
+
+        user.LinkAccountsWarningDismissed = true;
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task UpdateDisplayNameProviderAsync(long appUserId, string provider, CancellationToken cancellationToken = default) {

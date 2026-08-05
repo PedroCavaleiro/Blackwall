@@ -1,4 +1,6 @@
 @inherits LayoutComponentBase
+@inject BlackwallApiService Api
+@inject AuthenticationStateProvider AuthStateProvider
 
 <div class="bw-scanlines"></div>
 
@@ -35,6 +37,28 @@
         </div>
     </header>
 
+    @if (_showLinkWarning) {
+        <div class="bw-container" style="padding:0.5rem 1.5rem;background:rgba(34,211,238,0.06);border-bottom:1px solid rgba(34,211,238,0.2)">
+            <div class="d-flex align-items-center justify-content-between gap-3">
+                <span class="font-mono" style="font-size:0.72rem;color:var(--bw-primary)">
+                    // LINK YOUR @_missingProvider ACCOUNT
+                </span>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm font-display"
+                            style="font-size:0.58rem;padding:0.2rem 0.6rem"
+                            @onclick="ToggleAccountsModal">
+                        LINK NOW
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm font-display"
+                            style="font-size:0.58rem;padding:0.2rem 0.6rem"
+                            @onclick="DismissLinkWarning">
+                        DISMISS
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
     <main class="flex-grow-1">
         @Body
     </main>
@@ -51,10 +75,54 @@
 @code {
     private bool _accountsModalOpen;
     private bool _loginModalOpen;
+    private LinkedAccountsResponse? _accounts;
+    private bool _showLinkWarning;
+    private string _missingProvider = "DISCORD";
+
+    protected override async Task OnInitializedAsync() {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated != true)
+            return;
+
+        try {
+            _accounts = await Api.GetLinkedAccountsAsync();
+            UpdateLinkWarning();
+        } catch {
+            // Silently fail — banner is non-critical
+        }
+    }
+
+    private void UpdateLinkWarning() {
+        if (_accounts is null) {
+            _showLinkWarning = false;
+            return;
+        }
+
+        var hasBoth = _accounts.HasDiscord && _accounts.HasTwitch;
+        var hasNeither = !_accounts.HasDiscord && !_accounts.HasTwitch;
+
+        _showLinkWarning = !hasBoth && !hasNeither && !_accounts.LinkAccountsWarningDismissed;
+        _missingProvider = _accounts.HasDiscord ? "TWITCH" : "DISCORD";
+    }
+
+    private async Task DismissLinkWarning() {
+        try {
+            await Api.DismissLinkAccountsWarningAsync();
+            if (_accounts is not null)
+                _accounts = _accounts with { LinkAccountsWarningDismissed = true };
+            UpdateLinkWarning();
+        } catch {
+            // Silently fail
+        }
+    }
 
     private void ToggleAccountsModal() => _accountsModalOpen = true;
 
-    private void CloseAccountsModal() => _accountsModalOpen = false;
+    private void CloseAccountsModal() {
+        _accountsModalOpen = false;
+        if (_accounts is not null)
+            UpdateLinkWarning();
+    }
 
     private void ToggleLoginModal() => _loginModalOpen = true;
 

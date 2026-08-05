@@ -18,6 +18,7 @@ public sealed class AppUser: EntityBase {
     public DateTime? TwitchTokenExpiresAtUtc { get; set; }
 
     public string? ActiveDisplayNameProvider { get; set; }
+    public bool LinkAccountsWarningDismissed { get; set; }
 
     public ICollection<GuildInstance> OwnedGuilds { get; set; } = [];
     public ICollection<GuildManager> ManagedGuilds { get; set; } = [];
