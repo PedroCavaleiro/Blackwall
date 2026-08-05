@@ -12,17 +12,28 @@
                 <Authorized>
                     <div class="d-flex align-items-center gap-3">
                         <span class="font-mono" style="font-size:0.68rem;letter-spacing:0.1em;color:var(--bw-muted)">
-                            @context.User.Identity?.Name?.ToUpperInvariant()
+                            @(context.User.FindFirst("display_name")?.Value?.ToUpperInvariant()
+                              ?? context.User.Identity?.Name?.ToUpperInvariant())
                         </span>
+                        <button type="button" class="btn btn-outline-secondary btn-sm font-display"
+                                style="font-size:0.62rem;padding:0.25rem 0.75rem"
+                                @onclick="ToggleAccountsModal">
+                            ACCOUNTS
+                        </button>
                         <a href="/auth/logout" class="btn btn-outline-secondary btn-sm font-display" style="font-size:0.62rem;padding:0.25rem 0.75rem">
                             DISCONNECT
                         </a>
                     </div>
                 </Authorized>
                 <NotAuthorized>
-                    <a href="/auth/login" class="btn btn-primary btn-sm cut-corner font-display" style="font-size:0.62rem;padding:0.25rem 0.9rem">
-                        JACK IN
-                    </a>
+                    <div class="d-flex align-items-center gap-2">
+                        <a href="/auth/login" class="btn btn-primary btn-sm cut-corner font-display" style="font-size:0.62rem;padding:0.25rem 0.9rem">
+                            JACK IN
+                        </a>
+                        <a href="/auth/login/twitch" class="btn btn-outline-primary btn-sm cut-corner font-display" style="font-size:0.62rem;padding:0.25rem 0.9rem">
+                            TWITCH
+                        </a>
+                    </div>
                 </NotAuthorized>
             </AuthorizeView>
         </div>
@@ -32,3 +43,15 @@
         @Body
     </main>
 </div>
+
+@if (_accountsModalOpen) {
+    <AccountsModal OnClose="CloseAccountsModal" />
+}
+
+@code {
+    private bool _accountsModalOpen;
+
+    private void ToggleAccountsModal() => _accountsModalOpen = true;
+
+    private void CloseAccountsModal() => _accountsModalOpen = false;
+}

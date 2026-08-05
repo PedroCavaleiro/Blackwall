@@ -91,6 +91,18 @@ app.MapGet("/auth/login", async (HttpContext ctx) => {
         : Results.Redirect("/?error=auth_failed");
 }).AllowAnonymous();
 
+app.MapGet("/auth/login/twitch", async (HttpContext ctx) => {
+    using var client = new HttpClient();
+    if (apiOptions.ProtectionEnabled && !string.IsNullOrEmpty(apiOptions.Key))
+        client.DefaultRequestHeaders.Add("X-API-Key", apiOptions.Key);
+    var response = await client.GetFromJsonAsync<LoginResponse>(
+        $"{apiOptions.BaseUrl.TrimEnd('/')}/api/auth/twitch");
+
+    return response?.Url is not null
+        ? Results.Redirect(response.Url)
+        : Results.Redirect("/?error=auth_failed");
+}).AllowAnonymous();
+
 app.MapGet("/auth/callback", async (string? code, string? error, HttpContext ctx) => {
     if (!string.IsNullOrEmpty(error))
         return Results.Redirect($"/?error={Uri.EscapeDataString(error)}");

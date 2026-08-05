@@ -11,23 +11,22 @@ namespace Blackwall.Api.Services;
 public sealed class JwtService(IOptions<JwtOptions> options) {
     private readonly JwtOptions _options = options.Value;
 
-    /// <summary>
-    /// Generates a signed JWT for the given user, valid for 7 days.
-    /// Includes the user's internal ID, Discord user ID, and username as claims.
-    /// The display name claim is included only when present.
-    /// </summary>
-    /// <param name="user">The user to generate a token for.</param>
-    /// <returns>A signed JWT string.</returns>
     public string GenerateToken(AppUser user) {
-        
+        var displayName = AccountLinkingService.ResolveDisplayName(user);
+
         var claims = new List<Claim> {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new("discord_user_id", user.DiscordUserId.ToString()),
             new(JwtRegisteredClaimNames.UniqueName, user.Username)
         };
 
-        if (!string.IsNullOrWhiteSpace(user.DisplayName))
-            claims.Add(new Claim("display_name", user.DisplayName));
+        if (user.DiscordUserId != 0)
+            claims.Add(new Claim("discord_user_id", user.DiscordUserId.ToString()));
+
+        if (user.TwitchUserId.HasValue)
+            claims.Add(new Claim("twitch_user_id", user.TwitchUserId.Value.ToString()));
+
+        if (!string.IsNullOrWhiteSpace(displayName))
+            claims.Add(new Claim("display_name", displayName));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

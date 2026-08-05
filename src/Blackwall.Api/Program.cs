@@ -38,6 +38,9 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.Configure<DiscordOptions>(builder.Configuration.GetSection(DiscordOptions.SectionName));
 builder.Services.AddHttpClient<DiscordOAuthService>();
 
+builder.Services.Configure<TwitchOptions>(builder.Configuration.GetSection(TwitchOptions.SectionName));
+builder.Services.AddHttpClient<TwitchOAuthService>();
+
 builder.Services.Configure<ApiOptions>(
     builder.Configuration.GetSection(ApiOptions.SectionName));
 
@@ -96,6 +99,7 @@ builder.Services.AddSingleton<InteractionHandler>();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<AuthHandoffService>();
 builder.Services.AddScoped<GuildClaimService>();
+builder.Services.AddScoped<AccountLinkingService>();
 builder.Services.AddScoped<GuildPermissionSyncService>();
 builder.Services.AddSingleton<DiscordGuildCacheService>();
 builder.Services.AddScoped<BlacklistService>();
@@ -153,6 +157,7 @@ void ScrubSecretEnvironmentVariables() {
         "REDIS__CONNECTION_STRING",
         "DISCORD__BOT_TOKEN",
         "DISCORD__CLIENT_SECRET",
+        "TWITCH__CLIENT_SECRET",
         "JWT__SECRET",
         "APP__ENC_KEY",
         "APP__ENC_IV",

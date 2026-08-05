@@ -220,6 +220,10 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("ActiveDisplayNameProvider")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone");
@@ -240,6 +244,27 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.Property<string>("DisplayName")
                         .HasColumnType("text");
 
+                    b.Property<string>("TwitchAccessToken")
+                        .HasColumnType("text");
+
+                    b.Property<string>("TwitchDisplayName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TwitchRefreshToken")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("TwitchTokenExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("TwitchUserId")
+                        .HasMaxLength(20)
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("TwitchUsername")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -248,7 +273,12 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DiscordUserId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DiscordUserId\" IS NOT NULL");
+
+                    b.HasIndex("TwitchUserId")
+                        .IsUnique()
+                        .HasFilter("\"TwitchUserId\" IS NOT NULL");
 
                     b.ToTable("AppUsers");
                 });
