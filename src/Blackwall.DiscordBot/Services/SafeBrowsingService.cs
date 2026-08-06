@@ -39,7 +39,7 @@ public sealed class SafeBrowsingService(
     /// Checks a URL against Google Safe Browsing V5 using the Real-Time Mode procedure.
     /// 1. Check if any full SHA256 hash is in the Global Cache → UNSURE (likely benign)
     /// 2. Check local cache for 4-byte prefixes → UNSAFE if full hash match
-    /// 3. Query hashes.search for remaining prefixes → UNSAFE if match
+    /// 3. Query hashes. Search for remaining prefixes → UNSAFE if match
     /// Returns SAFE, UNSAFE, or UNSURE.
     /// </summary>
     /// <param name="url">The URL to check against the Safe Browsing threat lists.</param>

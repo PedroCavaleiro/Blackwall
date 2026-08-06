@@ -10,9 +10,9 @@ using Blackwall.TwitchBot;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TwitchLib.Api;
+// ReSharper disable NullableWarningSuppressionIsUsed
 
 namespace Blackwall.Api.Controllers;
 
@@ -287,7 +287,7 @@ public sealed class TwitchChannelsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await twitchBotService.RefreshChannelsAsync();
+        await twitchBotService.RefreshChannelsAsync(cancellationToken);
 
         return NoContent();
     }
@@ -302,9 +302,12 @@ public sealed class TwitchChannelsController(
             var iv = AesCrypto.GetBytes(appConfiguration.Value.EncryptionIv);
             var accessToken = AesCrypto.DecryptString(instance.BotAccessToken, key, iv);
 
-            var api = new TwitchAPI();
-            api.Settings.ClientId = opts.ClientId;
-            api.Settings.AccessToken = accessToken;
+            var api = new TwitchAPI {
+                Settings = {
+                    ClientId = opts.ClientId,
+                    AccessToken = accessToken
+                }
+            };
 
             var botUserResponse = await api.Helix.Users.GetUsersAsync(logins: [opts.BotUsername]);
             if (botUserResponse.Users.Length == 0) {
@@ -590,7 +593,7 @@ public sealed class TwitchChannelsController(
         var existingManager = await dbContext.TwitchChannelManagers
             .Include(m => m.User)
             .FirstOrDefaultAsync(m => m.TwitchChannelInstanceId == instance.Id
-                && (m.User.TwitchUsername != null && m.User.TwitchUsername.ToLowerInvariant() == normalizedUsername),
+                && (m.User.TwitchUsername != null && m.User.TwitchUsername.Equals(normalizedUsername, StringComparison.InvariantCultureIgnoreCase)),
                 cancellationToken);
 
         if (existingManager is not null)
@@ -601,7 +604,7 @@ public sealed class TwitchChannelsController(
             });
 
         var user = await dbContext.AppUsers
-            .FirstOrDefaultAsync(u => u.TwitchUsername != null && u.TwitchUsername.ToLowerInvariant() == normalizedUsername,
+            .FirstOrDefaultAsync(u => u.TwitchUsername != null && u.TwitchUsername.Equals(normalizedUsername, StringComparison.InvariantCultureIgnoreCase),
                 cancellationToken);
 
         if (user is null)

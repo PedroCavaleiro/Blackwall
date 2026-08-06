@@ -168,7 +168,7 @@ public sealed class AiSentinelService(
 
         var log = await dbContext.AiSentinelLogs
             .Include(l => l.AiSentinelConfiguration)
-            .ThenInclude(c => c!.GuildInstance)
+            .ThenInclude(c => c.GuildInstance)
             .FirstOrDefaultAsync(l => l.Id == logId
                 && l.AiSentinelConfiguration.GuildInstance.DiscordGuildId == discordGuildId,
                 cancellationToken);
@@ -218,15 +218,14 @@ public sealed class AiSentinelService(
         using var doc = JsonDocument.Parse(json);
 
         var models = new List<AiSentinelModelDto>();
-        if (doc.RootElement.TryGetProperty("data", out var data)) {
-            foreach (var item in data.EnumerateArray()) {
-                var id = item.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
-                if (id is not null)
-                    models.Add(new AiSentinelModelDto(id, id));
-            }
+        if (!doc.RootElement.TryGetProperty("data", out var data)) return [.. models.OrderBy(m => m.Name)];
+        foreach (var item in data.EnumerateArray()) {
+            var id = item.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+            if (id is not null)
+                models.Add(new AiSentinelModelDto(id, id));
         }
 
-        return models.OrderBy(m => m.Name).ToList();
+        return [.. models.OrderBy(m => m.Name)];
     }
 
     private static async Task<IReadOnlyList<AiSentinelModelDto>> ListAnthropicModelsAsync(
@@ -272,15 +271,13 @@ public sealed class AiSentinelService(
         using var doc = JsonDocument.Parse(json);
 
         var models = new List<AiSentinelModelDto>();
-        if (doc.RootElement.TryGetProperty("models", out var modelsEl)) {
-            foreach (var item in modelsEl.EnumerateArray()) {
-                var name = item.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
-                var displayName = item.TryGetProperty("displayName", out var dnEl) ? dnEl.GetString() : name;
-                if (name is not null) {
-                    var id = name.StartsWith("models/") ? name["models/".Length..] : name;
-                    models.Add(new AiSentinelModelDto(id, displayName ?? id));
-                }
-            }
+        if (!doc.RootElement.TryGetProperty("models", out var modelsEl)) return models.OrderBy(m => m.Name).ToList();
+        foreach (var item in modelsEl.EnumerateArray()) {
+            var name = item.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
+            var displayName = item.TryGetProperty("displayName", out var dnEl) ? dnEl.GetString() : name;
+            if (name is null) continue;
+            var id = name.StartsWith("models/") ? name["models/".Length..] : name;
+            models.Add(new AiSentinelModelDto(id, displayName ?? id));
         }
 
         return models.OrderBy(m => m.Name).ToList();
@@ -288,16 +285,16 @@ public sealed class AiSentinelService(
 
     private static async Task<IReadOnlyList<AiSentinelModelDto>> ListOllamaModelsAsync(
         string? ollamaUrl,
-        string? h1k, string? h1v,
-        string? h2k, string? h2v,
-        string? h3k, string? h3v,
+        string? h1K, string? h1V,
+        string? h2K, string? h2V,
+        string? h3K, string? h3V,
         CancellationToken ct) {
         if (string.IsNullOrWhiteSpace(ollamaUrl))
             return [];
 
         var url = ollamaUrl.TrimEnd('/') + "/api/tags";
         using var req = new HttpRequestMessage(HttpMethod.Get, url);
-        ApplyOllamaHeaders(req, h1k, h1v, h2k, h2v, h3k, h3v);
+        ApplyOllamaHeaders(req, h1K, h1V, h2K, h2V, h3K, h3V);
 
         using var resp = await HttpClient.SendAsync(req, ct);
         resp.EnsureSuccessStatusCode();
@@ -454,15 +451,15 @@ public sealed class AiSentinelService(
 
     private static void ApplyOllamaHeaders(
         HttpRequestMessage req,
-        string? h1k, string? h1v,
-        string? h2k, string? h2v,
-        string? h3k, string? h3v) {
-        if (!string.IsNullOrWhiteSpace(h1k) && h1v is not null)
-            req.Headers.TryAddWithoutValidation(h1k, h1v);
-        if (!string.IsNullOrWhiteSpace(h2k) && h2v is not null)
-            req.Headers.TryAddWithoutValidation(h2k, h2v);
-        if (!string.IsNullOrWhiteSpace(h3k) && h3v is not null)
-            req.Headers.TryAddWithoutValidation(h3k, h3v);
+        string? h1K, string? h1V,
+        string? h2K, string? h2V,
+        string? h3K, string? h3V) {
+        if (!string.IsNullOrWhiteSpace(h1K) && h1V is not null)
+            req.Headers.TryAddWithoutValidation(h1K, h1V);
+        if (!string.IsNullOrWhiteSpace(h2K) && h2V is not null)
+            req.Headers.TryAddWithoutValidation(h2K, h2V);
+        if (!string.IsNullOrWhiteSpace(h3K) && h3V is not null)
+            req.Headers.TryAddWithoutValidation(h3K, h3V);
     }
 
     private static AiSentinelAnalysisResult? ParseAnalysisResponse(string? response) {

@@ -1,4 +1,5 @@
 // ReSharper disable PropertyCanBeMadeInitOnly.Global
+// ReSharper disable NullableWarningSuppressionIsUsed
 namespace Blackwall.Core.Entities;
 
 public class MessageAuditRecord : EntityBase {

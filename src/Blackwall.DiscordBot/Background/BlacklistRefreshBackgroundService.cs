@@ -42,10 +42,10 @@ public sealed class BlacklistRefreshBackgroundService(
             } catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) {
                 break;
             } catch (Exception ex) {
-                logger.LogError(ex, "Error during scheduled blacklist refresh.");
+                logger.LogError(ex, "Error during scheduled blacklist refresh");
             }
         }
 
-        logger.LogInformation("Blacklist refresh background service stopped.");
+        logger.LogInformation("Blacklist refresh background service stopped");
     }
 }

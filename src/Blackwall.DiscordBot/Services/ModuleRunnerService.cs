@@ -9,6 +9,9 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
+// ReSharper disable NotAccessedPositionalProperty.Global
+// ReSharper disable NullableWarningSuppressionIsUsed
+// ReSharper disable UnusedAutoPropertyAccessor.Global
 
 namespace Blackwall.DiscordBot.Services;
 
@@ -35,12 +38,8 @@ internal sealed class LoadedModule : IDisposable {
     }
 }
 
-internal sealed class ModuleLoadContext : AssemblyLoadContext {
-    private readonly AssemblyDependencyResolver _resolver;
-
-    public ModuleLoadContext(string modulePath) : base(isCollectible: true) {
-        _resolver = new AssemblyDependencyResolver(modulePath);
-    }
+internal sealed class ModuleLoadContext(string modulePath) : AssemblyLoadContext(isCollectible: true) {
+    private readonly AssemblyDependencyResolver _resolver = new(modulePath);
 
     protected override Assembly? Load(AssemblyName assemblyName) {
         if (assemblyName.Name?.StartsWith("Blackwall", StringComparison.OrdinalIgnoreCase) == true)

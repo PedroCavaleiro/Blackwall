@@ -54,6 +54,6 @@ public sealed class AllowedBotService(
         if (!exists)
             return false;
 
-        return await db.SetContainsAsync(key, (RedisValue)discordBotId);
+        return await db.SetContainsAsync(key, discordBotId);
     }
 }

@@ -368,11 +368,13 @@ public sealed class ModuleInstallationService(
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardError = true,
-            RedirectStandardOutput = true
+            RedirectStandardOutput = true,
+            Environment = {
+                ["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "true",
+                ["DOTNET_CLI_HOME"] = dotnetHome,
+                ["NUGET_PACKAGES"] = Path.Combine(dotnetHome, "nuget-cache")
+            }
         };
-        psi.Environment["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "true";
-        psi.Environment["DOTNET_CLI_HOME"] = dotnetHome;
-        psi.Environment["NUGET_PACKAGES"] = Path.Combine(dotnetHome, "nuget-cache");
 
         using var process = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start dotnet build process.");
         var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
@@ -382,7 +384,10 @@ public sealed class ModuleInstallationService(
         var stderr = await stderrTask;
         var output = string.IsNullOrEmpty(stderr) ? stdout : $"{stdout}\n{stderr}";
 
-        try { if (Directory.Exists(dotnetHome)) Directory.Delete(dotnetHome, recursive: true); } catch { }
+        try { if (Directory.Exists(dotnetHome)) Directory.Delete(dotnetHome, recursive: true); }
+        catch {
+            // ignored
+        }
 
         return (process.ExitCode, output);
     }

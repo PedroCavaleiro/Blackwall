@@ -25,9 +25,6 @@ public sealed class TwitchOAuthService(
     private const string TwitchApiBase = "https://api.twitch.tv/helix";
     private const string TwitchOauthBase = "https://id.twitch.tv/oauth2";
 
-    private readonly JsonSerializerOptions _serializerOptions =
-        new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
-
     public string BuildLoginUrl(string state) {
         var query = new Dictionary<string, string> {
             ["client_id"] = _options.ClientId,

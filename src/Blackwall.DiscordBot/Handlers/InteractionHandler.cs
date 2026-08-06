@@ -2,6 +2,7 @@ using Blackwall.DiscordBot.Services;
 using Discord;
 using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
+// ReSharper disable NullableWarningSuppressionIsUsed
 
 namespace Blackwall.DiscordBot.Handlers;
 

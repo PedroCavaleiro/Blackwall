@@ -5,6 +5,7 @@ using Blackwall.Core.DTOs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
+// ReSharper disable UnusedVariable
 
 namespace Blackwall.DiscordBot.Services;
 

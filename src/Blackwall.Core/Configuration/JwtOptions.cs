@@ -1,6 +1,7 @@
 // ReSharper disable NullableWarningSuppressionIsUsed
 
 using Microsoft.Extensions.Configuration;
+// ReSharper disable PropertyCanBeMadeInitOnly.Global
 
 namespace Blackwall.Core.Configuration;
 

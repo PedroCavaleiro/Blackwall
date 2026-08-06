@@ -11,7 +11,6 @@ using Blackwall.TwitchBot;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TwitchLib.Api;
 
@@ -121,7 +120,7 @@ public sealed class AuthController(
         var encryptedAccessToken = AesCrypto.EncryptString(tokens.AccessToken, key, iv);
         var encryptedRefreshToken = AesCrypto.EncryptString(tokens.RefreshToken, key, iv);
 
-        AppUser? user = null;
+        AppUser? user;
 
         if (linkToUserId.HasValue) {
             user = await dbContext.AppUsers
@@ -256,7 +255,7 @@ public sealed class AuthController(
         var encryptedAccessToken = AesCrypto.EncryptString(tokens.AccessToken, key, iv);
         var encryptedRefreshToken = AesCrypto.EncryptString(tokens.RefreshToken, key, iv);
 
-        AppUser? user = null;
+        AppUser? user;
 
         if (linkToUserId.HasValue) {
             user = await dbContext.AppUsers
@@ -430,7 +429,7 @@ public sealed class AuthController(
 
             await TryAddBotAsModeratorAsync(twitchUser.Id, tokens.AccessToken);
 
-            await twitchBotService.RefreshChannelsAsync();
+            await twitchBotService.RefreshChannelsAsync(cancellationToken);
 
             try {
                 await twitchChannelService.AutoAddManagersAsync(user.Id, tokens.AccessToken, cancellationToken);
@@ -588,9 +587,12 @@ public sealed class AuthController(
             return;
 
         try {
-            var api = new TwitchAPI();
-            api.Settings.ClientId = opts.ClientId;
-            api.Settings.AccessToken = accessToken;
+            var api = new TwitchAPI {
+                Settings = {
+                    ClientId = opts.ClientId,
+                    AccessToken = accessToken
+                }
+            };
 
             var botUserResponse = await api.Helix.Users.GetUsersAsync(logins: [opts.BotUsername]);
             if (botUserResponse.Users.Length == 0) {

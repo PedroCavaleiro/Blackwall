@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Blackwall.Core.Entities;
 using StackExchange.Redis;
+// ReSharper disable NullableWarningSuppressionIsUsed
 
 namespace Blackwall.Api.Services;
 

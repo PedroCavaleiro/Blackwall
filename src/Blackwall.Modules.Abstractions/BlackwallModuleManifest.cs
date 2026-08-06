@@ -1,3 +1,9 @@
+// ReSharper disable CollectionNeverUpdated.Global
+// ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
+// ReSharper disable NullableWarningSuppressionIsUsed
+// ReSharper disable PropertyCanBeMadeInitOnly.Global
+// ReSharper disable UnusedMember.Global
+// ReSharper disable UnusedAutoPropertyAccessor.Global
 namespace Blackwall.Modules.Abstractions;
 
 public sealed class ModuleFieldOption {

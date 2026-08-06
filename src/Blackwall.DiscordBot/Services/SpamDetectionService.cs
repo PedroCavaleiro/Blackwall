@@ -189,7 +189,7 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
 
     /// <summary>Returns true if the content contains a Discord invite link.</summary>
     /// <param name="content">The message content to check.</param>
-    /// <returns><see langword="true"/> if an invite link pattern is found; otherwise <see langword="false"/>.</returns>
+    /// <returns><see langword="true"/> if an invitation link pattern is found; otherwise <see langword="false"/>.</returns>
     private static bool ContainsInviteLink(string content) =>
         InviteLinkPattern.IsMatch(content);
 

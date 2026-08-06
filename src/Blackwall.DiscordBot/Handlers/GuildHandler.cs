@@ -31,6 +31,8 @@ public sealed class GuildHandler(
             existing.IsActive = true;
             existing.UpdatedAtUtc = DateTime.UtcNow;
 
+            // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+            // ReSharper disable once ConvertIfStatementToNullCoalescingAssignment
             if (existing.AiSentinelConfiguration is null) {
                 existing.AiSentinelConfiguration = new AiSentinelConfiguration {
                     IsEnabled = false,

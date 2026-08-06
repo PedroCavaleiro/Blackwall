@@ -1008,7 +1008,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None));
+        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None), cancellationToken);
 
         return NoContent();
     }
@@ -2064,7 +2064,7 @@ public sealed class GuildsController(
                     r.DiscordChannelId,
                     r.ChannelName,
                     r.Content,
-                    System.Text.Json.JsonSerializer.Deserialize<List<EmbedDataDto>>(r.EmbedsJson) ?? new List<EmbedDataDto>(),
+                    JsonSerializer.Deserialize<List<EmbedDataDto>>(r.EmbedsJson) ?? new List<EmbedDataDto>(),
                     r.MessageTimestampUtc
                 )).ToList()
             })

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+// ReSharper disable NotAccessedPositionalProperty.Global
 
 namespace Blackwall.Core.DTOs;
 

@@ -37,14 +37,12 @@ public sealed class TwitchChannelService(
         existing.ProfileImageUrl = twitchUser.ProfileImageUrl;
         existing.UpdatedAtUtc = DateTime.UtcNow;
 
-        if (existing.OwnerUserId is null) {
-            existing.OwnerUserId = appUserId;
-        }
+        existing.OwnerUserId ??= appUserId;
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<TwitchChannelInstance> CreateOrUpdateChannelInstanceAsync(
+    public async Task CreateOrUpdateChannelInstanceAsync(
         long appUserId,
         TwitchUserDto twitchUser,
         string? encryptedAccessToken = null,
@@ -63,8 +61,7 @@ public sealed class TwitchChannelService(
             existing.ProfileImageUrl = twitchUser.ProfileImageUrl;
             existing.IsActive = true;
             existing.UpdatedAtUtc = DateTime.UtcNow;
-            if (existing.OwnerUserId is null)
-                existing.OwnerUserId = appUserId;
+            existing.OwnerUserId ??= appUserId;
             if (encryptedAccessToken is not null) {
                 existing.BotAccessToken = encryptedAccessToken;
                 existing.BotRefreshToken = encryptedRefreshToken;
@@ -72,7 +69,7 @@ public sealed class TwitchChannelService(
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
-            return existing;
+            return;
         }
 
         var instance = new TwitchChannelInstance {
@@ -90,7 +87,6 @@ public sealed class TwitchChannelService(
 
         dbContext.TwitchChannelInstances.Add(instance);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return instance;
     }
 
     public async Task<IReadOnlyList<ManageableTwitchChannelResponse>> GetManageableChannelsAsync(
@@ -299,8 +295,9 @@ public sealed class TwitchChannelService(
                     UserId = appUserId,
                     IsAdmin = false
                 });
-            } catch {
-                continue;
+            }
+            catch {
+                // ignored
             }
         }
 

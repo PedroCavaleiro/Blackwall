@@ -3,6 +3,7 @@ using Blackwall.Core.DTOs;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
+// ReSharper disable NullableWarningSuppressionIsUsed
 
 namespace Blackwall.Infrastructure.Cache.Discord;
 

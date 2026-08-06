@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace Blackwall.Core.DTOs;
 
 public sealed record DiscordUserDto(

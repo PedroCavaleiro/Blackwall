@@ -1,3 +1,4 @@
+// ReSharper disable NotAccessedPositionalProperty.Global
 namespace Blackwall.Modules.Abstractions;
 
 public sealed record ModuleAttachment(

@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+// ReSharper disable UnusedMember.Local
+// ReSharper disable NullableWarningSuppressionIsUsed
 
 namespace Blackwall.Infrastructure.Cache.Discord;
 
