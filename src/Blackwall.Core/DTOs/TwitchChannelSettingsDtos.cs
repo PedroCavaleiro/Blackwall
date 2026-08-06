@@ -1,3 +1,5 @@
+using Blackwall.Core.Entities;
+
 namespace Blackwall.Core.DTOs;
 
 public sealed record TwitchChannelSettingsResponse(
@@ -10,14 +12,36 @@ public sealed record TwitchChannelSettingsResponse(
     bool IsEnabled,
     bool IsDryRun,
     bool AutoAddManagers,
-    string CommandTrigger
+    string CommandTrigger,
+    int MaxMessagesPerWindow,
+    int RateLimitWindowSeconds,
+    int DuplicateMessageThreshold,
+    int DuplicateWindowSeconds,
+    int MentionLimit,
+    InfractionAction RateLimitAction,
+    int RateLimitTimeoutMinutes,
+    InfractionAction DuplicateAction,
+    int DuplicateTimeoutMinutes,
+    InfractionAction MentionLimitAction,
+    int MentionLimitTimeoutMinutes
 );
 
 public sealed record UpdateTwitchChannelSettingsRequest(
     bool IsEnabled,
     bool IsDryRun,
     bool AutoAddManagers,
-    string CommandTrigger
+    string CommandTrigger,
+    int MaxMessagesPerWindow,
+    int RateLimitWindowSeconds,
+    int DuplicateMessageThreshold,
+    int DuplicateWindowSeconds,
+    int MentionLimit,
+    InfractionAction RateLimitAction,
+    int RateLimitTimeoutMinutes,
+    InfractionAction DuplicateAction,
+    int DuplicateTimeoutMinutes,
+    InfractionAction MentionLimitAction,
+    int MentionLimitTimeoutMinutes
 );
 
 public sealed record TwitchAllowedBotResponse(

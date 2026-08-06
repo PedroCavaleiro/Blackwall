@@ -1,0 +1,118 @@
+@using Blackwall.Core.Entities
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">DETECTION MATRIX</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">Controls how the barrier detects and neutralizes spam, duplicate floods, and mass-mention attacks in Twitch chat. Each filter runs independently and stacks with the infraction action set below.</p>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Rate limit window (seconds)</div>
+                <div class="form-text">Rolling time window in which messages from a single user are counted. The counter resets once the window expires with no new messages.</div>
+            </div>
+            <InputNumber class="form-control bw-input-narrow" @bind-Value="Form.RateLimitWindowSeconds" />
+        </div>
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Max messages per window</div>
+                <div class="form-text">Maximum messages a user may send within the rate limit window. The next message after this limit triggers an infraction. Set to 0 to disable rate limiting.</div>
+            </div>
+            <InputNumber class="form-control bw-input-narrow" @bind-Value="Form.MaxMessagesPerWindow" />
+        </div>
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Duplicate threshold</div>
+                <div class="form-text">Number of identical messages a user must send within the duplicate window before the filter trips. Set to 0 to disable duplicate detection.</div>
+            </div>
+            <InputNumber class="form-control bw-input-narrow" @bind-Value="Form.DuplicateMessageThreshold" />
+        </div>
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Duplicate window (seconds)</div>
+                <div class="form-text">How long identical message hashes are remembered per user. Shorter windows catch burst spam; longer windows catch slow repeated floods. Range: 1–300 s.</div>
+            </div>
+            <InputNumber class="form-control bw-input-narrow" min="1" max="300" @bind-Value="Form.DuplicateWindowSeconds" />
+        </div>
+        <div class="bw-field bw-field-last">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Mention limit</div>
+                <div class="form-text">Maximum @@mentions allowed in a single message. Messages exceeding this are flagged as mass-ping spam. Set to 0 to disable.</div>
+            </div>
+            <InputNumber class="form-control bw-input-narrow" @bind-Value="Form.MentionLimit" />
+        </div>
+    </div>
+</div>
+
+<div class="cut-corner border mb-4 bw-card-danger">
+    <div class="card-header bw-header-danger">MODULE ACTIONS</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">Configure the action for each detection module independently. Twitch supports delete, timeout, and ban.</p>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Rate limit &mdash; action</div>
+                <div class="form-text">Action taken when a user exceeds the message rate limit.</div>
+            </div>
+            <InputSelect class="form-select bw-input-select" @bind-Value="Form.RateLimitAction">
+                <option value="@InfractionAction.DeleteOnly">Delete only</option>
+                <option value="@InfractionAction.Timeout">Timeout</option>
+                <option value="@InfractionAction.Ban">Ban</option>
+            </InputSelect>
+        </div>
+        @if (Form.RateLimitAction is InfractionAction.Timeout) {
+            <div class="bw-field">
+                <div class="bw-field-label">
+                    <div class="form-label mb-1">Rate limit &mdash; timeout (minutes)</div>
+                    <div class="form-text">How long the user is timed out. Minimum: 1 minute.</div>
+                </div>
+                <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="Form.RateLimitTimeoutMinutes" />
+            </div>
+        }
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Duplicate &mdash; action</div>
+                <div class="form-text">Action taken when a user sends duplicate messages.</div>
+            </div>
+            <InputSelect class="form-select bw-input-select" @bind-Value="Form.DuplicateAction">
+                <option value="@InfractionAction.DeleteOnly">Delete only</option>
+                <option value="@InfractionAction.Timeout">Timeout</option>
+                <option value="@InfractionAction.Ban">Ban</option>
+            </InputSelect>
+        </div>
+        @if (Form.DuplicateAction is InfractionAction.Timeout) {
+            <div class="bw-field">
+                <div class="bw-field-label">
+                    <div class="form-label mb-1">Duplicate &mdash; timeout (minutes)</div>
+                    <div class="form-text">How long the user is timed out. Minimum: 1 minute.</div>
+                </div>
+                <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="Form.DuplicateTimeoutMinutes" />
+            </div>
+        }
+
+        <div class="bw-field bw-field-last">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Mention limit &mdash; action</div>
+                <div class="form-text">Action taken when a user exceeds the mention limit.</div>
+            </div>
+            <InputSelect class="form-select bw-input-select" @bind-Value="Form.MentionLimitAction">
+                <option value="@InfractionAction.DeleteOnly">Delete only</option>
+                <option value="@InfractionAction.Timeout">Timeout</option>
+                <option value="@InfractionAction.Ban">Ban</option>
+            </InputSelect>
+        </div>
+        @if (Form.MentionLimitAction is InfractionAction.Timeout) {
+            <div class="bw-field bw-field-last">
+                <div class="bw-field-label">
+                    <div class="form-label mb-1">Mention limit &mdash; timeout (minutes)</div>
+                    <div class="form-text">How long the user is timed out. Minimum: 1 minute.</div>
+                </div>
+                <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="Form.MentionLimitTimeoutMinutes" />
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required TwitchChannelConfigForm Form { get; set; }
+}

@@ -58,6 +58,7 @@
                     <div class="bw-sidebar-header font-mono">MODULES</div>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "general" ? "active" : "")" @onclick='() => _activeTab = "general"'>GENERAL</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "managers" ? "active" : "")" @onclick='() => _activeTab = "managers"'>MANAGERS</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "detection" ? "active" : "")" @onclick='() => _activeTab = "detection"'>DETECTION</button>
                 </nav>
 
                 <div class="bw-sidebar-content">
@@ -65,6 +66,8 @@
                         <TwitchGeneralTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
                     } else if (_activeTab == "managers") {
                         <TwitchManagersTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
+                    } else if (_activeTab == "detection") {
+                        <TwitchDetectionTab Form="Form" />
                     }
 
                     <div class="d-flex align-items-center gap-3 mt-2">
@@ -143,6 +146,17 @@
                 Form.IsDryRun = _settings.IsDryRun;
                 Form.AutoAddManagers = _settings.AutoAddManagers;
                 Form.CommandTrigger = _settings.CommandTrigger;
+                Form.MaxMessagesPerWindow = _settings.MaxMessagesPerWindow;
+                Form.RateLimitWindowSeconds = _settings.RateLimitWindowSeconds;
+                Form.DuplicateMessageThreshold = _settings.DuplicateMessageThreshold;
+                Form.DuplicateWindowSeconds = _settings.DuplicateWindowSeconds;
+                Form.MentionLimit = _settings.MentionLimit;
+                Form.RateLimitAction = _settings.RateLimitAction;
+                Form.RateLimitTimeoutMinutes = _settings.RateLimitTimeoutMinutes;
+                Form.DuplicateAction = _settings.DuplicateAction;
+                Form.DuplicateTimeoutMinutes = _settings.DuplicateTimeoutMinutes;
+                Form.MentionLimitAction = _settings.MentionLimitAction;
+                Form.MentionLimitTimeoutMinutes = _settings.MentionLimitTimeoutMinutes;
             }
         } catch {
             _settings = null;
@@ -169,7 +183,18 @@
                 Form.IsEnabled,
                 Form.IsDryRun,
                 Form.AutoAddManagers,
-                Form.CommandTrigger
+                Form.CommandTrigger,
+                Form.MaxMessagesPerWindow,
+                Form.RateLimitWindowSeconds,
+                Form.DuplicateMessageThreshold,
+                Form.DuplicateWindowSeconds,
+                Form.MentionLimit,
+                Form.RateLimitAction,
+                Form.RateLimitTimeoutMinutes,
+                Form.DuplicateAction,
+                Form.DuplicateTimeoutMinutes,
+                Form.MentionLimitAction,
+                Form.MentionLimitTimeoutMinutes
             ));
             _saved = true;
             _isDirty = false;

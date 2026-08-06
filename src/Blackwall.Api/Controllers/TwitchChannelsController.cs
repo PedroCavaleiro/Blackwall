@@ -167,7 +167,18 @@ public sealed class TwitchChannelsController(
             config.IsEnabled,
             config.IsDryRun,
             config.AutoAddManagers,
-            config.CommandTrigger
+            config.CommandTrigger,
+            config.MaxMessagesPerWindow,
+            config.RateLimitWindowSeconds,
+            config.DuplicateMessageThreshold,
+            config.DuplicateWindowSeconds,
+            config.MentionLimit,
+            config.RateLimitAction,
+            config.RateLimitTimeoutMinutes,
+            config.DuplicateAction,
+            config.DuplicateTimeoutMinutes,
+            config.MentionLimitAction,
+            config.MentionLimitTimeoutMinutes
         ));
     }
 
@@ -226,6 +237,17 @@ public sealed class TwitchChannelsController(
         config.IsDryRun = request.IsDryRun;
         config.AutoAddManagers = request.AutoAddManagers;
         config.CommandTrigger = request.CommandTrigger;
+        config.MaxMessagesPerWindow = request.MaxMessagesPerWindow;
+        config.RateLimitWindowSeconds = request.RateLimitWindowSeconds;
+        config.DuplicateMessageThreshold = request.DuplicateMessageThreshold;
+        config.DuplicateWindowSeconds = request.DuplicateWindowSeconds;
+        config.MentionLimit = request.MentionLimit;
+        config.RateLimitAction = request.RateLimitAction;
+        config.RateLimitTimeoutMinutes = request.RateLimitTimeoutMinutes;
+        config.DuplicateAction = request.DuplicateAction;
+        config.DuplicateTimeoutMinutes = request.DuplicateTimeoutMinutes;
+        config.MentionLimitAction = request.MentionLimitAction;
+        config.MentionLimitTimeoutMinutes = request.MentionLimitTimeoutMinutes;
         config.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -243,7 +265,18 @@ public sealed class TwitchChannelsController(
             config.IsEnabled,
             config.IsDryRun,
             config.AutoAddManagers,
-            config.CommandTrigger
+            config.CommandTrigger,
+            config.MaxMessagesPerWindow,
+            config.RateLimitWindowSeconds,
+            config.DuplicateMessageThreshold,
+            config.DuplicateWindowSeconds,
+            config.MentionLimit,
+            config.RateLimitAction,
+            config.RateLimitTimeoutMinutes,
+            config.DuplicateAction,
+            config.DuplicateTimeoutMinutes,
+            config.MentionLimitAction,
+            config.MentionLimitTimeoutMinutes
         ));
     }
 

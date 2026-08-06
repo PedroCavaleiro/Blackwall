@@ -26,6 +26,7 @@ public sealed class TwitchBotService(
     BlackwallDbContext dbContext,
     IOptions<TwitchOptions> twitchOptions,
     IOptions<AppConfiguration> appConfig,
+    TwitchSpamDetectionService spamDetectionService,
     ILogger<TwitchBotService> logger
 )
     : IAsyncDisposable {
@@ -48,7 +49,21 @@ public sealed class TwitchBotService(
 
     public event EventHandler<OnMessageReceivedArgs>? OnMessageReceived;
 
-    private record ChannelRecord(long TwitchUserId, string Username, string AccessToken, string CommandTrigger, bool IsEnabled, bool IsDryRun);
+    private record ChannelRecord(long TwitchUserId, string Username, string AccessToken, string CommandTrigger, bool IsEnabled, bool IsDryRun, TwitchDetectionConfig? DetectionConfig);
+
+    public record TwitchDetectionConfig(
+        int MaxMessagesPerWindow,
+        int RateLimitWindowSeconds,
+        int DuplicateMessageThreshold,
+        int DuplicateWindowSeconds,
+        int MentionLimit,
+        InfractionAction RateLimitAction,
+        int RateLimitTimeoutMinutes,
+        InfractionAction DuplicateAction,
+        int DuplicateTimeoutMinutes,
+        InfractionAction MentionLimitAction,
+        int MentionLimitTimeoutMinutes
+    );
 
     private record TwitchTokenResponse(
         [property: System.Text.Json.Serialization.JsonPropertyName("access_token")] string AccessToken,
@@ -140,7 +155,7 @@ public sealed class TwitchBotService(
 
         foreach (var ch in channels) {
             var decryptedToken = DecryptToken(ch.BotAccessToken!);
-            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch));
+            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch), GetDetectionConfig(ch));
             _channelNameToUserId[ch.Username.ToLowerInvariant()] = ch.TwitchUserId;
         }
 
@@ -170,7 +185,7 @@ public sealed class TwitchBotService(
 
         foreach (var ch in toJoin) {
             var decryptedToken = DecryptToken(ch.BotAccessToken!);
-            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch));
+            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch), GetDetectionConfig(ch));
             _channelNameToUserId[ch.Username.ToLowerInvariant()] = ch.TwitchUserId;
 
             await _client.JoinChannelAsync(ch.Username);
@@ -281,6 +296,61 @@ public sealed class TwitchBotService(
         if (!_channels.TryGetValue(broadcasterId, out var record) || !record.IsEnabled)
             return;
 
+        if (e.ChatMessage.UserId == _botUserId)
+            return;
+
+        var detectionConfig = record.DetectionConfig;
+        if (detectionConfig is not null) {
+            var twitchUserId = long.Parse(e.ChatMessage.UserId);
+            var violations = new List<(string Type, InfractionAction Action, int TimeoutMinutes)>(3);
+
+            if (detectionConfig.MaxMessagesPerWindow > 0 && detectionConfig.RateLimitWindowSeconds > 0) {
+                if (await spamDetectionService.IsRateLimitedAsync(
+                        broadcasterId, twitchUserId, e.ChatMessage.Id,
+                        detectionConfig.MaxMessagesPerWindow, detectionConfig.RateLimitWindowSeconds)) {
+                    violations.Add(("rate_limit", detectionConfig.RateLimitAction, detectionConfig.RateLimitTimeoutMinutes));
+                }
+            }
+
+            if (detectionConfig.DuplicateMessageThreshold > 0) {
+                if (await spamDetectionService.IsDuplicateAsync(
+                        broadcasterId, twitchUserId, e.ChatMessage.Id,
+                        e.ChatMessage.Message,
+                        detectionConfig.DuplicateMessageThreshold, detectionConfig.DuplicateWindowSeconds)) {
+                    violations.Add(("duplicate", detectionConfig.DuplicateAction, detectionConfig.DuplicateTimeoutMinutes));
+                }
+            }
+
+            if (detectionConfig.MentionLimit > 0) {
+                if (TwitchSpamDetectionService.ExceedsMentionLimit(e.ChatMessage.Message, detectionConfig.MentionLimit)) {
+                    violations.Add(("mention_limit", detectionConfig.MentionLimitAction, detectionConfig.MentionLimitTimeoutMinutes));
+                }
+            }
+
+            if (violations.Count > 0) {
+                var violationSummary = string.Join(", ", violations.Select(v => v.Type));
+                var (effectiveAction, effectiveTimeout) = GetMostSevereViolation(violations);
+
+                logger.LogInformation(
+                    "Spam detected in channel {BroadcasterId} from user {UserId}: {Violations} (DryRun={DryRun}, Action={Action})",
+                    broadcasterId, twitchUserId, violationSummary, record.IsDryRun, effectiveAction);
+
+                if (!record.IsDryRun) {
+                    try {
+                        await DeleteMessageAsync(broadcasterId, e.ChatMessage.Id);
+                    } catch (Exception ex) {
+                        logger.LogWarning(ex,
+                            "Failed to delete spam message {MessageId} in channel {BroadcasterId}",
+                            e.ChatMessage.Id, broadcasterId);
+                    }
+
+                    await ApplyDetectionActionAsync(broadcasterId, twitchUserId, effectiveAction, effectiveTimeout);
+                }
+
+                return;
+            }
+        }
+
         var trigger = record.CommandTrigger;
         if (!e.ChatMessage.Message.StartsWith(trigger, StringComparison.Ordinal))
             return;
@@ -326,6 +396,69 @@ public sealed class TwitchBotService(
 
     private static bool GetIsDryRun(TwitchChannelInstance ch) =>
         ch.Configuration?.IsDryRun ?? false;
+
+    private static TwitchDetectionConfig? GetDetectionConfig(TwitchChannelInstance ch) {
+        var config = ch.Configuration;
+        if (config is null)
+            return null;
+
+        if (config.MaxMessagesPerWindow <= 0
+            && config.RateLimitWindowSeconds <= 0
+            && config.DuplicateMessageThreshold <= 0
+            && config.MentionLimit <= 0)
+            return null;
+
+        return new TwitchDetectionConfig(
+            config.MaxMessagesPerWindow,
+            config.RateLimitWindowSeconds,
+            config.DuplicateMessageThreshold,
+            config.DuplicateWindowSeconds,
+            config.MentionLimit,
+            config.RateLimitAction,
+            config.RateLimitTimeoutMinutes,
+            config.DuplicateAction,
+            config.DuplicateTimeoutMinutes,
+            config.MentionLimitAction,
+            config.MentionLimitTimeoutMinutes
+        );
+    }
+
+    private static (InfractionAction Action, int TimeoutMinutes) GetMostSevereViolation(
+        List<(string Type, InfractionAction Action, int TimeoutMinutes)> violations
+    ) {
+        var worst = violations[0];
+        foreach (var v in violations) {
+            if (v.Action > worst.Action)
+                worst = v;
+        }
+        return (worst.Action, worst.TimeoutMinutes);
+    }
+
+    private async Task ApplyDetectionActionAsync(
+        long broadcasterId, long twitchUserId, InfractionAction action, int timeoutMinutes
+    ) {
+        try {
+            switch (action) {
+                case InfractionAction.Timeout:
+                    await TimeoutUserAsync(broadcasterId, twitchUserId, timeoutMinutes * 60);
+                    break;
+                case InfractionAction.Ban:
+                case InfractionAction.SoftBan:
+                    await BanUserAsync(broadcasterId, twitchUserId);
+                    break;
+                case InfractionAction.Kick:
+                    await DeleteMessageAsync(broadcasterId, twitchUserId.ToString());
+                    break;
+                case InfractionAction.DeleteOnly:
+                default:
+                    break;
+            }
+        } catch (Exception ex) {
+            logger.LogWarning(ex,
+                "Failed to apply detection action {Action} to user {UserId} in channel {BroadcasterId}",
+                action, twitchUserId, broadcasterId);
+        }
+    }
 
     private string DecryptToken(string encrypted) {
         return AesCrypto.DecryptString(encrypted, _encKey!, _encIv!);
