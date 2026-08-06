@@ -26,6 +26,8 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<TwitchChannelManager> TwitchChannelManagers => Set<TwitchChannelManager>();
     public DbSet<TwitchChannelConfiguration> TwitchChannelConfigurations => Set<TwitchChannelConfiguration>();
     public DbSet<TwitchAllowedBot> TwitchAllowedBots => Set<TwitchAllowedBot>();
+    public DbSet<TwitchChannelBlacklist> TwitchChannelBlacklists => Set<TwitchChannelBlacklist>();
+    public DbSet<TwitchChannelDomainRule> TwitchChannelDomainRules => Set<TwitchChannelDomainRule>();
     public DbSet<TwitchRemovedManager> TwitchRemovedManagers => Set<TwitchRemovedManager>();
 
     /// <inheritdoc/>
@@ -728,6 +730,34 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .WithOne(e => e.TwitchChannelConfiguration)
                   .HasForeignKey(e => e.TwitchChannelConfigurationId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.Blacklists)
+                  .WithOne(e => e.TwitchChannelConfiguration)
+                  .HasForeignKey(e => e.TwitchChannelConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.DomainRules)
+                  .WithOne(e => e.TwitchChannelConfiguration)
+                  .HasForeignKey(e => e.TwitchChannelConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TwitchChannelBlacklist>(entity => {
+            entity.Property(e => e.Url)
+                  .IsRequired()
+                  .HasMaxLength(2000);
+
+            entity.HasIndex(e => new { e.TwitchChannelConfigurationId, e.Url })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<TwitchChannelDomainRule>(entity => {
+            entity.Property(e => e.Rule)
+                  .IsRequired()
+                  .HasMaxLength(500);
+
+            entity.HasIndex(e => new { e.TwitchChannelConfigurationId, e.Rule })
+                  .IsUnique();
         });
 
         modelBuilder.Entity<TwitchAllowedBot>(entity => {

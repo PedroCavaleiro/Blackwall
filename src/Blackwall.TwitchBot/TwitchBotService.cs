@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Blackwall.Core.Configuration;
 using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
@@ -22,11 +23,13 @@ using TwitchLib.Api.Helix.Models.Moderation.BanUser;
 
 namespace Blackwall.TwitchBot;
 
-public sealed class TwitchBotService(
+public sealed partial class TwitchBotService(
     BlackwallDbContext dbContext,
     IOptions<TwitchOptions> twitchOptions,
     IOptions<AppConfiguration> appConfig,
     TwitchSpamDetectionService spamDetectionService,
+    TwitchLinkDetectionService linkDetectionService,
+    ISafeBrowsingService safeBrowsingService,
     ILogger<TwitchBotService> logger
 )
     : IAsyncDisposable {
@@ -49,7 +52,7 @@ public sealed class TwitchBotService(
 
     public event EventHandler<OnMessageReceivedArgs>? OnMessageReceived;
 
-    private record ChannelRecord(long TwitchUserId, string Username, string AccessToken, string CommandTrigger, bool IsEnabled, bool IsDryRun, TwitchDetectionConfig? DetectionConfig);
+    private record ChannelRecord(long TwitchUserId, string Username, string AccessToken, string CommandTrigger, bool IsEnabled, bool IsDryRun, TwitchDetectionConfig? DetectionConfig, TwitchLinkConfig? LinkConfig);
 
     public record TwitchDetectionConfig(
         int MaxMessagesPerWindow,
@@ -63,6 +66,15 @@ public sealed class TwitchBotService(
         int DuplicateTimeoutMinutes,
         InfractionAction MentionLimitAction,
         int MentionLimitTimeoutMinutes
+    );
+
+    public record TwitchLinkConfig(
+        bool BlockSuspiciousLinks,
+        bool LinkWhitelistMode,
+        bool SafeBrowsingEnabled,
+        bool SafeBrowsingBlockUnsure,
+        InfractionAction SuspiciousLinkAction,
+        int SuspiciousLinkTimeoutMinutes
     );
 
     private record TwitchTokenResponse(
@@ -155,7 +167,7 @@ public sealed class TwitchBotService(
 
         foreach (var ch in channels) {
             var decryptedToken = DecryptToken(ch.BotAccessToken!);
-            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch), GetDetectionConfig(ch));
+            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch), GetDetectionConfig(ch), GetLinkConfig(ch));
             _channelNameToUserId[ch.Username.ToLowerInvariant()] = ch.TwitchUserId;
         }
 
@@ -185,7 +197,7 @@ public sealed class TwitchBotService(
 
         foreach (var ch in toJoin) {
             var decryptedToken = DecryptToken(ch.BotAccessToken!);
-            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch), GetDetectionConfig(ch));
+            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch), GetDetectionConfig(ch), GetLinkConfig(ch));
             _channelNameToUserId[ch.Username.ToLowerInvariant()] = ch.TwitchUserId;
 
             await _client.JoinChannelAsync(ch.Username);
@@ -351,6 +363,57 @@ public sealed class TwitchBotService(
             }
         }
 
+        var linkConfig = record.LinkConfig;
+        if (linkConfig is not null && linkConfig.BlockSuspiciousLinks) {
+            var twitchUserId2 = long.Parse(e.ChatMessage.UserId);
+            var linkBlocked = false;
+            var linkViolation = "suspicious_link";
+
+            var urls = UrlRegex().Matches(e.ChatMessage.Message);
+            if (urls.Count > 0) {
+                foreach (Match match in urls) {
+                    var url = match.Value;
+                    if (await linkDetectionService.IsLinkBlockedAsync(broadcasterId, url)) {
+                        linkBlocked = true;
+                        break;
+                    }
+                }
+
+                if (!linkBlocked && linkConfig.SafeBrowsingEnabled) {
+                    foreach (Match match in urls) {
+                        var url = match.Value;
+                        var sbResult = await safeBrowsingService.CheckUrlAsync(url);
+                        if (sbResult == SafeBrowsingResult.Unsafe
+                            || (sbResult == SafeBrowsingResult.Unsure && linkConfig.SafeBrowsingBlockUnsure)) {
+                            linkBlocked = true;
+                            linkViolation = "safe_browsing";
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (linkBlocked) {
+                logger.LogInformation(
+                    "Link violation in channel {BroadcasterId} from user {UserId}: {Violation} (DryRun={DryRun}, Action={Action})",
+                    broadcasterId, twitchUserId2, linkViolation, record.IsDryRun, linkConfig.SuspiciousLinkAction);
+
+                if (!record.IsDryRun) {
+                    try {
+                        await DeleteMessageAsync(broadcasterId, e.ChatMessage.Id);
+                    } catch (Exception ex) {
+                        logger.LogWarning(ex,
+                            "Failed to delete link violation message {MessageId} in channel {BroadcasterId}",
+                            e.ChatMessage.Id, broadcasterId);
+                    }
+
+                    await ApplyDetectionActionAsync(broadcasterId, twitchUserId2, linkConfig.SuspiciousLinkAction, linkConfig.SuspiciousLinkTimeoutMinutes);
+                }
+
+                return;
+            }
+        }
+
         var trigger = record.CommandTrigger;
         if (!e.ChatMessage.Message.StartsWith(trigger, StringComparison.Ordinal))
             return;
@@ -420,6 +483,21 @@ public sealed class TwitchBotService(
             config.DuplicateTimeoutMinutes,
             config.MentionLimitAction,
             config.MentionLimitTimeoutMinutes
+        );
+    }
+
+    private static TwitchLinkConfig? GetLinkConfig(TwitchChannelInstance ch) {
+        var config = ch.Configuration;
+        if (config is null || !config.BlockSuspiciousLinks)
+            return null;
+
+        return new TwitchLinkConfig(
+            config.BlockSuspiciousLinks,
+            config.LinkWhitelistMode,
+            config.SafeBrowsingEnabled,
+            config.SafeBrowsingBlockUnsure,
+            config.SuspiciousLinkAction,
+            config.SuspiciousLinkTimeoutMinutes
         );
     }
 
@@ -617,4 +695,7 @@ public sealed class TwitchBotService(
         _client = null;
         _tokenHttp.Dispose();
     }
+
+    [GeneratedRegex(@"(?:https?://)?[a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?)+(?:/[^\s]*)?", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
+    private static partial Regex UrlRegex();
 }

@@ -1,7 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
-using Blackwall.DiscordBot.Services.SafeBrowsingProto;
 using Blackwall.Core.Configuration;
+using Blackwall.Core.Services;
+using Blackwall.DiscordBot.Services.SafeBrowsingProto;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
@@ -9,21 +10,12 @@ using StackExchange.Redis;
 
 namespace Blackwall.DiscordBot.Services;
 
-/// <summary>
-/// Result of a Safe Browsing URL check.
-/// </summary>
-public enum SafeBrowsingResult {
-    Safe,
-    Unsafe,
-    Unsure
-}
-
 public sealed class SafeBrowsingService(
     IConnectionMultiplexer redis,
     IOptions<SafeBrowsingOptions> options,
     SafeBrowsingSyncService syncService,
     ILogger<SafeBrowsingService> logger
-) {
+) : ISafeBrowsingService {
     private const string CacheKeyPrefix = "sb:hash:";
     private static readonly TimeSpan DefaultCacheTtl = TimeSpan.FromMinutes(5);
 

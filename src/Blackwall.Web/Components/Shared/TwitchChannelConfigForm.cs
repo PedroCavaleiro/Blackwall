@@ -22,4 +22,11 @@ public sealed class TwitchChannelConfigForm {
 
     public InfractionAction MentionLimitAction { get; set; } = InfractionAction.Timeout;
     public int MentionLimitTimeoutMinutes { get; set; } = 10;
+
+    public bool BlockSuspiciousLinks { get; set; }
+    public bool LinkWhitelistMode { get; set; }
+    public bool SafeBrowsingEnabled { get; set; }
+    public bool SafeBrowsingBlockUnsure { get; set; }
+    public InfractionAction SuspiciousLinkAction { get; set; } = InfractionAction.Timeout;
+    public int SuspiciousLinkTimeoutMinutes { get; set; } = 10;
 }

@@ -23,7 +23,13 @@ public sealed record TwitchChannelSettingsResponse(
     InfractionAction DuplicateAction,
     int DuplicateTimeoutMinutes,
     InfractionAction MentionLimitAction,
-    int MentionLimitTimeoutMinutes
+    int MentionLimitTimeoutMinutes,
+    bool BlockSuspiciousLinks,
+    bool LinkWhitelistMode,
+    bool SafeBrowsingEnabled,
+    bool SafeBrowsingBlockUnsure,
+    InfractionAction SuspiciousLinkAction,
+    int SuspiciousLinkTimeoutMinutes
 );
 
 public sealed record UpdateTwitchChannelSettingsRequest(
@@ -41,7 +47,13 @@ public sealed record UpdateTwitchChannelSettingsRequest(
     InfractionAction DuplicateAction,
     int DuplicateTimeoutMinutes,
     InfractionAction MentionLimitAction,
-    int MentionLimitTimeoutMinutes
+    int MentionLimitTimeoutMinutes,
+    bool BlockSuspiciousLinks,
+    bool LinkWhitelistMode,
+    bool SafeBrowsingEnabled,
+    bool SafeBrowsingBlockUnsure,
+    InfractionAction SuspiciousLinkAction,
+    int SuspiciousLinkTimeoutMinutes
 );
 
 public sealed record TwitchAllowedBotResponse(
@@ -64,4 +76,22 @@ public sealed record TwitchChannelManagerResponse(
 
 public sealed record AddTwitchChannelManagerRequest(
     string Username
+);
+
+public sealed record TwitchChannelBlacklistResponse(
+    long Id,
+    string Url
+);
+
+public sealed record AddTwitchChannelBlacklistRequest(
+    string Url
+);
+
+public sealed record TwitchChannelDomainRuleResponse(
+    long Id,
+    string Rule
+);
+
+public sealed record AddTwitchChannelDomainRuleRequest(
+    string Rule
 );

@@ -59,6 +59,7 @@
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "general" ? "active" : "")" @onclick='() => _activeTab = "general"'>GENERAL</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "managers" ? "active" : "")" @onclick='() => _activeTab = "managers"'>MANAGERS</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "detection" ? "active" : "")" @onclick='() => _activeTab = "detection"'>DETECTION</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "links" ? "active" : "")" @onclick='() => _activeTab = "links"'>LINKS</button>
                 </nav>
 
                 <div class="bw-sidebar-content">
@@ -68,6 +69,8 @@
                         <TwitchManagersTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
                     } else if (_activeTab == "detection") {
                         <TwitchDetectionTab Form="Form" />
+                    } else if (_activeTab == "links") {
+                        <TwitchLinksTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
                     }
 
                     <div class="d-flex align-items-center gap-3 mt-2">
@@ -157,6 +160,12 @@
                 Form.DuplicateTimeoutMinutes = _settings.DuplicateTimeoutMinutes;
                 Form.MentionLimitAction = _settings.MentionLimitAction;
                 Form.MentionLimitTimeoutMinutes = _settings.MentionLimitTimeoutMinutes;
+                Form.BlockSuspiciousLinks = _settings.BlockSuspiciousLinks;
+                Form.LinkWhitelistMode = _settings.LinkWhitelistMode;
+                Form.SafeBrowsingEnabled = _settings.SafeBrowsingEnabled;
+                Form.SafeBrowsingBlockUnsure = _settings.SafeBrowsingBlockUnsure;
+                Form.SuspiciousLinkAction = _settings.SuspiciousLinkAction;
+                Form.SuspiciousLinkTimeoutMinutes = _settings.SuspiciousLinkTimeoutMinutes;
             }
         } catch {
             _settings = null;
@@ -194,7 +203,13 @@
                 Form.DuplicateAction,
                 Form.DuplicateTimeoutMinutes,
                 Form.MentionLimitAction,
-                Form.MentionLimitTimeoutMinutes
+                Form.MentionLimitTimeoutMinutes,
+                Form.BlockSuspiciousLinks,
+                Form.LinkWhitelistMode,
+                Form.SafeBrowsingEnabled,
+                Form.SafeBrowsingBlockUnsure,
+                Form.SuspiciousLinkAction,
+                Form.SuspiciousLinkTimeoutMinutes
             ));
             _saved = true;
             _isDirty = false;

@@ -23,6 +23,7 @@ public sealed class TwitchChannelsController(
     TwitchOAuthService twitchOAuthService,
     TwitchChannelService twitchChannelService,
     TwitchBotService twitchBotService,
+    TwitchLinkDetectionService linkDetectionService,
     BlackwallDbContext dbContext,
     IOptions<TwitchOptions> twitchOptions,
     IOptions<AppConfiguration> appConfiguration,
@@ -178,7 +179,13 @@ public sealed class TwitchChannelsController(
             config.DuplicateAction,
             config.DuplicateTimeoutMinutes,
             config.MentionLimitAction,
-            config.MentionLimitTimeoutMinutes
+            config.MentionLimitTimeoutMinutes,
+            config.BlockSuspiciousLinks,
+            config.LinkWhitelistMode,
+            config.SafeBrowsingEnabled,
+            config.SafeBrowsingBlockUnsure,
+            config.SuspiciousLinkAction,
+            config.SuspiciousLinkTimeoutMinutes
         ));
     }
 
@@ -248,6 +255,12 @@ public sealed class TwitchChannelsController(
         config.DuplicateTimeoutMinutes = request.DuplicateTimeoutMinutes;
         config.MentionLimitAction = request.MentionLimitAction;
         config.MentionLimitTimeoutMinutes = request.MentionLimitTimeoutMinutes;
+        config.BlockSuspiciousLinks = request.BlockSuspiciousLinks;
+        config.LinkWhitelistMode = request.LinkWhitelistMode;
+        config.SafeBrowsingEnabled = request.SafeBrowsingEnabled;
+        config.SafeBrowsingBlockUnsure = request.SafeBrowsingBlockUnsure;
+        config.SuspiciousLinkAction = request.SuspiciousLinkAction;
+        config.SuspiciousLinkTimeoutMinutes = request.SuspiciousLinkTimeoutMinutes;
         config.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -276,7 +289,13 @@ public sealed class TwitchChannelsController(
             config.DuplicateAction,
             config.DuplicateTimeoutMinutes,
             config.MentionLimitAction,
-            config.MentionLimitTimeoutMinutes
+            config.MentionLimitTimeoutMinutes,
+            config.BlockSuspiciousLinks,
+            config.LinkWhitelistMode,
+            config.SafeBrowsingEnabled,
+            config.SafeBrowsingBlockUnsure,
+            config.SuspiciousLinkAction,
+            config.SuspiciousLinkTimeoutMinutes
         ));
     }
 
@@ -730,6 +749,408 @@ public sealed class TwitchChannelsController(
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    [HttpGet("blacklists/defaults")]
+    [ProducesResponseType(typeof(IReadOnlyList<DefaultBlacklistResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<DefaultBlacklistResponse>>> GetDefaultBlacklists(
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        await Task.CompletedTask;
+        return Ok(linkDetectionService.GetDefaultBlacklists()
+            .Select(url => new DefaultBlacklistResponse(url))
+            .ToList());
+    }
+
+    [HttpGet("{twitchUserId:long}/blacklists")]
+    [ProducesResponseType(typeof(IReadOnlyList<TwitchChannelBlacklistResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<TwitchChannelBlacklistResponse>>> GetBlacklists(
+        long twitchUserId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .Include(x => x.Configuration!.Blacklists)
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var blacklists = instance.Configuration?.Blacklists ?? [];
+        return Ok(blacklists
+            .Select(b => new TwitchChannelBlacklistResponse(b.Id, b.Url))
+            .ToList());
+    }
+
+    [HttpPost("{twitchUserId:long}/blacklists")]
+    [ProducesResponseType(typeof(TwitchChannelBlacklistResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<TwitchChannelBlacklistResponse>> AddBlacklist(
+        long twitchUserId,
+        [FromBody] AddTwitchChannelBlacklistRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .Include(x => x.Configuration!.Blacklists)
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var config = instance.Configuration;
+        if (config is null) {
+            config = new TwitchChannelConfiguration {
+                TwitchChannelInstanceId = instance.Id,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            instance.Configuration = config;
+            dbContext.TwitchChannelConfigurations.Add(config);
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Url) || !Uri.TryCreate(request.Url, UriKind.Absolute, out var uri) || (uri.Scheme != "http" && uri.Scheme != "https"))
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid URL.",
+                Detail = "The blacklist URL must be a valid HTTP or HTTPS URL.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        if (config.Blacklists.Any(b => b.Url.Equals(request.Url, StringComparison.OrdinalIgnoreCase)))
+            return Conflict(new ProblemDetails {
+                Title = "Blacklist already configured.",
+                Detail = "This blacklist URL is already configured for this channel.",
+                Status = StatusCodes.Status409Conflict
+            });
+
+        var blacklist = new TwitchChannelBlacklist {
+            TwitchChannelConfigurationId = config.Id,
+            Url = request.Url
+        };
+
+        config.Blacklists.Add(blacklist);
+        config.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        _ = Task.Run(() => linkDetectionService.RefreshChannelAsync(twitchUserId, CancellationToken.None), cancellationToken);
+
+        return Ok(new TwitchChannelBlacklistResponse(blacklist.Id, blacklist.Url));
+    }
+
+    [HttpDelete("{twitchUserId:long}/blacklists/{blacklistId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveBlacklist(
+        long twitchUserId,
+        long blacklistId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .Include(x => x.Configuration!.Blacklists)
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var config = instance.Configuration;
+        if (config is null)
+            return NotFound(new ProblemDetails {
+                Title = "Blacklist not found.",
+                Detail = "No blacklist with this ID exists for this channel.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var blacklist = config.Blacklists.FirstOrDefault(b => b.Id == blacklistId);
+        if (blacklist is null)
+            return NotFound(new ProblemDetails {
+                Title = "Blacklist not found.",
+                Detail = "No blacklist with this ID exists for this channel.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        config.Blacklists.Remove(blacklist);
+        config.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        _ = Task.Run(() => linkDetectionService.RefreshChannelAsync(twitchUserId, CancellationToken.None), cancellationToken);
+
+        return NoContent();
+    }
+
+    [HttpPost("{twitchUserId:long}/blacklists/refresh")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RefreshBlacklists(
+        long twitchUserId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        await linkDetectionService.RefreshChannelAsync(twitchUserId, cancellationToken);
+
+        return Ok(new { Message = "Blacklists refreshed." });
+    }
+
+    [HttpGet("{twitchUserId:long}/domain-rules")]
+    [ProducesResponseType(typeof(IReadOnlyList<TwitchChannelDomainRuleResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<TwitchChannelDomainRuleResponse>>> GetDomainRules(
+        long twitchUserId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .Include(x => x.Configuration!.DomainRules)
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var rules = instance.Configuration?.DomainRules ?? [];
+        return Ok(rules
+            .Select(r => new TwitchChannelDomainRuleResponse(r.Id, r.Rule))
+            .ToList());
+    }
+
+    [HttpPost("{twitchUserId:long}/domain-rules")]
+    [ProducesResponseType(typeof(TwitchChannelDomainRuleResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<TwitchChannelDomainRuleResponse>> AddDomainRule(
+        long twitchUserId,
+        [FromBody] AddTwitchChannelDomainRuleRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .Include(x => x.Configuration!.DomainRules)
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var config = instance.Configuration;
+        if (config is null) {
+            config = new TwitchChannelConfiguration {
+                TwitchChannelInstanceId = instance.Id,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            instance.Configuration = config;
+            dbContext.TwitchChannelConfigurations.Add(config);
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Rule))
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid rule.",
+                Detail = "The domain rule must not be empty.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        var normalizedRule = request.Rule.Trim().ToLowerInvariant();
+
+        if (config.DomainRules.Any(r => r.Rule.Equals(normalizedRule, StringComparison.OrdinalIgnoreCase)))
+            return Conflict(new ProblemDetails {
+                Title = "Domain rule already configured.",
+                Detail = "This domain rule is already configured for this channel.",
+                Status = StatusCodes.Status409Conflict
+            });
+
+        var rule = new TwitchChannelDomainRule {
+            TwitchChannelConfigurationId = config.Id,
+            Rule = normalizedRule
+        };
+
+        config.DomainRules.Add(rule);
+        config.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        _ = Task.Run(() => linkDetectionService.RefreshChannelAsync(twitchUserId, CancellationToken.None), cancellationToken);
+
+        return Ok(new TwitchChannelDomainRuleResponse(rule.Id, rule.Rule));
+    }
+
+    [HttpDelete("{twitchUserId:long}/domain-rules/{ruleId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveDomainRule(
+        long twitchUserId,
+        long ruleId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .Include(x => x.Configuration!.DomainRules)
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var config = instance.Configuration;
+        if (config is null)
+            return NotFound(new ProblemDetails {
+                Title = "Domain rule not found.",
+                Detail = "No domain rule with this ID exists for this channel.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var rule = config.DomainRules.FirstOrDefault(r => r.Id == ruleId);
+        if (rule is null)
+            return NotFound(new ProblemDetails {
+                Title = "Domain rule not found.",
+                Detail = "No domain rule with this ID exists for this channel.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        config.DomainRules.Remove(rule);
+        config.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        _ = Task.Run(() => linkDetectionService.RefreshChannelAsync(twitchUserId, CancellationToken.None), cancellationToken);
 
         return NoContent();
     }

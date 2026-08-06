@@ -1113,6 +1113,34 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.ToTable("TwitchAllowedBots");
                 });
 
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelBlacklist", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("TwitchChannelConfigurationId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TwitchChannelConfigurationId", "Url")
+                        .IsUnique();
+
+                    b.ToTable("TwitchChannelBlacklists");
+                });
+
             modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelConfiguration", b =>
                 {
                     b.Property<long>("Id")
@@ -1122,6 +1150,9 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<bool>("AutoAddManagers")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("BlockSuspiciousLinks")
                         .HasColumnType("boolean");
 
                     b.Property<string>("CommandTrigger")
@@ -1151,6 +1182,9 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("LinkWhitelistMode")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("MaxMessagesPerWindow")
                         .HasColumnType("integer");
 
@@ -1172,6 +1206,18 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.Property<int>("RateLimitWindowSeconds")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("SafeBrowsingBlockUnsure")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("SafeBrowsingEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("SuspiciousLinkAction")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SuspiciousLinkTimeoutMinutes")
+                        .HasColumnType("integer");
+
                     b.Property<long>("TwitchChannelInstanceId")
                         .HasColumnType("bigint");
 
@@ -1184,6 +1230,34 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("TwitchChannelConfigurations");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelDomainRule", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Rule")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("TwitchChannelConfigurationId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TwitchChannelConfigurationId", "Rule")
+                        .IsUnique();
+
+                    b.ToTable("TwitchChannelDomainRules");
                 });
 
             modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelInstance", b =>
@@ -1483,6 +1557,17 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.Navigation("TwitchChannelConfiguration");
                 });
 
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelBlacklist", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.TwitchChannelConfiguration", "TwitchChannelConfiguration")
+                        .WithMany("Blacklists")
+                        .HasForeignKey("TwitchChannelConfigurationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TwitchChannelConfiguration");
+                });
+
             modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelConfiguration", b =>
                 {
                     b.HasOne("Blackwall.Core.Entities.TwitchChannelInstance", "TwitchChannelInstance")
@@ -1492,6 +1577,17 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("TwitchChannelInstance");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelDomainRule", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.TwitchChannelConfiguration", "TwitchChannelConfiguration")
+                        .WithMany("DomainRules")
+                        .HasForeignKey("TwitchChannelConfigurationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TwitchChannelConfiguration");
                 });
 
             modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelInstance", b =>
@@ -1575,6 +1671,10 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelConfiguration", b =>
                 {
                     b.Navigation("AllowedBots");
+
+                    b.Navigation("Blacklists");
+
+                    b.Navigation("DomainRules");
                 });
 
             modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelInstance", b =>

@@ -697,4 +697,67 @@ public sealed class BlackwallApiService(
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<IReadOnlyList<DefaultBlacklistResponse>> GetTwitchDefaultBlacklistsAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/twitchchannels/blacklists/defaults");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<DefaultBlacklistResponse>>(ct) ?? [];
+    }
+
+    public async Task<IReadOnlyList<TwitchChannelBlacklistResponse>> GetTwitchBlacklistsAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/blacklists");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchChannelBlacklistResponse>>(ct) ?? [];
+    }
+
+    public async Task<TwitchChannelBlacklistResponse?> AddTwitchBlacklistAsync(long twitchUserId, string url, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/blacklists");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddTwitchChannelBlacklistRequest(url));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TwitchChannelBlacklistResponse>(ct);
+    }
+
+    public async Task RemoveTwitchBlacklistAsync(long twitchUserId, long blacklistId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/blacklists/{blacklistId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task RefreshTwitchBlacklistsAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/blacklists/refresh");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<TwitchChannelDomainRuleResponse>> GetTwitchDomainRulesAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/domain-rules");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchChannelDomainRuleResponse>>(ct) ?? [];
+    }
+
+    public async Task<TwitchChannelDomainRuleResponse?> AddTwitchDomainRuleAsync(long twitchUserId, string rule, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/domain-rules");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddTwitchChannelDomainRuleRequest(rule));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TwitchChannelDomainRuleResponse>(ct);
+    }
+
+    public async Task RemoveTwitchDomainRuleAsync(long twitchUserId, long ruleId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/domain-rules/{ruleId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }
