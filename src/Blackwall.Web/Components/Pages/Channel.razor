@@ -60,6 +60,7 @@
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "managers" ? "active" : "")" @onclick='() => _activeTab = "managers"'>MANAGERS</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "detection" ? "active" : "")" @onclick='() => _activeTab = "detection"'>DETECTION</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "links" ? "active" : "")" @onclick='() => _activeTab = "links"'>LINKS</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "contentguard" ? "active" : "")" @onclick='() => _activeTab = "contentguard"'>CONTENT GUARD</button>
                 </nav>
 
                 <div class="bw-sidebar-content">
@@ -71,6 +72,8 @@
                         <TwitchDetectionTab Form="Form" />
                     } else if (_activeTab == "links") {
                         <TwitchLinksTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
+                    } else if (_activeTab == "contentguard") {
+                        <TwitchContentGuardTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
                     }
 
                     <div class="d-flex align-items-center gap-3 mt-2">
@@ -166,6 +169,11 @@
                 Form.SafeBrowsingBlockUnsure = _settings.SafeBrowsingBlockUnsure;
                 Form.SuspiciousLinkAction = _settings.SuspiciousLinkAction;
                 Form.SuspiciousLinkTimeoutMinutes = _settings.SuspiciousLinkTimeoutMinutes;
+                Form.IsContentGuardEnabled = _settings.IsContentGuardEnabled;
+                Form.ContentGuardFuzzyMatching = _settings.ContentGuardFuzzyMatching;
+                Form.ContentGuardFuzzyThreshold = _settings.ContentGuardFuzzyThreshold;
+                Form.ContentGuardAction = _settings.ContentGuardAction;
+                Form.ContentGuardTimeoutMinutes = _settings.ContentGuardTimeoutMinutes;
             }
         } catch {
             _settings = null;
@@ -209,7 +217,12 @@
                 Form.SafeBrowsingEnabled,
                 Form.SafeBrowsingBlockUnsure,
                 Form.SuspiciousLinkAction,
-                Form.SuspiciousLinkTimeoutMinutes
+                Form.SuspiciousLinkTimeoutMinutes,
+                Form.IsContentGuardEnabled,
+                Form.ContentGuardFuzzyMatching,
+                Form.ContentGuardFuzzyThreshold,
+                Form.ContentGuardAction,
+                Form.ContentGuardTimeoutMinutes
             ));
             _saved = true;
             _isDirty = false;

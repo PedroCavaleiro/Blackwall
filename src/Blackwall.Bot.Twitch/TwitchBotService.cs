@@ -4,6 +4,7 @@ using System.Text.Json;
 using Blackwall.Core.Configuration;
 using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
+using Blackwall.Modules.ContentGuard;
 using Blackwall.Modules.DetectionMatrix;
 using Blackwall.Infrastructure.Persistence;
 using Blackwall.Modules.LinkProtection;
@@ -31,6 +32,7 @@ public sealed partial class TwitchBotService(
     IOptions<AppConfiguration> appConfig,
     [FromKeyedServices("twitch")] DetectionService spamDetectionService,
     [FromKeyedServices("twitch")] LinkProtectionService linkProtectionService,
+    ContentGuardService contentGuardService,
     ISafeBrowsingService safeBrowsingService,
     ILogger<TwitchBotService> logger
 )
@@ -54,7 +56,7 @@ public sealed partial class TwitchBotService(
 
     public event EventHandler<OnMessageReceivedArgs>? OnMessageReceived;
 
-    private record ChannelRecord(long TwitchUserId, string Username, string AccessToken, string CommandTrigger, bool IsEnabled, bool IsDryRun, TwitchDetectionConfig? DetectionConfig, TwitchLinkConfig? LinkConfig);
+    private record ChannelRecord(long TwitchUserId, string Username, string AccessToken, string CommandTrigger, bool IsEnabled, bool IsDryRun, TwitchDetectionConfig? DetectionConfig, TwitchLinkConfig? LinkConfig, TwitchContentGuardConfig? ContentGuardConfig);
 
     public record TwitchDetectionConfig(
         int MaxMessagesPerWindow,
@@ -77,6 +79,14 @@ public sealed partial class TwitchBotService(
         bool SafeBrowsingBlockUnsure,
         InfractionAction SuspiciousLinkAction,
         int SuspiciousLinkTimeoutMinutes
+    );
+
+    public record TwitchContentGuardConfig(
+        bool IsEnabled,
+        bool FuzzyMatching,
+        int FuzzyThreshold,
+        InfractionAction Action,
+        int TimeoutMinutes
     );
 
     private record TwitchTokenResponse(
@@ -169,7 +179,7 @@ public sealed partial class TwitchBotService(
 
         foreach (var ch in channels) {
             var decryptedToken = DecryptToken(ch.BotAccessToken!);
-            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch), GetDetectionConfig(ch), GetLinkConfig(ch));
+            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch), GetDetectionConfig(ch), GetLinkConfig(ch), GetContentGuardConfig(ch));
             _channelNameToUserId[ch.Username.ToLowerInvariant()] = ch.TwitchUserId;
         }
 
@@ -199,7 +209,7 @@ public sealed partial class TwitchBotService(
 
         foreach (var ch in toJoin) {
             var decryptedToken = DecryptToken(ch.BotAccessToken!);
-            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch), GetDetectionConfig(ch), GetLinkConfig(ch));
+            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch), GetDetectionConfig(ch), GetLinkConfig(ch), GetContentGuardConfig(ch));
             _channelNameToUserId[ch.Username.ToLowerInvariant()] = ch.TwitchUserId;
 
             await _client.JoinChannelAsync(ch.Username);
@@ -415,6 +425,35 @@ public sealed partial class TwitchBotService(
             }
         }
 
+        var contentGuardConfig = record.ContentGuardConfig;
+        if (contentGuardConfig is not null && contentGuardConfig.IsEnabled) {
+            var twitchUserIdCg = long.Parse(e.ChatMessage.UserId);
+            var cgViolations = await contentGuardService.EvaluateTwitchAsync(
+                e.ChatMessage.Message, broadcasterId,
+                contentGuardConfig.FuzzyMatching, contentGuardConfig.FuzzyThreshold);
+
+            if (cgViolations.Count > 0) {
+                var violationSummary = string.Join(", ", cgViolations);
+                logger.LogInformation(
+                    "Content Guard violation in channel {BroadcasterId} from user {UserId}: {Violations} (DryRun={DryRun}, Action={Action})",
+                    broadcasterId, twitchUserIdCg, violationSummary, record.IsDryRun, contentGuardConfig.Action);
+
+                if (!record.IsDryRun) {
+                    try {
+                        await DeleteMessageAsync(broadcasterId, e.ChatMessage.Id);
+                    } catch (Exception ex) {
+                        logger.LogWarning(ex,
+                            "Failed to delete Content Guard message {MessageId} in channel {BroadcasterId}",
+                            e.ChatMessage.Id, broadcasterId);
+                    }
+
+                    await ApplyDetectionActionAsync(broadcasterId, twitchUserIdCg, contentGuardConfig.Action, contentGuardConfig.TimeoutMinutes);
+                }
+
+                return;
+            }
+        }
+
         var trigger = record.CommandTrigger;
         if (!e.ChatMessage.Message.StartsWith(trigger, StringComparison.Ordinal))
             return;
@@ -499,6 +538,20 @@ public sealed partial class TwitchBotService(
             config.SafeBrowsingBlockUnsure,
             config.SuspiciousLinkAction,
             config.SuspiciousLinkTimeoutMinutes
+        );
+    }
+
+    private static TwitchContentGuardConfig? GetContentGuardConfig(TwitchChannelInstance ch) {
+        var config = ch.Configuration;
+        if (config is null || !config.IsContentGuardEnabled)
+            return null;
+
+        return new TwitchContentGuardConfig(
+            config.IsContentGuardEnabled,
+            config.ContentGuardFuzzyMatching,
+            config.ContentGuardFuzzyThreshold,
+            config.ContentGuardAction,
+            config.ContentGuardTimeoutMinutes
         );
     }
 

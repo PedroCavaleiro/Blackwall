@@ -29,4 +29,10 @@ public sealed class TwitchChannelConfigForm {
     public bool SafeBrowsingBlockUnsure { get; set; }
     public InfractionAction SuspiciousLinkAction { get; set; } = InfractionAction.Timeout;
     public int SuspiciousLinkTimeoutMinutes { get; set; } = 10;
+
+    public bool IsContentGuardEnabled { get; set; }
+    public bool ContentGuardFuzzyMatching { get; set; }
+    public int ContentGuardFuzzyThreshold { get; set; } = 2;
+    public InfractionAction ContentGuardAction { get; set; } = InfractionAction.DeleteOnly;
+    public int ContentGuardTimeoutMinutes { get; set; } = 10;
 }

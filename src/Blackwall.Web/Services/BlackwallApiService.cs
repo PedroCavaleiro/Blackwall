@@ -760,4 +760,28 @@ public sealed class BlackwallApiService(
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<IReadOnlyList<TwitchBannedWordResponse>> GetTwitchBannedWordsAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/banned-words");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchBannedWordResponse>>(ct) ?? [];
+    }
+
+    public async Task<TwitchBannedWordResponse?> AddTwitchBannedWordAsync(long twitchUserId, string word, bool isRegex = false, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/banned-words");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddTwitchBannedWordRequest(word, isRegex));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TwitchBannedWordResponse>(ct);
+    }
+
+    public async Task RemoveTwitchBannedWordAsync(long twitchUserId, long wordId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/banned-words/{wordId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

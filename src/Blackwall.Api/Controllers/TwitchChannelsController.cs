@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using Blackwall.Api.Services;
 using Blackwall.Api.Services.Twitch;
 using Blackwall.Core.Configuration;
@@ -187,7 +188,12 @@ public sealed class TwitchChannelsController(
             config.SafeBrowsingEnabled,
             config.SafeBrowsingBlockUnsure,
             config.SuspiciousLinkAction,
-            config.SuspiciousLinkTimeoutMinutes
+            config.SuspiciousLinkTimeoutMinutes,
+            config.IsContentGuardEnabled,
+            config.ContentGuardFuzzyMatching,
+            config.ContentGuardFuzzyThreshold,
+            config.ContentGuardAction,
+            config.ContentGuardTimeoutMinutes
         ));
     }
 
@@ -263,6 +269,11 @@ public sealed class TwitchChannelsController(
         config.SafeBrowsingBlockUnsure = request.SafeBrowsingBlockUnsure;
         config.SuspiciousLinkAction = request.SuspiciousLinkAction;
         config.SuspiciousLinkTimeoutMinutes = request.SuspiciousLinkTimeoutMinutes;
+        config.IsContentGuardEnabled = request.IsContentGuardEnabled;
+        config.ContentGuardFuzzyMatching = request.ContentGuardFuzzyMatching;
+        config.ContentGuardFuzzyThreshold = request.ContentGuardFuzzyThreshold;
+        config.ContentGuardAction = request.ContentGuardAction;
+        config.ContentGuardTimeoutMinutes = request.ContentGuardTimeoutMinutes;
         config.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -297,7 +308,12 @@ public sealed class TwitchChannelsController(
             config.SafeBrowsingEnabled,
             config.SafeBrowsingBlockUnsure,
             config.SuspiciousLinkAction,
-            config.SuspiciousLinkTimeoutMinutes
+            config.SuspiciousLinkTimeoutMinutes,
+            config.IsContentGuardEnabled,
+            config.ContentGuardFuzzyMatching,
+            config.ContentGuardFuzzyThreshold,
+            config.ContentGuardAction,
+            config.ContentGuardTimeoutMinutes
         ));
     }
 
@@ -1153,6 +1169,181 @@ public sealed class TwitchChannelsController(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         _ = Task.Run(() => linkProtectionService.RefreshScopeAsync(twitchUserId, CancellationToken.None), cancellationToken);
+
+        return NoContent();
+    }
+
+    [HttpGet("{twitchUserId:long}/banned-words")]
+    [ProducesResponseType(typeof(IReadOnlyList<TwitchBannedWordResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IReadOnlyList<TwitchBannedWordResponse>>> GetBannedWords(
+        long twitchUserId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var words = await dbContext.TwitchChannelBannedWords
+            .Where(x => x.TwitchChannelConfiguration.TwitchChannelInstance.TwitchUserId == twitchUserId)
+            .Select(x => new TwitchBannedWordResponse(x.Id, x.Word, x.IsRegex))
+            .ToListAsync(cancellationToken);
+
+        return Ok(words);
+    }
+
+    [HttpPost("{twitchUserId:long}/banned-words")]
+    [ProducesResponseType(typeof(TwitchBannedWordResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<TwitchBannedWordResponse>> AddBannedWord(
+        long twitchUserId,
+        [FromBody] AddTwitchBannedWordRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .Include(x => x.Configuration!.BannedWords)
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var config = instance.Configuration;
+        if (config is null) {
+            config = new TwitchChannelConfiguration {
+                TwitchChannelInstanceId = instance.Id,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            instance.Configuration = config;
+            dbContext.TwitchChannelConfigurations.Add(config);
+        }
+
+        var word = request.Word.Trim();
+        if (string.IsNullOrWhiteSpace(word) || word.Length > 100)
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid word.",
+                Detail = "The word must be between 1 and 100 characters.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        if (request.IsRegex) {
+            try {
+                _ = Regex.Match(string.Empty, word, RegexOptions.Compiled, TimeSpan.FromMilliseconds(500));
+            } catch (ArgumentException) {
+                return BadRequest(new ProblemDetails {
+                    Title = "Invalid regex pattern.",
+                    Detail = "The provided regex pattern is not valid.",
+                    Status = StatusCodes.Status400BadRequest
+                });
+            }
+        } else {
+            word = word.ToLowerInvariant();
+        }
+
+        if (config.BannedWords.Any(w => w.Word.Equals(word, StringComparison.OrdinalIgnoreCase)))
+            return Conflict(new ProblemDetails {
+                Title = "Word already configured.",
+                Detail = "This word is already in the banned words list for this channel.",
+                Status = StatusCodes.Status409Conflict
+            });
+
+        var entry = new TwitchChannelBannedWord {
+            TwitchChannelConfigurationId = config.Id,
+            Word = word,
+            IsRegex = request.IsRegex
+        };
+
+        config.BannedWords.Add(entry);
+        config.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new TwitchBannedWordResponse(entry.Id, entry.Word, entry.IsRegex));
+    }
+
+    [HttpDelete("{twitchUserId:long}/banned-words/{wordId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveBannedWord(
+        long twitchUserId,
+        long wordId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .Include(x => x.Configuration!.BannedWords)
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var config = instance.Configuration;
+        if (config is null)
+            return NotFound(new ProblemDetails {
+                Title = "Banned word not found.",
+                Detail = "No banned word with this ID exists for this channel.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var entry = config.BannedWords.FirstOrDefault(w => w.Id == wordId);
+        if (entry is null)
+            return NotFound(new ProblemDetails {
+                Title = "Banned word not found.",
+                Detail = "No banned word with this ID exists for this channel.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        config.BannedWords.Remove(entry);
+        config.UpdatedAtUtc = DateTime.UtcNow;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return NoContent();
     }

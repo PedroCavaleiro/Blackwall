@@ -33,9 +33,16 @@ public sealed class TwitchChannelConfiguration : EntityBase {
     public InfractionAction SuspiciousLinkAction { get; set; } = InfractionAction.Timeout;
     public int SuspiciousLinkTimeoutMinutes { get; set; } = 10;
 
+    public bool IsContentGuardEnabled { get; set; }
+    public bool ContentGuardFuzzyMatching { get; set; }
+    public int ContentGuardFuzzyThreshold { get; set; } = 2;
+    public InfractionAction ContentGuardAction { get; set; } = InfractionAction.DeleteOnly;
+    public int ContentGuardTimeoutMinutes { get; set; } = 10;
+
     public DateTime UpdatedAtUtc { get; set; }
 
     public ICollection<TwitchAllowedBot> AllowedBots { get; set; } = [];
     public ICollection<TwitchChannelBlacklist> Blacklists { get; set; } = [];
     public ICollection<TwitchChannelDomainRule> DomainRules { get; set; } = [];
+    public ICollection<TwitchChannelBannedWord> BannedWords { get; set; } = [];
 }

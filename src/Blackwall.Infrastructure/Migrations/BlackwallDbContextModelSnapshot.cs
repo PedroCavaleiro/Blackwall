@@ -1118,6 +1118,39 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.ToTable("TwitchAllowedBots");
                 });
 
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelBannedWord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsRegex")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<long>("TwitchChannelConfigurationId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Word")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TwitchChannelConfigurationId", "Word")
+                        .IsUnique();
+
+                    b.ToTable("TwitchChannelBannedWords");
+                });
+
             modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelBlacklist", b =>
                 {
                     b.Property<long>("Id")
@@ -1165,6 +1198,18 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                         .HasMaxLength(2)
                         .HasColumnType("character varying(2)");
 
+                    b.Property<int>("ContentGuardAction")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("ContentGuardFuzzyMatching")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ContentGuardFuzzyThreshold")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ContentGuardTimeoutMinutes")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone");
@@ -1180,6 +1225,9 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("DuplicateWindowSeconds")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("IsContentGuardEnabled")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDryRun")
                         .HasColumnType("boolean");
@@ -1562,6 +1610,17 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.Navigation("TwitchChannelConfiguration");
                 });
 
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelBannedWord", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.TwitchChannelConfiguration", "TwitchChannelConfiguration")
+                        .WithMany("BannedWords")
+                        .HasForeignKey("TwitchChannelConfigurationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TwitchChannelConfiguration");
+                });
+
             modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelBlacklist", b =>
                 {
                     b.HasOne("Blackwall.Core.Entities.TwitchChannelConfiguration", "TwitchChannelConfiguration")
@@ -1676,6 +1735,8 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelConfiguration", b =>
                 {
                     b.Navigation("AllowedBots");
+
+                    b.Navigation("BannedWords");
 
                     b.Navigation("Blacklists");
 

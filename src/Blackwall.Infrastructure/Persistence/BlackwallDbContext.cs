@@ -28,6 +28,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<TwitchAllowedBot> TwitchAllowedBots => Set<TwitchAllowedBot>();
     public DbSet<TwitchChannelBlacklist> TwitchChannelBlacklists => Set<TwitchChannelBlacklist>();
     public DbSet<TwitchChannelDomainRule> TwitchChannelDomainRules => Set<TwitchChannelDomainRule>();
+    public DbSet<TwitchChannelBannedWord> TwitchChannelBannedWords => Set<TwitchChannelBannedWord>();
     public DbSet<TwitchRemovedManager> TwitchRemovedManagers => Set<TwitchRemovedManager>();
 
     /// <inheritdoc/>
@@ -743,6 +744,11 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .WithOne(e => e.TwitchChannelConfiguration)
                   .HasForeignKey(e => e.TwitchChannelConfigurationId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.BannedWords)
+                  .WithOne(e => e.TwitchChannelConfiguration)
+                  .HasForeignKey(e => e.TwitchChannelConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<TwitchChannelBlacklist>(entity => {
@@ -769,6 +775,18 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .HasMaxLength(100);
 
             entity.HasIndex(e => new { e.TwitchChannelConfigurationId, e.BotUsername })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<TwitchChannelBannedWord>(entity => {
+            entity.Property(e => e.Word)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(e => e.IsRegex)
+                  .HasDefaultValue(false);
+
+            entity.HasIndex(e => new { e.TwitchChannelConfigurationId, e.Word })
                   .IsUnique();
         });
 

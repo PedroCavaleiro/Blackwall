@@ -54,6 +54,89 @@ public sealed partial class ContentGuardService(
     }
 
     /// <summary>
+    /// Evaluates a message against the Twitch channel's Content Guard configuration and banned word list.
+    /// Returns the set of Content Guard violations found (e.g. "banned_word").
+    /// Only banned words and fuzzy matching are evaluated for Twitch.
+    /// </summary>
+    public async Task<List<string>> EvaluateTwitchAsync(
+        string content,
+        long twitchUserId,
+        bool fuzzyMatching,
+        int fuzzyThreshold,
+        CancellationToken cancellationToken = default
+    ) {
+        var violations = new List<string>(1);
+
+        if (await ContainsTwitchBannedWordAsync(twitchUserId, content, fuzzyMatching, fuzzyThreshold, cancellationToken))
+            violations.Add("banned_word");
+
+        return violations;
+    }
+
+    /// <summary>
+    /// Checks if the content contains any banned word configured for the given Twitch channel
+    /// using exact match or fuzzy (Levenshtein distance) matching when enabled.
+    /// Regex entries are matched with Regex.IsMatch (case-insensitive, 500ms timeout).
+    /// </summary>
+    private async Task<bool> ContainsTwitchBannedWordAsync(
+        long twitchUserId,
+        string content,
+        bool fuzzyMatching,
+        int fuzzyThreshold,
+        CancellationToken cancellationToken
+    ) {
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<Infrastructure.Persistence.BlackwallDbContext>();
+
+        var entries = await dbContext.TwitchChannelBannedWords
+            .Where(w => w.TwitchChannelConfiguration.TwitchChannelInstance.TwitchUserId == twitchUserId)
+            .Select(w => new { w.Word, w.IsRegex })
+            .ToListAsync(cancellationToken);
+
+        if (entries.Count == 0)
+            return false;
+
+        var regexEntries = entries.Where(e => e.IsRegex).ToList();
+        if (regexEntries.Count > 0) {
+            foreach (var entry in regexEntries) {
+                try {
+                    if (Regex.IsMatch(content, entry.Word, RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(500)))
+                        return true;
+                } catch (ArgumentException) {
+                    // Skip invalid regex patterns at evaluation time
+                }
+            }
+        }
+
+        var plainWords = entries.Where(e => !e.IsRegex).Select(e => e.Word).ToList();
+        if (plainWords.Count == 0)
+            return false;
+
+        var normalisedContent = NormaliseLeetspeak(content);
+        var tokens = WordBoundaryPattern.Split(normalisedContent)
+            .Where(t => t.Length > 0)
+            .ToList();
+
+        foreach (var word in plainWords) {
+            var normalisedWord = NormaliseLeetspeak(word);
+
+            foreach (var token in tokens) {
+                if (token.Equals(normalisedWord, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                if (fuzzyMatching
+                    && token.Length >= 3
+                    && normalisedWord.Length >= 3
+                    && Math.Abs(token.Length - normalisedWord.Length) <= fuzzyThreshold
+                    && LevenshteinDistance(token, normalisedWord) <= fuzzyThreshold)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Checks if the scrubbed content contains any banned word using exact match or fuzzy
     /// (Levenshtein distance) matching when enabled. Words are compared on a per-token basis
     /// after normalising leetspeak substitutions.

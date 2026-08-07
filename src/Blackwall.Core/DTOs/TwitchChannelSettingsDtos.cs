@@ -29,7 +29,12 @@ public sealed record TwitchChannelSettingsResponse(
     bool SafeBrowsingEnabled,
     bool SafeBrowsingBlockUnsure,
     InfractionAction SuspiciousLinkAction,
-    int SuspiciousLinkTimeoutMinutes
+    int SuspiciousLinkTimeoutMinutes,
+    bool IsContentGuardEnabled,
+    bool ContentGuardFuzzyMatching,
+    int ContentGuardFuzzyThreshold,
+    InfractionAction ContentGuardAction,
+    int ContentGuardTimeoutMinutes
 );
 
 public sealed record UpdateTwitchChannelSettingsRequest(
@@ -53,7 +58,12 @@ public sealed record UpdateTwitchChannelSettingsRequest(
     bool SafeBrowsingEnabled,
     bool SafeBrowsingBlockUnsure,
     InfractionAction SuspiciousLinkAction,
-    int SuspiciousLinkTimeoutMinutes
+    int SuspiciousLinkTimeoutMinutes,
+    bool IsContentGuardEnabled,
+    bool ContentGuardFuzzyMatching,
+    int ContentGuardFuzzyThreshold,
+    InfractionAction ContentGuardAction,
+    int ContentGuardTimeoutMinutes
 );
 
 public sealed record TwitchAllowedBotResponse(
@@ -94,4 +104,15 @@ public sealed record TwitchChannelDomainRuleResponse(
 
 public sealed record AddTwitchChannelDomainRuleRequest(
     string Rule
+);
+
+public sealed record TwitchBannedWordResponse(
+    long Id,
+    string Word,
+    bool IsRegex
+);
+
+public sealed record AddTwitchBannedWordRequest(
+    string Word,
+    bool IsRegex = false
 );
