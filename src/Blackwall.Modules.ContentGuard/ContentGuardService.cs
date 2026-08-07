@@ -67,12 +67,32 @@ public sealed partial class ContentGuardService(
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<Infrastructure.Persistence.BlackwallDbContext>();
 
-        var words = await dbContext.GuildBannedWords
+        var entries = await dbContext.GuildBannedWords
             .Where(w => w.SpamConfiguration.GuildInstance.DiscordGuildId == discordGuildId)
-            .Select(w => w.Word)
+            .Select(w => new { w.Word, w.IsRegex })
             .ToListAsync(cancellationToken);
 
-        if (words.Count == 0)
+        if (entries.Count == 0)
+            return false;
+
+        var regexEntries = entries.Where(e => e.IsRegex).ToList();
+        if (regexEntries.Count > 0) {
+            var scrubbed = config.ContentGuardInvisibleCharScrubbing
+                ? ScrubInvisibleCharacters(content)
+                : content;
+
+            foreach (var entry in regexEntries) {
+                try {
+                    if (Regex.IsMatch(scrubbed, entry.Word, RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(500)))
+                        return true;
+                } catch (ArgumentException) {
+                    // Skip invalid regex patterns at evaluation time
+                }
+            }
+        }
+
+        var plainWords = entries.Where(e => !e.IsRegex).Select(e => e.Word).ToList();
+        if (plainWords.Count == 0)
             return false;
 
         var normalisedContent = NormaliseLeetspeak(content);
@@ -80,7 +100,7 @@ public sealed partial class ContentGuardService(
             .Where(t => t.Length > 0)
             .ToList();
 
-        foreach (var word in words) {
+        foreach (var word in plainWords) {
             var normalisedWord = NormaliseLeetspeak(word);
 
             foreach (var token in tokens) {

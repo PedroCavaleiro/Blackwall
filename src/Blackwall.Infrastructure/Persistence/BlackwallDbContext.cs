@@ -444,6 +444,9 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .IsRequired()
                   .HasMaxLength(100);
 
+            entity.Property(e => e.IsRegex)
+                  .HasDefaultValue(false);
+
             entity.HasIndex(e => new { e.SpamConfigurationId, e.Word })
                   .IsUnique();
         });

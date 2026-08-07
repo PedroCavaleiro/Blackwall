@@ -7,4 +7,5 @@ public sealed class GuildBannedWord : EntityBase {
     public SpamConfiguration SpamConfiguration { get; set; } = null!;
 
     public string Word { get; set; } = string.Empty;
+    public bool IsRegex { get; set; }
 }

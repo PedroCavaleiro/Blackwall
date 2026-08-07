@@ -324,10 +324,10 @@ public sealed class BlackwallApiService(
         return await response.Content.ReadFromJsonAsync<IReadOnlyList<BannedWordResponse>>(ct) ?? [];
     }
 
-    public async Task<BannedWordResponse?> AddBannedWordAsync(long discordGuildId, string word, CancellationToken ct = default) {
+    public async Task<BannedWordResponse?> AddBannedWordAsync(long discordGuildId, string word, bool isRegex = false, CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/banned-words");
         ApplyAuth(request);
-        request.Content = JsonContent.Create(new AddBannedWordRequest(word));
+        request.Content = JsonContent.Create(new AddBannedWordRequest(word, isRegex));
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<BannedWordResponse>(ct);

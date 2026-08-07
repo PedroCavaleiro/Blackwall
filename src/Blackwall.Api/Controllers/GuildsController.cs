@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Blackwall.Api.Services.Discord;
 using Blackwall.Bot.Discord.Services;
 using Blackwall.Core.Configuration;
@@ -1607,7 +1608,7 @@ public sealed class GuildsController(
 
         var words = await dbContext.GuildBannedWords
             .Where(x => x.SpamConfiguration.GuildInstance.DiscordGuildId == discordGuildId)
-            .Select(x => new BannedWordResponse(x.Id, x.Word))
+            .Select(x => new BannedWordResponse(x.Id, x.Word, x.IsRegex))
             .ToListAsync(cancellationToken);
 
         return Ok(words);
@@ -1660,13 +1661,27 @@ public sealed class GuildsController(
                 Status = StatusCodes.Status404NotFound
             });
 
-        var word = request.Word.Trim().ToLowerInvariant();
+        var word = request.Word.Trim();
         if (string.IsNullOrWhiteSpace(word) || word.Length > 100)
             return BadRequest(new ProblemDetails {
                 Title = "Invalid word.",
                 Detail = "The word must be between 1 and 100 characters.",
                 Status = StatusCodes.Status400BadRequest
             });
+
+        if (request.IsRegex) {
+            try {
+                _ = Regex.Match(string.Empty, word, RegexOptions.Compiled, TimeSpan.FromMilliseconds(500));
+            } catch (ArgumentException) {
+                return BadRequest(new ProblemDetails {
+                    Title = "Invalid regex pattern.",
+                    Detail = "The provided regex pattern is not valid.",
+                    Status = StatusCodes.Status400BadRequest
+                });
+            }
+        } else {
+            word = word.ToLowerInvariant();
+        }
 
         if (instance.SpamConfiguration.BannedWords.Any(w => w.Word.Equals(word, StringComparison.OrdinalIgnoreCase)))
             return Conflict(new ProblemDetails {
@@ -1677,7 +1692,8 @@ public sealed class GuildsController(
 
         var entry = new GuildBannedWord {
             SpamConfigurationId = instance.SpamConfiguration.Id,
-            Word = word
+            Word = word,
+            IsRegex = request.IsRegex
         };
 
         instance.SpamConfiguration.BannedWords.Add(entry);
@@ -1687,7 +1703,7 @@ public sealed class GuildsController(
         await dbContext.SaveChangesAsync(cancellationToken);
         await spamConfigurationCache.InvalidateAsync(discordGuildId);
 
-        return Ok(new BannedWordResponse(entry.Id, entry.Word));
+        return Ok(new BannedWordResponse(entry.Id, entry.Word, entry.IsRegex));
     }
 
     /// <summary>

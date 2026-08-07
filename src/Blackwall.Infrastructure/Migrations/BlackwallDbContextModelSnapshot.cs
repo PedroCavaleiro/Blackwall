@@ -401,6 +401,11 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("IsRegex")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<long>("SpamConfigurationId")
                         .HasColumnType("bigint");
 
