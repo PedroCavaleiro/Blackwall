@@ -1,7 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
-using Blackwall.Core.Services;
 using Discord;
 using StackExchange.Redis;
 // ReSharper disable NullableWarningSuppressionIsUsed
@@ -10,17 +8,6 @@ namespace Blackwall.DiscordBot.Services;
 
 public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
     private readonly IDatabase _db = redis.GetDatabase();
-
-    private static readonly Regex InviteLinkPattern = InviteLinkPatternRegex();
-    private static readonly Regex SuspiciousLinkPattern = SuspiciousLinkPatternRegex();
-    private static readonly Regex UrlPattern = UrlPatternRegex();
-
-    private static readonly HttpClient RedirectHttpClient = new(new HttpClientHandler {
-        AllowAutoRedirect = true,
-        MaxAutomaticRedirections = 10
-    }) {
-        Timeout = TimeSpan.FromSeconds(5)
-    };
 
     /// <summary>
     /// Tracks per-user per-guild message timestamps in a Redis sorted set. Returns true if the count
@@ -188,171 +175,6 @@ public sealed partial class SpamDetectionService(IConnectionMultiplexer redis) {
         return count > limit;
     }
 
-    /// <summary>Returns true if the content contains a Discord invite link.</summary>
-    /// <param name="content">The message content to check.</param>
-    /// <returns><see langword="true"/> if an invitation link pattern is found; otherwise <see langword="false"/>.</returns>
-    private static bool ContainsInviteLink(string content) =>
-        InviteLinkPattern.IsMatch(content);
-
-    /// <summary>
-    /// Checks if the content contains a Discord invite link, either directly or hidden behind
-    /// a URL shortener / redirect. First checks the raw content with the invite regex. If no
-    /// direct match is found, extracts all URLs and follows redirects to their final destination,
-    /// checking each resolved URL against the invite pattern.
-    /// </summary>
-    /// <param name="content">The message content to check for invite links.</param>
-    /// <returns><see langword="true"/> if a Discord invite link is found directly or via redirect; otherwise <see langword="false"/>.</returns>
-    /// <exception cref="HttpRequestException">Thrown when an HTTP request to follow a redirect fails.</exception>
-    public static async Task<bool> ContainsInviteLinkWithRedirectAsync(string content) {
-        if (ContainsInviteLink(content))
-            return true;
-
-        var urls = UrlPattern.Matches(content);
-        if (urls.Count == 0)
-            return false;
-
-        foreach (Match match in urls) {
-            var url = match.Value;
-
-            if (InviteLinkPattern.IsMatch(url))
-                return true;
-
-            var redirectUrl = url.Contains("://") ? url : "https://" + url;
-            var resolved = await ResolveRedirectAsync(redirectUrl);
-            if (resolved is not null && InviteLinkPattern.IsMatch(resolved))
-                return true;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Follows HTTP redirects for the given URL using a HEAD request and returns the final
-    /// destination URI, or <c>null</c> if the request fails or times out.
-    /// </summary>
-    /// <param name="url">The URL to follow redirects for.</param>
-    /// <returns>The final destination URL as a string, or <see langword="null"/> if the request fails or times out.</returns>
-    private static async Task<string?> ResolveRedirectAsync(string url) {
-        try {
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.UserAgent.ParseAdd("Blackwall/1.0 (+https://blackwall.app)");
-
-            using var response = await RedirectHttpClient.SendAsync(
-                request,
-                HttpCompletionOption.ResponseHeadersRead);
-
-            return response.RequestMessage?.RequestUri?.ToString();
-        } catch {
-            return null;
-        }
-    }
-
-    /// <summary>Returns true if the content contains any non-Discord URL.</summary>
-    /// <param name="content">The message content to check.</param>
-    /// <returns><see langword="true"/> if a non-Discord URL is found; otherwise <see langword="false"/>.</returns>
-    public static bool ContainsSuspiciousLink(string content) =>
-        SuspiciousLinkPattern.IsMatch(content);
-
-    /// <summary>
-    /// Checks if the content contains any URL whose domain (or redirect destination domain)
-    /// should be blocked for the guild. In blacklist mode, blocked if the domain is in the
-    /// blacklist or custom domain set. In whitelist mode, blocked if the domain is NOT in the
-    /// custom domain set. Follows redirects to check the final destination as well.
-    /// </summary>
-    /// <param name="content">The message content to check for blocked links.</param>
-    /// <param name="blacklistService">The blacklist service used to evaluate link domains.</param>
-    /// <param name="discordGuildId">The Discord ID of the guild whose blacklist/whitelist rules apply.</param>
-    /// <returns><see langword="true"/> if a blacklisted or non-whitelisted link is found; otherwise <see langword="false"/>.</returns>
-    public static async Task<bool> ContainsBlacklistedLinkAsync(
-        string content,
-        BlacklistService blacklistService,
-        long discordGuildId
-    ) {
-        var urls = UrlPattern.Matches(content);
-        if (urls.Count == 0)
-            return false;
-
-        foreach (Match match in urls) {
-            var url = match.Value;
-
-            if (await blacklistService.IsLinkBlockedAsync(discordGuildId, url))
-                return true;
-
-            var redirectUrl = url.Contains("://") ? url : "https://" + url;
-            var resolved = await ResolveRedirectAsync(redirectUrl);
-            if (resolved is not null && await blacklistService.IsLinkBlockedAsync(discordGuildId, resolved))
-                return true;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Checks all non-Discord URLs in the content against Google Safe Browsing.
-    /// Returns the worst result found (Unsafe > Unsure > Safe).
-    /// Only URLs that are not Discord domains are checked.
-    /// </summary>
-    /// <param name="content">The message content to check for unsafe URLs.</param>
-    /// <param name="safeBrowsingService">The Safe Browsing service used to evaluate URLs.</param>
-    /// <returns>The worst <see cref="SafeBrowsingResult"/> found across all checked URLs.</returns>
-    public static async Task<SafeBrowsingResult> CheckSafeBrowsingAsync(
-        string content,
-        SafeBrowsingService safeBrowsingService
-    ) {
-        var urls = UrlPattern.Matches(content);
-        if (urls.Count == 0)
-            return SafeBrowsingResult.Safe;
-
-        var worst = SafeBrowsingResult.Safe;
-
-        foreach (Match match in urls) {
-            var url = match.Value;
-
-            if (IsDiscordUrl(url))
-                continue;
-
-            var result = await safeBrowsingService.CheckUrlAsync(url);
-            if (result == SafeBrowsingResult.Unsafe)
-                return SafeBrowsingResult.Unsafe;
-            if (result == SafeBrowsingResult.Unsure && worst == SafeBrowsingResult.Safe)
-                worst = SafeBrowsingResult.Unsure;
-
-            var redirectUrl = url.Contains("://") ? url : "https://" + url;
-            var resolved = await ResolveRedirectAsync(redirectUrl);
-            if (resolved is not null && !IsDiscordUrl(resolved)) {
-                var resolvedResult = await safeBrowsingService.CheckUrlAsync(resolved);
-                if (resolvedResult == SafeBrowsingResult.Unsafe)
-                    return SafeBrowsingResult.Unsafe;
-                if (resolvedResult == SafeBrowsingResult.Unsure && worst == SafeBrowsingResult.Safe)
-                    worst = SafeBrowsingResult.Unsure;
-            }
-        }
-
-        return worst;
-    }
-
-    /// <summary>
-    /// Returns true if the URL points to a Discord-owned domain.
-    /// </summary>
-    /// <param name="url">The URL to check.</param>
-    /// <returns><see langword="true"/> if the URL's host is a Discord-owned domain; otherwise <see langword="false"/>.</returns>
-    private static bool IsDiscordUrl(string url) {
-        if (!url.Contains("://"))
-            url = "https://" + url;
-
-        return Uri.TryCreate(url, UriKind.Absolute, out var uri)
-            && (uri.Host.EndsWith("discord.gg", StringComparison.OrdinalIgnoreCase)
-                || uri.Host.EndsWith("discord.com", StringComparison.OrdinalIgnoreCase)
-                || uri.Host.EndsWith("discordapp.com", StringComparison.OrdinalIgnoreCase)
-                || uri.Host.EndsWith("discordapp.net", StringComparison.OrdinalIgnoreCase));
-    }
-    
-    [GeneratedRegex(@"discord(?:\.gg|\.com/invite)/[a-zA-Z0-9-]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
-    private static partial Regex InviteLinkPatternRegex();
-    [GeneratedRegex(@"https?://(?!(?:cdn\.discordapp\.com|media\.discordapp\.net|discord\.com|discord\.gg))[^\s]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
-    private static partial Regex SuspiciousLinkPatternRegex();
-    [GeneratedRegex(@"(?:https?://)?[a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?)+(?:/[^\s]*)?", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
-    private static partial Regex UrlPatternRegex();
 }
 
 public sealed record DuplicateDetectionResult(

@@ -1,12 +1,13 @@
 using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Blackwall.Core.Configuration;
 using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
 using Blackwall.Infrastructure.Persistence;
+using Blackwall.LinkProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TwitchLib.Api;
@@ -28,7 +29,7 @@ public sealed partial class TwitchBotService(
     IOptions<TwitchOptions> twitchOptions,
     IOptions<AppConfiguration> appConfig,
     TwitchSpamDetectionService spamDetectionService,
-    TwitchLinkDetectionService linkDetectionService,
+    [FromKeyedServices("twitch")] LinkProtectionService linkProtectionService,
     ISafeBrowsingService safeBrowsingService,
     ILogger<TwitchBotService> logger
 )
@@ -369,19 +370,17 @@ public sealed partial class TwitchBotService(
             var linkBlocked = false;
             var linkViolation = "suspicious_link";
 
-            var urls = UrlRegex().Matches(e.ChatMessage.Message);
+            var urls = LinkProtectionService.ExtractUrls(e.ChatMessage.Message);
             if (urls.Count > 0) {
-                foreach (Match match in urls) {
-                    var url = match.Value;
-                    if (await linkDetectionService.IsLinkBlockedAsync(broadcasterId, url)) {
+                foreach (var url in urls) {
+                    if (await linkProtectionService.IsLinkBlockedAsync(broadcasterId, url)) {
                         linkBlocked = true;
                         break;
                     }
                 }
 
                 if (!linkBlocked && linkConfig.SafeBrowsingEnabled) {
-                    foreach (Match match in urls) {
-                        var url = match.Value;
+                    foreach (var url in urls) {
                         var sbResult = await safeBrowsingService.CheckUrlAsync(url);
                         if (sbResult == SafeBrowsingResult.Unsafe
                             || (sbResult == SafeBrowsingResult.Unsure && linkConfig.SafeBrowsingBlockUnsure)) {
@@ -696,6 +695,4 @@ public sealed partial class TwitchBotService(
         _tokenHttp.Dispose();
     }
 
-    [GeneratedRegex(@"(?:https?://)?[a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?)+(?:/[^\s]*)?", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
-    private static partial Regex UrlRegex();
 }

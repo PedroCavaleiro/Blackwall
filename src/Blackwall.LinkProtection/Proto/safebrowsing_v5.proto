@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option csharp_namespace = "Blackwall.DiscordBot.Services.SafeBrowsingProto";
+option csharp_namespace = "Blackwall.LinkProtection.SafeBrowsingProto";
 
 package safebrowsing.v5;
 

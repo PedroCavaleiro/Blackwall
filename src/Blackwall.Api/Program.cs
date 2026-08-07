@@ -9,6 +9,9 @@ using Blackwall.DiscordBot.Background;
 using Blackwall.DiscordBot.Handlers;
 using Blackwall.DiscordBot.Services;
 using Blackwall.TwitchBot;
+using Blackwall.LinkProtection;
+using Blackwall.LinkProtection.Background;
+using Blackwall.LinkProtection.Services;
 using Blackwall.Api.Services.Twitch;
 using Blackwall.Core.Configuration;
 using Blackwall.Core.Services;
@@ -20,7 +23,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
+using StackExchange.Redis;
 
 if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("POSTGRES__CONNECTION_STRING")))
     try { Env.TraversePath().Load(); } catch { /* .env not readable — vars injected by systemd */ }
@@ -106,7 +111,6 @@ builder.Services.AddScoped<GuildClaimService>();
 builder.Services.AddScoped<AccountLinkingService>();
 builder.Services.AddScoped<GuildPermissionSyncService>();
 builder.Services.AddSingleton<DiscordGuildCacheService>();
-builder.Services.AddScoped<BlacklistService>();
 builder.Services.AddSingleton<BanSyncService>();
 builder.Services.AddSingleton<SafeBrowsingService>();
 builder.Services.AddSingleton<ISafeBrowsingService>(sp => sp.GetRequiredService<SafeBrowsingService>());
@@ -120,8 +124,25 @@ builder.Services.AddSingleton<ModuleRunnerService>();
 builder.Services.AddScoped<ModuleInstallationService>();
 builder.Services.AddScoped<TwitchChannelService>();
 builder.Services.AddSingleton<TwitchSpamDetectionService>();
-builder.Services.AddSingleton<TwitchLinkDetectionService>();
 builder.Services.AddSingleton<TwitchBotService>();
+builder.Services.AddKeyedSingleton<ILinkConfigProvider, DiscordLinkConfigProvider>("discord");
+builder.Services.AddKeyedSingleton<ILinkConfigProvider, TwitchLinkConfigProvider>("twitch");
+builder.Services.AddKeyedSingleton<LinkProtectionService>("discord", (sp, _) => {
+    var redis = sp.GetRequiredService<IConnectionMultiplexer>();
+    var configProvider = sp.GetRequiredKeyedService<ILinkConfigProvider>("discord");
+    var blacklistOptions = sp.GetRequiredService<IOptions<BlacklistOptions>>();
+    var options = new LinkProtectionOptions { RedisKeyPrefix = "blacklist" };
+    var logger = sp.GetRequiredService<ILogger<LinkProtectionService>>();
+    return new LinkProtectionService(redis, configProvider, blacklistOptions, options, logger);
+});
+builder.Services.AddKeyedSingleton<LinkProtectionService>("twitch", (sp, _) => {
+    var redis = sp.GetRequiredService<IConnectionMultiplexer>();
+    var configProvider = sp.GetRequiredKeyedService<ILinkConfigProvider>("twitch");
+    var blacklistOptions = sp.GetRequiredService<IOptions<BlacklistOptions>>();
+    var options = new LinkProtectionOptions { RedisKeyPrefix = "twitch" };
+    var logger = sp.GetRequiredService<ILogger<LinkProtectionService>>();
+    return new LinkProtectionService(redis, configProvider, blacklistOptions, options, logger);
+});
 builder.Services.AddHostedService<SafeBrowsingSyncBackgroundService>();
 builder.Services.AddHostedService<MessageAuditPurgeBackgroundService>();
 builder.Services.AddHostedService<AiSentinelPurgeBackgroundService>();

@@ -1,4 +1,4 @@
-using Blackwall.DiscordBot.Services;
+using Blackwall.LinkProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -17,9 +17,9 @@ public sealed class BlacklistRefreshBackgroundService(
         logger.LogInformation("Blacklist refresh background service started with interval {Hours}h", Interval.TotalHours);
 
         using (var scope = scopeFactory.CreateScope()) {
-            var blacklistService = scope.ServiceProvider.GetRequiredService<BlacklistService>();
+            var linkProtection = scope.ServiceProvider.GetRequiredKeyedService<LinkProtectionService>("discord");
             try {
-                await blacklistService.RefreshAllAsync(stoppingToken);
+                await linkProtection.RefreshAllAsync(stoppingToken);
             } catch (Exception ex) {
                 logger.LogError(ex, "Error during initial blacklist refresh");
             }
@@ -37,8 +37,8 @@ public sealed class BlacklistRefreshBackgroundService(
 
             try {
                 using var scope = scopeFactory.CreateScope();
-                var blacklistService = scope.ServiceProvider.GetRequiredService<BlacklistService>();
-                await blacklistService.RefreshAllAsync(stoppingToken);
+                var linkProtection = scope.ServiceProvider.GetRequiredKeyedService<LinkProtectionService>("discord");
+                await linkProtection.RefreshAllAsync(stoppingToken);
             } catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) {
                 break;
             } catch (Exception ex) {

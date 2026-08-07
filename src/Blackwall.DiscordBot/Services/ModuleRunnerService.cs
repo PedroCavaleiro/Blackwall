@@ -17,6 +17,8 @@ namespace Blackwall.DiscordBot.Services;
 
 public sealed record ModuleEvaluationResult(
     string ViolationType,
+    string ModuleName,
+    string? ReadableName,
     InfractionAction Action,
     int TimeoutMinutes,
     int DeleteDays,
@@ -99,6 +101,8 @@ public sealed class ModuleRunnerService(
                 if (verdict is not null) {
                     results.Add(new ModuleEvaluationResult(
                         verdict.ViolationType,
+                        installation.ModuleName,
+                        installation.ReadableName,
                         MapAction(verdict.Action),
                         verdict.TimeoutMinutes,
                         verdict.DeleteDays,

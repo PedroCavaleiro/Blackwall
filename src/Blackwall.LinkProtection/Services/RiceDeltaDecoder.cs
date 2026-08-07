@@ -1,7 +1,7 @@
 using System.Numerics;
-using Blackwall.DiscordBot.Services.SafeBrowsingProto;
+using Blackwall.LinkProtection.SafeBrowsingProto;
 
-namespace Blackwall.DiscordBot.Services;
+namespace Blackwall.LinkProtection.Services;
 
 /// <summary>
 /// Decodes Rice-Golomb delta-encoded data used by the Google Safe Browsing V5

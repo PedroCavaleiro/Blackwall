@@ -1,11 +1,11 @@
-using Blackwall.DiscordBot.Services.SafeBrowsingProto;
+using Blackwall.LinkProtection.SafeBrowsingProto;
 using Blackwall.Core.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 // ReSharper disable NullableWarningSuppressionIsUsed
 
-namespace Blackwall.DiscordBot.Services;
+namespace Blackwall.LinkProtection.Services;
 
 /// <summary>
 /// Metadata about a discovered hash list, used to route list contents during sync.

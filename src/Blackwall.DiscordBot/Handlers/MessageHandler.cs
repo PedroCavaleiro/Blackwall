@@ -4,6 +4,8 @@ using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
 using Blackwall.Infrastructure.Cache.Discord;
+using Blackwall.LinkProtection;
+using Blackwall.LinkProtection.Services;
 using Discord;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +18,7 @@ namespace Blackwall.DiscordBot.Handlers;
 public sealed class MessageHandler(
     IServiceScopeFactory scopeFactory,
     SpamDetectionService spamDetectionService,
+    [FromKeyedServices("discord")] LinkProtectionService linkProtectionService,
     LockdownService lockdownService,
     SafeBrowsingService safeBrowsingService,
     ContentGuardService contentGuardService,
@@ -116,7 +119,7 @@ public sealed class MessageHandler(
                 _ = Task.Run(() => messageAuditService.RecordEventAsync(
                     discordGuildId,
                     message,
-                    ["NetWatchSnare_trap"],
+                    ["NetWatch Snare Trap"],
                     netWatchSnare.Action,
                     config.IsDryRun,
                     config.MessageAuditRetentionDays,
@@ -136,7 +139,7 @@ public sealed class MessageHandler(
         if (await spamDetectionService.IsRateLimitedAsync(
                 discordGuildId, discordUserId, message.Id,
                 config.MaxMessagesPerWindow, config.RateLimitWindowSeconds)) {
-            violations.Add("rate_limit");
+            violations.Add("Rate Limit");
             triggeredModules.Add((config.RateLimitAction, config.RateLimitTimeoutMinutes, config.RateLimitMessageDeleteDays));
             if (config is { RateLimitAutoLockdown: true, IsLockedDown: false })
                 shouldLockdown = true;
@@ -152,7 +155,7 @@ public sealed class MessageHandler(
             config.DuplicateWindowSeconds, config.DuplicateCrossChannelEnabled);
 
         if (dupResult.IsDuplicate) {
-            violations.Add("duplicate");
+            violations.Add("Duplicate");
             triggeredModules.Add((config.DuplicateAction, config.DuplicateTimeoutMinutes, config.DuplicateMessageDeleteDays));
             if (config is { DuplicateAutoLockdown: true, IsLockedDown: false })
                 shouldLockdown = true;
@@ -160,14 +163,14 @@ public sealed class MessageHandler(
         }
 
         if (SpamDetectionService.ExceedsMentionLimit(message, config.MentionLimit)) {
-            violations.Add("mention_limit");
+            violations.Add("Mention Limit");
             triggeredModules.Add((config.MentionLimitAction, config.MentionLimitTimeoutMinutes, config.MentionLimitMessageDeleteDays));
             if (config is { MentionLimitAutoLockdown: true, IsLockedDown: false })
                 shouldLockdown = true;
         }
 
-        if (config.BlockInviteLinks && await SpamDetectionService.ContainsInviteLinkWithRedirectAsync(message.Content)) {
-            violations.Add("invite_link");
+        if (config.BlockInviteLinks && await LinkProtectionService.ContainsInviteLinkWithRedirectAsync(message.Content)) {
+            violations.Add("Invite Link");
             triggeredModules.Add((config.InviteLinkAction, config.InviteLinkTimeoutMinutes, config.InviteLinkMessageDeleteDays));
             if (config is { InviteLinkAutoLockdown: true, IsLockedDown: false })
                 shouldLockdown = true;
@@ -178,7 +181,7 @@ public sealed class MessageHandler(
                 fullContent, discordGuildId, discordUserId, config);
 
             if (cgViolations.Count > 0) {
-                violations.AddRange(cgViolations);
+                violations.AddRange(cgViolations.Select(HumanizeContentGuardViolation));
                 triggeredModules.Add((config.ContentGuardAction, config.ContentGuardTimeoutMinutes, config.ContentGuardMessageDeleteDays));
                 if (config is { ContentGuardAutoLockdown: true, IsLockedDown: false })
                     shouldLockdown = true;
@@ -186,22 +189,19 @@ public sealed class MessageHandler(
         }
 
         if (config.BlockSuspiciousLinks) {
-            using var blacklistScope = scopeFactory.CreateScope();
-            var blacklistService = blacklistScope.ServiceProvider.GetRequiredService<BlacklistService>();
-
-            var blockedByBlacklist = await SpamDetectionService.ContainsBlacklistedLinkAsync(message.Content, blacklistService, discordGuildId);
+            var blockedByBlacklist = await linkProtectionService.ContainsBlacklistedLinkAsync(message.Content, discordGuildId);
 
             if (blockedByBlacklist) {
-                violations.Add("suspicious_link");
+                violations.Add("Suspicious Link");
                 triggeredModules.Add((config.SuspiciousLinkAction, config.SuspiciousLinkTimeoutMinutes, config.SuspiciousLinkMessageDeleteDays));
                 if (config is { SuspiciousLinkAutoLockdown: true, IsLockedDown: false })
                     shouldLockdown = true;
             } else if (config.SafeBrowsingEnabled) {
-                var sbResult = await SpamDetectionService.CheckSafeBrowsingAsync(message.Content, safeBrowsingService);
+                var sbResult = await LinkProtectionService.CheckSafeBrowsingAsync(message.Content, safeBrowsingService);
 
                 if (sbResult == SafeBrowsingResult.Unsafe
                     || (sbResult == SafeBrowsingResult.Unsure && config.SafeBrowsingBlockUnsure)) {
-                    violations.Add("safe_browsing");
+                    violations.Add("Safe Browsing");
                     triggeredModules.Add((config.SuspiciousLinkAction, config.SuspiciousLinkTimeoutMinutes, config.SuspiciousLinkMessageDeleteDays));
                     if (config is { SuspiciousLinkAutoLockdown: true, IsLockedDown: false })
                         shouldLockdown = true;
@@ -213,7 +213,7 @@ public sealed class MessageHandler(
             discordGuildId, message, guildChannel, config.IsDryRun, CancellationToken.None);
 
         foreach (var result in moduleResults) {
-            violations.Add($"module:{result.ViolationType}");
+            violations.Add($"module:{result.ReadableName ?? result.ModuleName}");
             triggeredModules.Add((result.Action, result.TimeoutMinutes, result.DeleteDays));
             if (result.AutoLockdown && !config.IsLockedDown)
                 shouldLockdown = true;
@@ -370,7 +370,7 @@ public sealed class MessageHandler(
             _ = Task.Run(() => messageAuditService.RecordEventAsync(
                 discordGuildId,
                 message,
-                [$"ai_sentinel_{result.Classification.ToString().ToLowerInvariant()}"],
+                [$"AI Sentinel: {result.Classification}"],
                 aiConfig.Action,
                 effectiveDryRun,
                 spamConfig.MessageAuditRetentionDays,
@@ -552,6 +552,16 @@ public sealed class MessageHandler(
 
         return content;
     }
+
+    /// <summary>
+    /// Maps a Content Guard violation identifier to a human-readable display name.
+    /// </summary>
+    private static string HumanizeContentGuardViolation(string violation) => violation switch {
+        "banned_word" => "Banned Word",
+        "zalgo" => "Zalgo",
+        "copypasta" => "Copypasta",
+        _ => violation
+    };
 
     /// <summary>
     /// Sends an infraction log embed to the configured log channel.

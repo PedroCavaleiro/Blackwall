@@ -6,10 +6,12 @@ using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
 using Blackwall.Infrastructure.Persistence;
+using Blackwall.LinkProtection;
 using Blackwall.TwitchBot;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using TwitchLib.Api;
 // ReSharper disable NullableWarningSuppressionIsUsed
@@ -23,7 +25,7 @@ public sealed class TwitchChannelsController(
     TwitchOAuthService twitchOAuthService,
     TwitchChannelService twitchChannelService,
     TwitchBotService twitchBotService,
-    TwitchLinkDetectionService linkDetectionService,
+    [FromKeyedServices("twitch")] LinkProtectionService linkProtectionService,
     BlackwallDbContext dbContext,
     IOptions<TwitchOptions> twitchOptions,
     IOptions<AppConfiguration> appConfiguration,
@@ -768,7 +770,7 @@ public sealed class TwitchChannelsController(
             });
 
         await Task.CompletedTask;
-        return Ok(linkDetectionService.GetDefaultBlacklists()
+        return Ok(linkProtectionService.GetDefaultBlacklists()
             .Select(url => new DefaultBlacklistResponse(url))
             .ToList());
     }
@@ -880,7 +882,7 @@ public sealed class TwitchChannelsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => linkDetectionService.RefreshChannelAsync(twitchUserId, CancellationToken.None), cancellationToken);
+        _ = Task.Run(() => linkProtectionService.RefreshScopeAsync(twitchUserId, CancellationToken.None), cancellationToken);
 
         return Ok(new TwitchChannelBlacklistResponse(blacklist.Id, blacklist.Url));
     }
@@ -940,7 +942,7 @@ public sealed class TwitchChannelsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => linkDetectionService.RefreshChannelAsync(twitchUserId, CancellationToken.None), cancellationToken);
+        _ = Task.Run(() => linkProtectionService.RefreshScopeAsync(twitchUserId, CancellationToken.None), cancellationToken);
 
         return NoContent();
     }
@@ -976,7 +978,7 @@ public sealed class TwitchChannelsController(
                 Status = StatusCodes.Status404NotFound
             });
 
-        await linkDetectionService.RefreshChannelAsync(twitchUserId, cancellationToken);
+        await linkProtectionService.RefreshScopeAsync(twitchUserId, cancellationToken);
 
         return Ok(new { Message = "Blacklists refreshed." });
     }
@@ -1090,7 +1092,7 @@ public sealed class TwitchChannelsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => linkDetectionService.RefreshChannelAsync(twitchUserId, CancellationToken.None), cancellationToken);
+        _ = Task.Run(() => linkProtectionService.RefreshScopeAsync(twitchUserId, CancellationToken.None), cancellationToken);
 
         return Ok(new TwitchChannelDomainRuleResponse(rule.Id, rule.Rule));
     }
@@ -1150,7 +1152,7 @@ public sealed class TwitchChannelsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => linkDetectionService.RefreshChannelAsync(twitchUserId, CancellationToken.None), cancellationToken);
+        _ = Task.Run(() => linkProtectionService.RefreshScopeAsync(twitchUserId, CancellationToken.None), cancellationToken);
 
         return NoContent();
     }

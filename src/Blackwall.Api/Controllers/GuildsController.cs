@@ -9,10 +9,12 @@ using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
 using Blackwall.Infrastructure.Cache.Discord;
 using Blackwall.Infrastructure.Persistence;
+using Blackwall.LinkProtection;
 using Discord.WebSocket;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Blackwall.Api.Controllers;
@@ -29,7 +31,7 @@ public sealed class GuildsController(
     DiscordGuildCacheService guildCache,
     DiscordSocketClient discordClient,
     LockdownService lockdownService,
-    BlacklistService blacklistService,
+    [FromKeyedServices("discord")] LinkProtectionService linkProtectionService,
     BanSyncService banSyncService,
     AllowedBotService allowedBotService,
     AiSentinelCache aiSentinelCache,
@@ -339,7 +341,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await spamConfigurationCache.InvalidateAsync(discordGuildId);
-        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None), cancellationToken);
+        _ = Task.Run(() => linkProtectionService.RefreshScopeAsync(discordGuildId, CancellationToken.None), cancellationToken);
 
         return NoContent();
     }
@@ -582,7 +584,7 @@ public sealed class GuildsController(
             });
 
         await Task.CompletedTask;
-        return Ok(blacklistService.GetDefaultBlacklists()
+        return Ok(linkProtectionService.GetDefaultBlacklists()
             .Select(url => new DefaultBlacklistResponse(url))
             .ToList());
     }
@@ -707,7 +709,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None), cancellationToken);
+        _ = Task.Run(() => linkProtectionService.RefreshScopeAsync(discordGuildId, CancellationToken.None), cancellationToken);
 
         return Ok(new BlacklistResponse(blacklist.Id, blacklist.Url));
     }
@@ -770,7 +772,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None), cancellationToken);
+        _ = Task.Run(() => linkProtectionService.RefreshScopeAsync(discordGuildId, CancellationToken.None), cancellationToken);
 
         return NoContent();
     }
@@ -817,7 +819,7 @@ public sealed class GuildsController(
                 Status = StatusCodes.Status404NotFound
             });
 
-        await blacklistService.RefreshGuildAsync(discordGuildId, cancellationToken);
+        await linkProtectionService.RefreshScopeAsync(discordGuildId, cancellationToken);
 
         return Ok(new { Message = "Blacklists refreshed." });
     }
@@ -945,7 +947,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None), cancellationToken);
+        _ = Task.Run(() => linkProtectionService.RefreshScopeAsync(discordGuildId, CancellationToken.None), cancellationToken);
 
         return Ok(new BlacklistDomainResponse(entry.Id, entry.Domain));
     }
@@ -1008,7 +1010,7 @@ public sealed class GuildsController(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(() => blacklistService.RefreshGuildAsync(discordGuildId, CancellationToken.None), cancellationToken);
+        _ = Task.Run(() => linkProtectionService.RefreshScopeAsync(discordGuildId, CancellationToken.None), cancellationToken);
 
         return NoContent();
     }

@@ -12,20 +12,15 @@
       <ProjectReference Include="..\Blackwall.Core\Blackwall.Core.csproj" />
       <ProjectReference Include="..\Blackwall.Infrastructure\Blackwall.Infrastructure.csproj" />
       <ProjectReference Include="..\Blackwall.Modules.Abstractions\Blackwall.Modules.Abstractions.csproj" />
+      <ProjectReference Include="..\Blackwall.LinkProtection\Blackwall.LinkProtection.csproj" />
     </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="Discord.Net" Version="3.20.1" />
       <PackageReference Include="Discord.Net.WebSocket" Version="3.20.1" />
-      <PackageReference Include="Google.Protobuf" Version="3.30.2" />
-      <PackageReference Include="Grpc.Tools" Version="2.71.0" />
       <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.9" />
       <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
       <PackageReference Include="StackExchange.Redis" Version="3.0.7" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Protobuf Include="Proto\safebrowsing_v5.proto" GrpcServices="None" />
     </ItemGroup>
 
 </Project>

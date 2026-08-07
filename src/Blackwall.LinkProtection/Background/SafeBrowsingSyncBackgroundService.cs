@@ -1,9 +1,9 @@
-using Blackwall.DiscordBot.Services;
+using Blackwall.LinkProtection.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Blackwall.DiscordBot.Background;
+namespace Blackwall.LinkProtection.Background;
 
 public sealed class SafeBrowsingSyncBackgroundService(
     IServiceScopeFactory scopeFactory,

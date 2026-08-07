@@ -2,13 +2,13 @@ using System.Security.Cryptography;
 using System.Text;
 using Blackwall.Core.Configuration;
 using Blackwall.Core.Services;
-using Blackwall.DiscordBot.Services.SafeBrowsingProto;
+using Blackwall.LinkProtection.SafeBrowsingProto;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 // ReSharper disable NullableWarningSuppressionIsUsed
 
-namespace Blackwall.DiscordBot.Services;
+namespace Blackwall.LinkProtection.Services;
 
 public sealed class SafeBrowsingService(
     IConnectionMultiplexer redis,
