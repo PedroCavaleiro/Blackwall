@@ -185,7 +185,7 @@
           <tbody>
             <tr><td><code>Blackwall.Core</code></td><td>Shared entities, DTOs, and configuration models</td></tr>
             <tr><td><code>Blackwall.Infrastructure</code></td><td>PostgreSQL persistence (EF Core) and Redis caching</td></tr>
-            <tr><td><code>Blackwall.DiscordBot</code></td><td>Discord gateway client &mdash; spam detection, guild events, background sync</td></tr>
+            <tr><td><code>Blackwall.Bot.Discord</code></td><td>Discord gateway client &mdash; spam detection, guild events, background sync</td></tr>
             <tr><td><code>Blackwall.Api</code></td><td>ASP.NET Core Web API &mdash; OAuth flows, JWT auth, guild management endpoints</td></tr>
             <tr><td><code>Blackwall.Web</code></td><td>Blazor Server dashboard &mdash; authenticates against the API</td></tr>
           </tbody>
@@ -1372,7 +1372,7 @@ public sealed partial class EmojiSpamModule : IBlackwallModule
         <pre><code>Blackwall/
 ├── src/
 │   ├── Blackwall.Api/              # Web API + Discord bot host
-│   ├── Blackwall.DiscordBot/        # Discord bot worker, handlers, background services
+│   ├── Blackwall.Bot.Discord/        # Discord bot worker, handlers, background services
 │   ├── Blackwall.Core/             # Entities, DTOs, configuration
 │   ├── Blackwall.Infrastructure/   # EF Core DbContext, Redis cache
 │   └── Blackwall.Web/              # Blazor Server dashboard

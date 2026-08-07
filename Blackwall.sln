@@ -2,7 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Api", "src\Blackwall.Api\Blackwall.Api.csproj", "{F97C4577-96B4-423F-B665-5A0F592066EE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.DiscordBot", "src\Blackwall.DiscordBot\Blackwall.DiscordBot.csproj", "{8A4B43BD-1AA5-47A1-998F-00AD99FF119C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Bot.Discord", "src\Blackwall.Bot.Discord\Blackwall.Bot.Discord.csproj", "{8A4B43BD-1AA5-47A1-998F-00AD99FF119C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Core", "src\Blackwall.Core\Blackwall.Core.csproj", "{8AE09C9B-EAA8-4FAB-9A3F-857FD20F93AE}"
 EndProject

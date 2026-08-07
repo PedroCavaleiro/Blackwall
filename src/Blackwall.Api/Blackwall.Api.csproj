@@ -11,7 +11,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Blackwall.DiscordBot\Blackwall.DiscordBot.csproj" />
+      <ProjectReference Include="..\Blackwall.Bot.Discord\Blackwall.Bot.Discord.csproj" />
       <ProjectReference Include="..\Blackwall.TwitchBot\Blackwall.TwitchBot.csproj" />
       <ProjectReference Include="..\Blackwall.Core\Blackwall.Core.csproj" />
       <ProjectReference Include="..\Blackwall.Infrastructure\Blackwall.Infrastructure.csproj" />

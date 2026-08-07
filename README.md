@@ -154,7 +154,7 @@ The solution is split into five projects:
 |---------|-------------|
 | `Blackwall.Core` | Shared entities, DTOs, and configuration models |
 | `Blackwall.Infrastructure` | PostgreSQL persistence (EF Core) and Redis caching |
-| `Blackwall.DiscordBot` | Discord gateway client — spam detection, guild events, background sync |
+| `Blackwall.Bot.Discord` | Discord gateway client — spam detection, guild events, background sync |
 | `Blackwall.Api` | ASP.NET Core Web API — OAuth flows, JWT auth, guild management endpoints |
 | `Blackwall.Web` | Blazor Server dashboard — authenticates against the API |
 
@@ -376,7 +376,7 @@ When `ENABLE_DOCS=true` is set in your environment, the API exposes an OpenAPI s
 Blackwall/
 ├── src/
 │   ├── Blackwall.Api/          # Web API + Discord bot host
-│   ├── Blackwall.DiscordBot/    # Discord bot worker, handlers, background services
+│   ├── Blackwall.Bot.Discord/    # Discord bot worker, handlers, background services
 │   ├── Blackwall.Core/         # Entities, DTOs, configuration
 │   ├── Blackwall.Infrastructure/ # EF Core DbContext, Redis cache
 │   └── Blackwall.Web/          # Blazor Server dashboard

@@ -47,7 +47,7 @@ Thanks for your interest in contributing! This document outlines how to get star
 |---------|---------|
 | `Blackwall.Core` | Entities, DTOs, configuration — no dependencies on other projects |
 | `Blackwall.Infrastructure` | EF Core DbContext, Redis cache |
-| `Blackwall.DiscordBot` | Discord gateway client, event handlers, background services |
+| `Blackwall.Bot.Discord` | Discord gateway client, event handlers, background services |
 | `Blackwall.Api` | ASP.NET Core Web API, OAuth flows, JWT auth |
 | `Blackwall.Web` | Blazor Server dashboard |
 
