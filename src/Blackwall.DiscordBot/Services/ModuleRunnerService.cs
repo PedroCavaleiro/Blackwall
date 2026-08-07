@@ -1,6 +1,6 @@
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
-using Blackwall.DetectionMatrix;
+using Blackwall.Modules.DetectionMatrix;
 using Blackwall.Infrastructure.Cache.Discord;
 using Blackwall.Modules.Abstractions;
 using Discord.WebSocket;

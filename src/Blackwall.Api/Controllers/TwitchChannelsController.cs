@@ -6,7 +6,7 @@ using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
 using Blackwall.Infrastructure.Persistence;
-using Blackwall.LinkProtection;
+using Blackwall.Modules.LinkProtection;
 using Blackwall.TwitchBot;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

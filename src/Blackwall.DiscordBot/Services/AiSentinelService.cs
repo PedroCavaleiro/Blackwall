@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
-using Blackwall.DetectionMatrix;
+using Blackwall.Modules.DetectionMatrix;
 using Discord;
 using Discord.WebSocket;
 using Microsoft.EntityFrameworkCore;

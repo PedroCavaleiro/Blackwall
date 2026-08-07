@@ -1,5 +1,5 @@
 using Blackwall.DiscordBot.Services;
-using Blackwall.LinkProtection.Services;
+using Blackwall.Modules.LinkProtection.Services;
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
 using Blackwall.Infrastructure.Cache.Discord;

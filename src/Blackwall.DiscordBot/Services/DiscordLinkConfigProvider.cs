@@ -1,5 +1,5 @@
 using Blackwall.Infrastructure.Persistence;
-using Blackwall.LinkProtection;
+using Blackwall.Modules.LinkProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

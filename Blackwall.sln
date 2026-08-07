@@ -14,9 +14,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Modules.Abstracti
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.TwitchBot", "src\Blackwall.TwitchBot\Blackwall.TwitchBot.csproj", "{E2F4A5B6-7C8D-9E01-A2B3-C4D5E6F70829}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.LinkProtection", "src\Blackwall.LinkProtection\Blackwall.LinkProtection.csproj", "{A1B2C3D4-E5F6-7890-1234-567890ABCDEF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Modules.LinkProtection", "src\Blackwall.Modules.LinkProtection\Blackwall.Modules.LinkProtection.csproj", "{A1B2C3D4-E5F6-7890-1234-567890ABCDEF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.DetectionMatrix", "src\Blackwall.DetectionMatrix\Blackwall.DetectionMatrix.csproj", "{B2C3D4E5-F6A7-8901-2345-67890ABCDEF1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Modules.DetectionMatrix", "src\Blackwall.Modules.DetectionMatrix\Blackwall.Modules.DetectionMatrix.csproj", "{B2C3D4E5-F6A7-8901-2345-67890ABCDEF1}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Modules", "Modules", "{10863526-CB4F-4070-837F-20130A8AA0E4}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Bots", "Bots", "{D093FC31-8E47-444F-85C3-1767D1038F1E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -60,5 +64,12 @@ Global
 		{B2C3D4E5-F6A7-8901-2345-67890ABCDEF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B2C3D4E5-F6A7-8901-2345-67890ABCDEF1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B2C3D4E5-F6A7-8901-2345-67890ABCDEF1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{B2C3D4E5-F6A7-8901-2345-67890ABCDEF1} = {10863526-CB4F-4070-837F-20130A8AA0E4}
+		{A1B2C3D4-E5F6-7890-1234-567890ABCDEF} = {10863526-CB4F-4070-837F-20130A8AA0E4}
+		{D1A3B4C5-6D7E-8F90-A1B2-C3D4E5F60718} = {10863526-CB4F-4070-837F-20130A8AA0E4}
+		{8A4B43BD-1AA5-47A1-998F-00AD99FF119C} = {D093FC31-8E47-444F-85C3-1767D1038F1E}
+		{E2F4A5B6-7C8D-9E01-A2B3-C4D5E6F70829} = {D093FC31-8E47-444F-85C3-1767D1038F1E}
 	EndGlobalSection
 EndGlobal

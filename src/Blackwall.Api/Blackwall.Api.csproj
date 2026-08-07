@@ -15,8 +15,8 @@
       <ProjectReference Include="..\Blackwall.TwitchBot\Blackwall.TwitchBot.csproj" />
       <ProjectReference Include="..\Blackwall.Core\Blackwall.Core.csproj" />
       <ProjectReference Include="..\Blackwall.Infrastructure\Blackwall.Infrastructure.csproj" />
-      <ProjectReference Include="..\Blackwall.LinkProtection\Blackwall.LinkProtection.csproj" />
-      <ProjectReference Include="..\Blackwall.DetectionMatrix\Blackwall.DetectionMatrix.csproj" />
+      <ProjectReference Include="..\Blackwall.Modules.LinkProtection\Blackwall.Modules.LinkProtection.csproj" />
+      <ProjectReference Include="..\Blackwall.Modules.DetectionMatrix\Blackwall.Modules.DetectionMatrix.csproj" />
     </ItemGroup>
 
     <ItemGroup>

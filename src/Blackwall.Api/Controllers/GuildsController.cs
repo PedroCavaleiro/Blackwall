@@ -9,7 +9,7 @@ using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
 using Blackwall.Infrastructure.Cache.Discord;
 using Blackwall.Infrastructure.Persistence;
-using Blackwall.LinkProtection;
+using Blackwall.Modules.LinkProtection;
 using Discord.WebSocket;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
