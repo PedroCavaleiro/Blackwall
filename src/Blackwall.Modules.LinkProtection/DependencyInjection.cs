@@ -1,6 +1,9 @@
 using Blackwall.Core.Configuration;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+// ReSharper disable UnusedType.Global
+// ReSharper disable UnusedMember.Global
+// ReSharper disable RedundantTypeArgumentsOfMethod
+// ReSharper disable UnusedParameter.Local
 
 namespace Blackwall.Modules.LinkProtection;
 

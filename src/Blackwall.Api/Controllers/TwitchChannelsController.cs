@@ -12,7 +12,6 @@ using Blackwall.Bot.Twitch;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using TwitchLib.Api;
 // ReSharper disable NullableWarningSuppressionIsUsed

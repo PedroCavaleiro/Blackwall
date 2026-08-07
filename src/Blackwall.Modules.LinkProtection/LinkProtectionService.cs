@@ -4,6 +4,8 @@ using Blackwall.Core.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+// ReSharper disable NullableWarningSuppressionIsUsed
+// ReSharper disable MemberCanBePrivate.Global
 
 namespace Blackwall.Modules.LinkProtection;
 
@@ -121,12 +123,9 @@ public sealed partial class LinkProtectionService(
             pathCandidates.Add("/" + built);
         }
 
-        foreach (var hc in hostCandidates) {
-            foreach (var pc in pathCandidates) {
-                var candidate = $"{hc}|{pc}";
-                if (await db.SetContainsAsync(ruleKey, candidate))
-                    return isWhitelist ? false : true;
-            }
+        foreach (var candidate in hostCandidates.SelectMany(hc => pathCandidates.Select(pc => $"{hc}|{pc}"))) {
+            if (await db.SetContainsAsync(ruleKey, candidate))
+                return !isWhitelist;
         }
 
         return isWhitelist;

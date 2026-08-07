@@ -23,6 +23,8 @@ using TwitchLib.Api.Helix.Models.Moderation.BanUser;
 // ReSharper disable AllUnderscoreLocalParameterName
 // ReSharper disable NullableWarningSuppressionIsUsed
 // ReSharper disable MethodHasAsyncOverload
+// ReSharper disable NotAccessedPositionalProperty.Global
+// ReSharper disable PartialTypeWithSinglePart
 
 namespace Blackwall.Bot.Twitch;
 
@@ -328,7 +330,7 @@ public sealed partial class TwitchBotService(
             var twitchUserId = long.Parse(e.ChatMessage.UserId);
             var violations = new List<(string Type, InfractionAction Action, int TimeoutMinutes)>(3);
 
-            if (detectionConfig.MaxMessagesPerWindow > 0 && detectionConfig.RateLimitWindowSeconds > 0) {
+            if (detectionConfig is { MaxMessagesPerWindow: > 0, RateLimitWindowSeconds: > 0 }) {
                 if (await spamDetectionService.IsRateLimitedAsync(
                         broadcasterId.ToString(), twitchUserId.ToString(), e.ChatMessage.Id,
                         detectionConfig.MaxMessagesPerWindow, detectionConfig.RateLimitWindowSeconds)) {

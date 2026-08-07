@@ -2,6 +2,8 @@ using Blackwall.Infrastructure.Persistence;
 using Blackwall.Modules.LinkProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+// ReSharper disable NullableWarningSuppressionIsUsed
+// ReSharper disable RedundantAnonymousTypePropertyName
 
 namespace Blackwall.Bot.Twitch;
 
