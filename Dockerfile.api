@@ -6,6 +6,7 @@ COPY src/Blackwall.Infrastructure/Blackwall.Infrastructure.csproj     src/Blackw
 COPY src/Blackwall.Bot.Discord/Blackwall.Bot.Discord.csproj             src/Blackwall.Bot.Discord/
 COPY src/Blackwall.Api/Blackwall.Api.csproj                           src/Blackwall.Api/
 COPY src/Blackwall.Modules.Abstractions/Blackwall.Modules.Abstractions.csproj src/Blackwall.Modules.Abstractions/
+COPY src/Blackwall.Modules.ContentGuard/Blackwall.Modules.ContentGuard.csproj src/Blackwall.Modules.ContentGuard/
 RUN dotnet restore src/Blackwall.Api/Blackwall.Api.csproj
 
 COPY src/ src/

@@ -7,7 +7,7 @@ using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
 using Blackwall.Infrastructure.Persistence;
 using Blackwall.Modules.LinkProtection;
-using Blackwall.TwitchBot;
+using Blackwall.Bot.Twitch;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;

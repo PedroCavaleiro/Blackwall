@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Blackwall.TwitchBot;
+namespace Blackwall.Bot.Twitch;
 
 public sealed class TwitchBotWorker(
     TwitchBotService twitchBotService,

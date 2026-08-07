@@ -3,7 +3,7 @@ using Blackwall.Modules.LinkProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Blackwall.TwitchBot;
+namespace Blackwall.Bot.Twitch;
 
 public sealed class TwitchLinkConfigProvider(
     IServiceScopeFactory scopeFactory

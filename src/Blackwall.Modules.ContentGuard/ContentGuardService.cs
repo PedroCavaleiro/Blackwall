@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
 // ReSharper disable UnusedVariable
 
-namespace Blackwall.Bot.Discord.Services;
+namespace Blackwall.Modules.ContentGuard;
 
 public sealed partial class ContentGuardService(
     IConnectionMultiplexer redis,

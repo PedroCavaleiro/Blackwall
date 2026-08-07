@@ -3,6 +3,7 @@ using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
 using Blackwall.Modules.DetectionMatrix;
+using Blackwall.Modules.ContentGuard;
 using Blackwall.Bot.Discord.Services;
 using Blackwall.Infrastructure.Cache.Discord;
 using Blackwall.Modules.LinkProtection;

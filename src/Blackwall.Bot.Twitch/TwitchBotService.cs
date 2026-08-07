@@ -23,7 +23,7 @@ using TwitchLib.Api.Helix.Models.Moderation.BanUser;
 // ReSharper disable NullableWarningSuppressionIsUsed
 // ReSharper disable MethodHasAsyncOverload
 
-namespace Blackwall.TwitchBot;
+namespace Blackwall.Bot.Twitch;
 
 public sealed partial class TwitchBotService(
     BlackwallDbContext dbContext,
