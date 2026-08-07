@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
+using Blackwall.DetectionMatrix;
 using Discord;
 using Discord.WebSocket;
 using Microsoft.EntityFrameworkCore;
@@ -79,7 +80,7 @@ public sealed class AiSentinelService(
         AiSentinelConfigurationDto config,
         CancellationToken cancellationToken = default
     ) {
-        var fullContent = SpamDetectionService.ExtractFullContent(message);
+        var fullContent = DetectionService.ExtractFullContent(message);
 
         if (string.IsNullOrWhiteSpace(fullContent))
             return new AiSentinelAnalysisResult(AiSentinelClassification.Clean, "Message has no content.");

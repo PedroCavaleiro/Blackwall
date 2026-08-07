@@ -8,6 +8,7 @@ using Blackwall.DiscordBot;
 using Blackwall.DiscordBot.Background;
 using Blackwall.DiscordBot.Handlers;
 using Blackwall.DiscordBot.Services;
+using Blackwall.DetectionMatrix;
 using Blackwall.TwitchBot;
 using Blackwall.LinkProtection;
 using Blackwall.LinkProtection.Background;
@@ -100,7 +101,6 @@ builder.Services.AddSingleton<DiscordSocketClient>(_ => new DiscordSocketClient(
 builder.Services.AddSingleton<GuildHandler>();
 builder.Services.AddSingleton<MessageHandler>();
 builder.Services.AddSingleton<GuildMemberHandler>();
-builder.Services.AddSingleton<SpamDetectionService>();
 builder.Services.AddSingleton<RaidDetectionService>();
 builder.Services.AddSingleton<AccountScoringService>();
 builder.Services.AddSingleton<LockdownService>();
@@ -123,8 +123,15 @@ builder.Services.AddScoped<MessageAuditService>();
 builder.Services.AddSingleton<ModuleRunnerService>();
 builder.Services.AddScoped<ModuleInstallationService>();
 builder.Services.AddScoped<TwitchChannelService>();
-builder.Services.AddSingleton<TwitchSpamDetectionService>();
 builder.Services.AddSingleton<TwitchBotService>();
+builder.Services.AddKeyedSingleton<DetectionService>("discord", (sp, _) => {
+    var redis = sp.GetRequiredService<IConnectionMultiplexer>();
+    return new DetectionService("spam:", redis);
+});
+builder.Services.AddKeyedSingleton<DetectionService>("twitch", (sp, _) => {
+    var redis = sp.GetRequiredService<IConnectionMultiplexer>();
+    return new DetectionService("twitch:", redis);
+});
 builder.Services.AddKeyedSingleton<ILinkConfigProvider, DiscordLinkConfigProvider>("discord");
 builder.Services.AddKeyedSingleton<ILinkConfigProvider, TwitchLinkConfigProvider>("twitch");
 builder.Services.AddKeyedSingleton<LinkProtectionService>("discord", (sp, _) => {

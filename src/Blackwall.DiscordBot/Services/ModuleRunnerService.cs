@@ -1,5 +1,6 @@
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
+using Blackwall.DetectionMatrix;
 using Blackwall.Infrastructure.Cache.Discord;
 using Blackwall.Modules.Abstractions;
 using Discord.WebSocket;
@@ -257,7 +258,7 @@ public sealed class ModuleRunnerService(
             ))
             .ToList();
 
-        var fullContent = SpamDetectionService.ExtractFullContent(message);
+        var fullContent = DetectionService.ExtractFullContent(message);
 
         return new ModuleMessageContext(
             discordGuildId,

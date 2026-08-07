@@ -13,6 +13,7 @@
       <ProjectReference Include="..\Blackwall.Infrastructure\Blackwall.Infrastructure.csproj" />
       <ProjectReference Include="..\Blackwall.Modules.Abstractions\Blackwall.Modules.Abstractions.csproj" />
       <ProjectReference Include="..\Blackwall.LinkProtection\Blackwall.LinkProtection.csproj" />
+      <ProjectReference Include="..\Blackwall.DetectionMatrix\Blackwall.DetectionMatrix.csproj" />
     </ItemGroup>
 
     <ItemGroup>

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Blackwall.Core.Configuration;
 using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
+using Blackwall.DetectionMatrix;
 using Blackwall.Infrastructure.Persistence;
 using Blackwall.LinkProtection;
 using Microsoft.EntityFrameworkCore;
@@ -28,7 +29,7 @@ public sealed partial class TwitchBotService(
     BlackwallDbContext dbContext,
     IOptions<TwitchOptions> twitchOptions,
     IOptions<AppConfiguration> appConfig,
-    TwitchSpamDetectionService spamDetectionService,
+    [FromKeyedServices("twitch")] DetectionService spamDetectionService,
     [FromKeyedServices("twitch")] LinkProtectionService linkProtectionService,
     ISafeBrowsingService safeBrowsingService,
     ILogger<TwitchBotService> logger
@@ -319,23 +320,24 @@ public sealed partial class TwitchBotService(
 
             if (detectionConfig.MaxMessagesPerWindow > 0 && detectionConfig.RateLimitWindowSeconds > 0) {
                 if (await spamDetectionService.IsRateLimitedAsync(
-                        broadcasterId, twitchUserId, e.ChatMessage.Id,
+                        broadcasterId.ToString(), twitchUserId.ToString(), e.ChatMessage.Id,
                         detectionConfig.MaxMessagesPerWindow, detectionConfig.RateLimitWindowSeconds)) {
                     violations.Add(("rate_limit", detectionConfig.RateLimitAction, detectionConfig.RateLimitTimeoutMinutes));
                 }
             }
 
             if (detectionConfig.DuplicateMessageThreshold > 0) {
-                if (await spamDetectionService.IsDuplicateAsync(
-                        broadcasterId, twitchUserId, e.ChatMessage.Id,
+                var dupResult = await spamDetectionService.IsDuplicateAsync(
+                        broadcasterId.ToString(), twitchUserId.ToString(), e.ChatMessage.Id,
                         e.ChatMessage.Message,
-                        detectionConfig.DuplicateMessageThreshold, detectionConfig.DuplicateWindowSeconds)) {
+                        detectionConfig.DuplicateMessageThreshold, detectionConfig.DuplicateWindowSeconds);
+                if (dupResult.IsDuplicate) {
                     violations.Add(("duplicate", detectionConfig.DuplicateAction, detectionConfig.DuplicateTimeoutMinutes));
                 }
             }
 
             if (detectionConfig.MentionLimit > 0) {
-                if (TwitchSpamDetectionService.ExceedsMentionLimit(e.ChatMessage.Message, detectionConfig.MentionLimit)) {
+                if (DetectionService.ExceedsMentionLimit(e.ChatMessage.Message, detectionConfig.MentionLimit)) {
                     violations.Add(("mention_limit", detectionConfig.MentionLimitAction, detectionConfig.MentionLimitTimeoutMinutes));
                 }
             }

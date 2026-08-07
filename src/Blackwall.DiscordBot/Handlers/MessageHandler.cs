@@ -1,8 +1,9 @@
-using Blackwall.DiscordBot.Services;
 using Blackwall.Core.Configuration;
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
+using Blackwall.DetectionMatrix;
+using Blackwall.DiscordBot.Services;
 using Blackwall.Infrastructure.Cache.Discord;
 using Blackwall.LinkProtection;
 using Blackwall.LinkProtection.Services;
@@ -17,7 +18,7 @@ namespace Blackwall.DiscordBot.Handlers;
 
 public sealed class MessageHandler(
     IServiceScopeFactory scopeFactory,
-    SpamDetectionService spamDetectionService,
+    [FromKeyedServices("discord")] DetectionService spamDetectionService,
     [FromKeyedServices("discord")] LinkProtectionService linkProtectionService,
     LockdownService lockdownService,
     SafeBrowsingService safeBrowsingService,
@@ -137,7 +138,7 @@ public sealed class MessageHandler(
         List<(ulong ChannelId, ulong MessageId)>? duplicateMessagesToDelete = null;
 
         if (await spamDetectionService.IsRateLimitedAsync(
-                discordGuildId, discordUserId, message.Id,
+                discordGuildId.ToString(), discordUserId.ToString(), message.Id.ToString(),
                 config.MaxMessagesPerWindow, config.RateLimitWindowSeconds)) {
             violations.Add("Rate Limit");
             triggeredModules.Add((config.RateLimitAction, config.RateLimitTimeoutMinutes, config.RateLimitMessageDeleteDays));
@@ -145,24 +146,27 @@ public sealed class MessageHandler(
                 shouldLockdown = true;
         }
 
-        var fullContent = SpamDetectionService.ExtractFullContent(message);
+        var fullContent = DetectionService.ExtractFullContent(message);
 
         var dupResult = await spamDetectionService.IsDuplicateAsync(
-            discordGuildId, discordUserId,
-            message.Channel.Id,
-            message.Id,
+            discordGuildId.ToString(), discordUserId.ToString(),
+            message.Id.ToString(),
             fullContent, config.DuplicateMessageThreshold,
-            config.DuplicateWindowSeconds, config.DuplicateCrossChannelEnabled);
+            config.DuplicateWindowSeconds,
+            message.Channel.Id.ToString(),
+            config.DuplicateCrossChannelEnabled);
 
         if (dupResult.IsDuplicate) {
             violations.Add("Duplicate");
             triggeredModules.Add((config.DuplicateAction, config.DuplicateTimeoutMinutes, config.DuplicateMessageDeleteDays));
             if (config is { DuplicateAutoLockdown: true, IsLockedDown: false })
                 shouldLockdown = true;
-            duplicateMessagesToDelete = dupResult.MessagesToDelete.ToList();
+            duplicateMessagesToDelete = dupResult.MessagesToDelete
+                .Select(m => (ulong.Parse(m.ChannelKey), ulong.Parse(m.MessageId)))
+                .ToList();
         }
 
-        if (SpamDetectionService.ExceedsMentionLimit(message, config.MentionLimit)) {
+        if (DetectionService.ExceedsMentionLimit(message, config.MentionLimit)) {
             violations.Add("Mention Limit");
             triggeredModules.Add((config.MentionLimitAction, config.MentionLimitTimeoutMinutes, config.MentionLimitMessageDeleteDays));
             if (config is { MentionLimitAutoLockdown: true, IsLockedDown: false })
