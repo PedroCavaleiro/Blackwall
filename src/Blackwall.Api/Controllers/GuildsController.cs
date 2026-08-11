@@ -32,7 +32,7 @@ public sealed class GuildsController(
     DiscordSocketClient discordClient,
     LockdownService lockdownService,
     [FromKeyedServices("discord")] LinkProtectionService linkProtectionService,
-    BanSyncService banSyncService,
+    DiscordBanSyncService banSyncService,
     AllowedBotService allowedBotService,
     AiSentinelCache aiSentinelCache,
     AiSentinelService aiSentinelService,
@@ -1308,10 +1308,10 @@ public sealed class GuildsController(
                 Status = StatusCodes.Status400BadRequest
             });
 
-        var (imported, skipped, failed, errors) = await banSyncService.ImportBansAsync(
+        var result = await banSyncService.ImportBansAsync(
             discordGuildId, request.SourceDiscordGuildId, request.DiscordUserIds, cancellationToken);
 
-        return Ok(new ImportBansResultResponse(imported, skipped, failed, errors));
+        return Ok(new ImportBansResultResponse(result.Imported, result.Skipped, result.Failed, result.Errors));
     }
 
     /// <summary>

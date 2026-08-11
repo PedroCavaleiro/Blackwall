@@ -18,6 +18,7 @@
       <ProjectReference Include="..\Blackwall.Modules.LinkProtection\Blackwall.Modules.LinkProtection.csproj" />
       <ProjectReference Include="..\Blackwall.Modules.DetectionMatrix\Blackwall.Modules.DetectionMatrix.csproj" />
       <ProjectReference Include="..\Blackwall.Modules.ContentGuard\Blackwall.Modules.ContentGuard.csproj" />
+      <ProjectReference Include="..\Blackwall.Modules.Banlist\Blackwall.Modules.Banlist.csproj" />
     </ItemGroup>
 
     <ItemGroup>

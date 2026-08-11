@@ -1590,10 +1590,10 @@ public sealed class TwitchChannelsController(
                 Status = StatusCodes.Status400BadRequest
             });
 
-        var (imported, skipped, failed, errors) = await twitchBanSyncService.ImportBansAsync(
+        var result = await twitchBanSyncService.ImportBansAsync(
             twitchUserId, request.SourceTwitchUserId, request.TwitchUserIds, cancellationToken);
 
-        return Ok(new ImportTwitchBansResultResponse(imported, skipped, failed, errors));
+        return Ok(new ImportTwitchBansResultResponse(result.Imported, result.Skipped, result.Failed, result.Errors));
     }
 
     [HttpGet("{twitchUserId:long}/bans/auto-sync")]

@@ -1,30 +1,31 @@
-using Blackwall.Bot.Discord.Services;
-using Blackwall.Core.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
-namespace Blackwall.Bot.Discord.Background;
+namespace Blackwall.Modules.Banlist;
 
-public sealed class BanSyncBackgroundService(
+public class BanSyncBackgroundService<TOptions>(
     IServiceScopeFactory scopeFactory,
-    IOptions<GuildSyncOptions> options,
-    ILogger<BanSyncBackgroundService> logger
-) : BackgroundService {
-    private readonly GuildSyncOptions _options = options.Value;
+    Func<TOptions, (bool Enabled, int IntervalMinutes)> optionsSelector,
+    string platformName,
+    ILogger<BanSyncBackgroundService<TOptions>> logger
+) : BackgroundService where TOptions : class {
 
-    /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
-        if (!_options.Enabled) {
-            logger.LogInformation("Ban sync background service is disabled");
+        using var scope = scopeFactory.CreateScope();
+        var options = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<TOptions>>().Value;
+        var (enabled, intervalMinutes) = optionsSelector(options);
+
+        if (!enabled) {
+            logger.LogInformation("{Platform} ban sync background service is disabled", platformName);
             return;
         }
 
-        var interval = TimeSpan.FromMinutes(Math.Max(1, _options.IntervalMinutes));
+        var interval = TimeSpan.FromMinutes(Math.Max(1, intervalMinutes));
 
         logger.LogInformation(
-            "Ban sync background service started with interval {IntervalMinutes} minute(s)",
+            "{Platform} ban sync background service started with interval {IntervalMinutes} minute(s)",
+            platformName,
             interval.TotalMinutes
         );
 
@@ -36,7 +37,7 @@ public sealed class BanSyncBackgroundService(
             } catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) {
                 break;
             } catch (Exception ex) {
-                logger.LogError(ex, "Error while syncing bans");
+                logger.LogError(ex, "Error while syncing {Platform} bans", platformName);
             }
 
             try {
@@ -47,17 +48,12 @@ public sealed class BanSyncBackgroundService(
             }
         }
 
-        logger.LogInformation("Ban sync background service stopped");
+        logger.LogInformation("{Platform} ban sync background service stopped", platformName);
     }
 
-    /// <summary>
-    /// Runs a single ban sync operation for all active guilds.
-    /// </summary>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
     private async Task RunOnceAsync(CancellationToken cancellationToken) {
         using var scope = scopeFactory.CreateScope();
         var banSyncService = scope.ServiceProvider.GetRequiredService<BanSyncService>();
-
         await banSyncService.SyncAllBansAsync(cancellationToken);
         await banSyncService.ProcessAutoSyncRulesAsync(cancellationToken);
     }
