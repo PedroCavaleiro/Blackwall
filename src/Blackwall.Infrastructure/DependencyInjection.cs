@@ -33,7 +33,6 @@ public static class DependencyInjection {
         services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConnection));
         services.AddScoped<SpamConfigurationCache>();
         services.AddScoped<NetWatchSnareChannelCache>();
-        services.AddScoped<AiSentinelCache>();
         services.AddScoped<ModuleInstallationCache>();
     }
 

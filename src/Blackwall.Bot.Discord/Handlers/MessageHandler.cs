@@ -1,4 +1,3 @@
-using Blackwall.Core.Configuration;
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
@@ -12,7 +11,6 @@ using Discord;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using System.Text;
 
 namespace Blackwall.Bot.Discord.Handlers;
@@ -27,10 +25,8 @@ public sealed class MessageHandler(
     AllowedBotService allowedBotService,
     MessageAuditService messageAuditService,
     NetWatchSnareService netWatchSnareService,
-    AiSentinelService aiSentinelService,
     ModuleRunnerService moduleRunnerService,
     DiscordSocketClient discordClient,
-    IOptions<AppConfiguration> appConfiguration,
     ILogger<MessageHandler> logger
 ) {
     private const long DebugLogGuildId = 1194456258703544431;
@@ -224,11 +220,6 @@ public sealed class MessageHandler(
                 shouldLockdown = true;
         }
 
-        if (violations.Count == 0 && appConfiguration.Value.AiSentinelEnabled) {
-            await RunAiSentinelAsync(message, guildChannel, discordGuildId, discordUserId, config);
-            return;
-        }
-
         var violationSummary = string.Join(", ", violations);
         var (effectiveAction, effectiveTimeoutMinutes, effectiveDeleteDays) = GetMostSevereModule(triggeredModules);
 
@@ -293,152 +284,6 @@ public sealed class MessageHandler(
                 duplicateMessagesToDelete,
                 CancellationToken.None
             ));
-        }
-    }
-
-    /// <summary>
-    /// Runs the AI Sentinel module as the last step in the protection pipeline.
-    /// Only executes if no other protection modules were triggered.
-    /// Respects the module's own enable/disable and dry-run settings.
-    /// In training mode, logs all analyses but only logs to the audit channel the ones that would have resulted in an action.
-    /// </summary>
-    private async Task RunAiSentinelAsync(
-        SocketUserMessage message,
-        SocketGuildChannel guildChannel,
-        long discordGuildId,
-        long discordUserId,
-        SpamConfigurationDto spamConfig
-    ) {
-        AiSentinelConfigurationDto? aiConfig;
-
-        using (var scope = scopeFactory.CreateScope()) {
-            var aiCache = scope.ServiceProvider.GetRequiredService<AiSentinelCache>();
-            aiConfig = await aiCache.GetByDiscordGuildIdAsync(discordGuildId);
-        }
-
-        if (aiConfig is null || !aiConfig.IsEnabled)
-            return;
-
-        if (string.IsNullOrWhiteSpace(aiConfig.Model))
-            return;
-
-        if (aiConfig.Provider != AiSentinelProvider.Ollama && string.IsNullOrWhiteSpace(aiConfig.ApiKey))
-            return;
-
-        if (aiConfig.Provider == AiSentinelProvider.Ollama && string.IsNullOrWhiteSpace(aiConfig.OllamaUrl))
-            return;
-
-        var result = await aiSentinelService.AnalyzeMessageAsync(message, aiConfig);
-        if (result is null)
-            return;
-
-        var isMalicious = result.Classification != AiSentinelClassification.Clean;
-        var wouldAction = isMalicious;
-
-        var effectiveDryRun = aiConfig.IsTrainingMode || aiConfig.IsDryRun || spamConfig.IsDryRun;
-
-        logger.LogInformation(
-            "AI Sentinel analyzed message {MessageId} in guild {GuildId}: {Classification} (Reasoning={Reasoning}, WouldAction={WouldAction}, DryRun={DryRun}, TrainingMode={TrainingMode})",
-            message.Id, discordGuildId, result.Classification, result.Reasoning, wouldAction, effectiveDryRun, aiConfig.IsTrainingMode);
-
-        if (wouldAction && !effectiveDryRun) {
-            try {
-                await message.DeleteAsync();
-            } catch (Exception ex) {
-                logger.LogWarning(ex,
-                    "Failed to delete AI-flagged message {MessageId} in guild {GuildId}",
-                    message.Id, discordGuildId);
-            }
-
-            await ApplyActionAsync(message, guildChannel.Guild, aiConfig.Action, aiConfig.TimeoutMinutes, aiConfig.MessageDeleteDays);
-
-            if (aiConfig.AutoLockdown && !spamConfig.IsLockedDown) {
-                logger.LogWarning(
-                    "Auto-lockdown triggered for guild {GuildId} due to AI Sentinel infraction from user {UserId}: {Classification}",
-                    discordGuildId, discordUserId, result.Classification);
-
-                _ = Task.Run(() => lockdownService.LockdownAsync(guildChannel.Guild.Id));
-            }
-        }
-
-        if (wouldAction && spamConfig.LogChannelId.HasValue) {
-            try {
-                await SendAiLogMessageAsync(message, guildChannel.Guild, result, aiConfig, effectiveDryRun);
-            } catch (Exception ex) {
-                logger.LogWarning(ex,
-                    "Failed to send AI sentinel log message in guild {GuildId}",
-                    discordGuildId);
-            }
-        }
-
-        if (wouldAction && spamConfig.IsMessageAuditEnabled) {
-            _ = Task.Run(() => messageAuditService.RecordEventAsync(
-                discordGuildId,
-                message,
-                [$"AI Sentinel: {result.Classification}"],
-                aiConfig.Action,
-                effectiveDryRun,
-                spamConfig.MessageAuditRetentionDays,
-                null,
-                CancellationToken.None
-            ));
-        }
-
-        _ = Task.Run(() => aiSentinelService.LogAnalysisAsync(
-            discordGuildId,
-            message,
-            aiConfig,
-            result,
-            wouldAction,
-            effectiveDryRun,
-            spamConfig.MessageAuditRetentionDays,
-            CancellationToken.None
-        ));
-    }
-
-    /// <summary>
-    /// Sends an AI Sentinel infraction log embed to the configured log channel.
-    /// </summary>
-    private async Task SendAiLogMessageAsync(
-        SocketUserMessage message,
-        SocketGuild guild,
-        AiSentinelAnalysisResult result,
-        AiSentinelConfigurationDto aiConfig,
-        bool isDryRun
-    ) {
-        using var scope = scopeFactory.CreateScope();
-        var cache = scope.ServiceProvider.GetRequiredService<SpamConfigurationCache>();
-        var config = await cache.GetByDiscordGuildIdAsync((long)guild.Id);
-
-        if (config?.LogChannelId is null)
-            return;
-
-        var channel = guild.GetTextChannel((ulong)config.LogChannelId.Value);
-        if (channel is null)
-            return;
-
-        var actionLabel = isDryRun
-            ? $"[DRY RUN] Would have applied: **{aiConfig.Action}**"
-            : $"**{aiConfig.Action}**";
-
-        var embed = new EmbedBuilder()
-            .WithColor(isDryRun ? Color.Gold : Color.Red)
-            .WithTitle(isDryRun ? "⚠️ Dry Run — AI Sentinel Detection" : "🤖 AI Sentinel Action Taken")
-            .AddField("User", $"{message.Author.Mention} (`{message.Author.Id}`)", true)
-            .AddField("Channel", $"<#{message.Channel.Id}>", true)
-            .AddField("Classification", result.Classification.ToString())
-            .AddField("Reasoning", result.Reasoning.Length > 1024 ? result.Reasoning[..1021] + "..." : result.Reasoning)
-            .AddField("Model", $"{aiConfig.Provider} / {aiConfig.Model}", true)
-            .AddField("Action", actionLabel, true)
-            .WithTimestamp(message.Timestamp)
-            .Build();
-
-        try {
-            await channel.SendMessageAsync(embed: embed);
-        } catch (Exception ex) {
-            logger.LogWarning(ex,
-                "Failed to send AI log message to channel {ChannelId} in guild {GuildId}",
-                config.LogChannelId.Value, guild.Id);
         }
     }
 

@@ -22,196 +22,6 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Blackwall.Core.Entities.AiSentinelConfiguration", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<int>("Action")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<string>("ApiKey")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<bool>("AutoLockdown")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("GuildInstanceId")
-                        .HasColumnType("bigint");
-
-                    b.Property<bool>("IsDryRun")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("IsTrainingMode")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<int>("MessageDeleteDays")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<string>("Model")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("OllamaHeader1Key")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("OllamaHeader1Value")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<string>("OllamaHeader2Key")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("OllamaHeader2Value")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<string>("OllamaHeader3Key")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("OllamaHeader3Value")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<string>("OllamaUrl")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<int>("Provider")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<int>("TimeoutMinutes")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(10);
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GuildInstanceId")
-                        .IsUnique();
-
-                    b.ToTable("AiSentinelConfigurations");
-                });
-
-            modelBuilder.Entity("Blackwall.Core.Entities.AiSentinelLog", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("AiSentinelConfigurationId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("AvatarHash")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ChannelName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<int>("Classification")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("DiscordChannelId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("DiscordMessageId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("DiscordUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("EmbedsJson")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDryRun")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("MessageTimestampUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Model")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<int>("Provider")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Reasoning")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("TrainingFeedback")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<string>("Username")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<bool>("WouldAction")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AiSentinelConfigurationId");
-
-                    b.HasIndex("ExpiresAtUtc");
-
-                    b.HasIndex("AiSentinelConfigurationId", "CreatedAtUtc");
-
-                    b.ToTable("AiSentinelLogs");
-                });
-
             modelBuilder.Entity("Blackwall.Core.Entities.AppUser", b =>
                 {
                     b.Property<long>("Id")
@@ -1499,28 +1309,6 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.ToTable("TwitchRemovedManagers");
                 });
 
-            modelBuilder.Entity("Blackwall.Core.Entities.AiSentinelConfiguration", b =>
-                {
-                    b.HasOne("Blackwall.Core.Entities.GuildInstance", "GuildInstance")
-                        .WithOne("AiSentinelConfiguration")
-                        .HasForeignKey("Blackwall.Core.Entities.AiSentinelConfiguration", "GuildInstanceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("GuildInstance");
-                });
-
-            modelBuilder.Entity("Blackwall.Core.Entities.AiSentinelLog", b =>
-                {
-                    b.HasOne("Blackwall.Core.Entities.AiSentinelConfiguration", "AiSentinelConfiguration")
-                        .WithMany("Logs")
-                        .HasForeignKey("AiSentinelConfigurationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AiSentinelConfiguration");
-                });
-
             modelBuilder.Entity("Blackwall.Core.Entities.GuildAllowedBot", b =>
                 {
                     b.HasOne("Blackwall.Core.Entities.SpamConfiguration", "SpamConfiguration")
@@ -1777,11 +1565,6 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Blackwall.Core.Entities.AiSentinelConfiguration", b =>
-                {
-                    b.Navigation("Logs");
-                });
-
             modelBuilder.Entity("Blackwall.Core.Entities.AppUser", b =>
                 {
                     b.Navigation("ManagedGuilds");
@@ -1795,9 +1578,6 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Blackwall.Core.Entities.GuildInstance", b =>
                 {
-                    b.Navigation("AiSentinelConfiguration")
-                        .IsRequired();
-
                     b.Navigation("BanSyncRules");
 
                     b.Navigation("Bans");

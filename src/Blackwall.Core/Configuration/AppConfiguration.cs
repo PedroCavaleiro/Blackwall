@@ -20,7 +20,4 @@ public sealed record AppConfiguration {
 
     [ConfigurationKeyName("INSTANCE_OWNER")]
     public string InstanceOwner { get; set; } = string.Empty;
-
-    [ConfigurationKeyName("AI_SENTINEL_ENABLED")]
-    public bool AiSentinelEnabled { get; set; } = true;
 }

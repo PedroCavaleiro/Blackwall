@@ -132,7 +132,6 @@ builder.Services.AddSingleton<ISafeBrowsingService>(sp => sp.GetRequiredService<
 builder.Services.AddSingleton<ContentGuardService>();
 builder.Services.AddSingleton<AllowedBotService>();
 builder.Services.AddSingleton<NetWatchSnareService>();
-builder.Services.AddSingleton<AiSentinelService>();
 builder.Services.AddScoped<SafeBrowsingSyncService>();
 builder.Services.AddScoped<MessageAuditService>();
 builder.Services.AddSingleton<ModuleRunnerService>();
@@ -180,7 +179,6 @@ builder.Services.AddKeyedSingleton<LinkProtectionService>("twitch", (sp, _) => {
 });
 builder.Services.AddHostedService<SafeBrowsingSyncBackgroundService>();
 builder.Services.AddHostedService<MessageAuditPurgeBackgroundService>();
-builder.Services.AddHostedService<AiSentinelPurgeBackgroundService>();
 builder.Services.AddHostedService<BotWorker>();
 builder.Services.AddHostedService<GuildPermissionSyncBackgroundService>();
 builder.Services.AddHostedService<BlacklistRefreshBackgroundService>();
