@@ -30,6 +30,8 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<TwitchChannelDomainRule> TwitchChannelDomainRules => Set<TwitchChannelDomainRule>();
     public DbSet<TwitchChannelBannedWord> TwitchChannelBannedWords => Set<TwitchChannelBannedWord>();
     public DbSet<TwitchRemovedManager> TwitchRemovedManagers => Set<TwitchRemovedManager>();
+    public DbSet<TwitchChannelBan> TwitchChannelBans => Set<TwitchChannelBan>();
+    public DbSet<TwitchChannelBanSyncRule> TwitchChannelBanSyncRules => Set<TwitchChannelBanSyncRule>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -712,6 +714,16 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .WithOne(e => e.TwitchChannelInstance)
                   .HasForeignKey<TwitchChannelConfiguration>(e => e.TwitchChannelInstanceId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.Bans)
+                  .WithOne(e => e.TwitchChannelInstance)
+                  .HasForeignKey(e => e.TwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.BanSyncRules)
+                  .WithOne(e => e.TargetTwitchChannelInstance)
+                  .HasForeignKey(e => e.TargetTwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<TwitchChannelConfiguration>(entity => {
@@ -810,6 +822,31 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
 
         modelBuilder.Entity<TwitchRemovedManager>(entity => {
             entity.HasIndex(e => new { e.TwitchChannelInstanceId, e.UserId })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<TwitchChannelBan>(entity => {
+            entity.Property(e => e.TwitchUserId)
+                  .IsRequired();
+
+            entity.Property(e => e.Username)
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.Reason)
+                  .HasMaxLength(2000);
+
+            entity.HasIndex(e => new { e.TwitchChannelInstanceId, e.TwitchUserId })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<TwitchChannelBanSyncRule>(entity => {
+            entity.Property(e => e.SourceTwitchUserId)
+                  .IsRequired();
+
+            entity.Property(e => e.IsEnabled)
+                  .IsRequired();
+
+            entity.HasIndex(e => new { e.TargetTwitchChannelInstanceId, e.SourceTwitchUserId })
                   .IsUnique();
         });
 

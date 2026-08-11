@@ -9,6 +9,7 @@ public sealed record TwitchChannelSettingsResponse(
     string? ProfileImageUrl,
     bool IsActive,
     bool IsOwner,
+    bool ShareBanList,
     bool IsEnabled,
     bool IsDryRun,
     bool AutoAddManagers,

@@ -292,14 +292,56 @@ public sealed partial class TwitchBotService(
         logger.LogInformation("Unbanned user {UserId} in channel {BroadcasterId}", userId, broadcasterId);
     }
 
-    public async Task GetBannedUsersAsync(long broadcasterId) {
-        if (_botApi is null || _botUserId is null) {
-            logger.LogWarning("No bot API instance available");
-            return;
+    public async Task<List<(long UserId, string? Username, string? Reason, DateTime? BannedAtUtc)>> GetChannelBansAsync(long broadcasterId, CancellationToken cancellationToken = default) {
+        string? accessToken = null;
+
+        if (_channels.TryGetValue(broadcasterId, out var channel))
+            accessToken = channel.AccessToken;
+
+        if (string.IsNullOrWhiteSpace(accessToken)) {
+            if (_botApi is null || _botUserId is null) {
+                logger.LogWarning("No bot API instance available and no channel token for {BroadcasterId}", broadcasterId);
+                return [];
+            }
+            accessToken = _botAccessToken;
         }
 
-        var result = await _botApi.Helix.Moderation.GetBannedUsersAsync(broadcasterId.ToString());
-        logger.LogInformation("Retrieved {Count} banned users for channel {BroadcasterId}", result.Data.Length, broadcasterId);
+        if (string.IsNullOrWhiteSpace(accessToken)) {
+            logger.LogWarning("No access token available for channel {BroadcasterId}", broadcasterId);
+            return [];
+        }
+
+        var api = new TwitchAPI {
+            Settings = {
+                ClientId = _twitchOptions.ClientId,
+                AccessToken = accessToken
+            }
+        };
+
+        var allBans = new List<(long, string?, string?, DateTime?)>();
+        string? cursor = null;
+
+        do {
+            var result = string.IsNullOrEmpty(cursor)
+                ? await api.Helix.Moderation.GetBannedUsersAsync(broadcasterId.ToString(), first: 100)
+                : await api.Helix.Moderation.GetBannedUsersAsync(broadcasterId.ToString(), first: 100, after: cursor);
+
+            foreach (var ban in result.Data) {
+                if (ban.ExpiresAt.HasValue)
+                    continue;
+
+                DateTime? bannedAt = null;
+                if (DateTime.TryParse(ban.CreatedAt, null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsed))
+                    bannedAt = parsed;
+
+                allBans.Add((long.Parse(ban.UserId), ban.UserName, ban.Reason, bannedAt));
+            }
+
+            cursor = result.Pagination?.Cursor;
+        } while (!string.IsNullOrEmpty(cursor));
+
+        logger.LogInformation("Retrieved {Count} banned users for channel {BroadcasterId}", allBans.Count, broadcasterId);
+        return allBans;
     }
 
     private Task OnConnected(object? sender, EventArgs e) {

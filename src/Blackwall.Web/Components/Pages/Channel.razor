@@ -61,6 +61,7 @@
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "detection" ? "active" : "")" @onclick='() => _activeTab = "detection"'>DETECTION</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "links" ? "active" : "")" @onclick='() => _activeTab = "links"'>LINKS</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "contentguard" ? "active" : "")" @onclick='() => _activeTab = "contentguard"'>CONTENT GUARD</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "bans" ? "active" : "")" @onclick='() => _activeTab = "bans"'>BAN LIST</button>
                 </nav>
 
                 <div class="bw-sidebar-content">
@@ -74,6 +75,8 @@
                         <TwitchLinksTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
                     } else if (_activeTab == "contentguard") {
                         <TwitchContentGuardTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
+                    } else if (_activeTab == "bans") {
+                        <TwitchBansTab TwitchUserId="TwitchUserId" InitialShareBanList="@(_settings?.ShareBanList ?? false)" OnError="HandleError" />
                     }
 
                     <div class="d-flex align-items-center gap-3 mt-2">

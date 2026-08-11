@@ -51,6 +51,7 @@ builder.Services.AddHttpClient<DiscordOAuthService>();
 
 builder.Services.Configure<TwitchOptions>(builder.Configuration.GetSection(TwitchOptions.SectionName));
 builder.Services.AddHttpClient<TwitchOAuthService>();
+builder.Services.Configure<TwitchSyncOptions>(builder.Configuration.GetSection(TwitchSyncOptions.SectionName));
 
 builder.Services.Configure<ApiOptions>(
     builder.Configuration.GetSection(ApiOptions.SectionName));
@@ -125,6 +126,7 @@ builder.Services.AddSingleton<ModuleRunnerService>();
 builder.Services.AddScoped<ModuleInstallationService>();
 builder.Services.AddScoped<TwitchChannelService>();
 builder.Services.AddSingleton<TwitchBotService>();
+builder.Services.AddScoped<TwitchBanSyncService>();
 builder.Services.AddKeyedSingleton<DetectionService>("discord", (sp, _) => {
     var redis = sp.GetRequiredService<IConnectionMultiplexer>();
     return new DetectionService("spam:", redis);
@@ -159,6 +161,7 @@ builder.Services.AddHostedService<GuildPermissionSyncBackgroundService>();
 builder.Services.AddHostedService<BlacklistRefreshBackgroundService>();
 builder.Services.AddHostedService<BanSyncBackgroundService>();
 builder.Services.AddHostedService<TwitchBotWorker>();
+builder.Services.AddHostedService<TwitchBanSyncBackgroundService>();
 
 builder.Services.AddAuthorization();
 

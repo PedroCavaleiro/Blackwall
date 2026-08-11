@@ -784,4 +784,87 @@ public sealed class BlackwallApiService(
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<IReadOnlyList<TwitchChannelBanResponse>> GetTwitchChannelBansAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/bans");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchChannelBanResponse>>(ct) ?? [];
+    }
+
+    public async Task SyncTwitchBansAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/bans/sync");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) {
+            var detail = await response.Content.ReadAsStringAsync(ct);
+            throw new Exception(detail);
+        }
+    }
+
+    public async Task UpdateTwitchShareBanListAsync(long twitchUserId, bool shareBanList, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/twitchchannels/{twitchUserId}/bans/share");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new UpdateTwitchShareBanListRequest(shareBanList));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<SharedBanListTwitchChannelResponse>> GetSharedBanListTwitchChannelsAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/bans/shared-channels");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<SharedBanListTwitchChannelResponse>>(ct) ?? [];
+    }
+
+    public async Task<IReadOnlyList<TwitchChannelBanResponse>> GetSourceTwitchChannelBansAsync(long twitchUserId, long sourceTwitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/bans/source/{sourceTwitchUserId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchChannelBanResponse>>(ct) ?? [];
+    }
+
+    public async Task<ImportTwitchBansResultResponse?> ImportTwitchBansAsync(long twitchUserId, long sourceTwitchUserId, IReadOnlyList<long>? twitchUserIds = null, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/bans/import");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new ImportTwitchBansRequest(sourceTwitchUserId, twitchUserIds));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ImportTwitchBansResultResponse>(ct);
+    }
+
+    public async Task<IReadOnlyList<TwitchBanSyncRuleResponse>> GetTwitchBanSyncRulesAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/bans/auto-sync");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchBanSyncRuleResponse>>(ct) ?? [];
+    }
+
+    public async Task<TwitchBanSyncRuleResponse?> AddTwitchBanSyncRuleAsync(long twitchUserId, long sourceTwitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/bans/auto-sync");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddTwitchBanSyncRuleRequest(sourceTwitchUserId));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TwitchBanSyncRuleResponse>(ct);
+    }
+
+    public async Task UpdateTwitchBanSyncRuleAsync(long twitchUserId, long ruleId, bool isEnabled, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/twitchchannels/{twitchUserId}/bans/auto-sync/{ruleId}");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new UpdateTwitchBanSyncRuleRequest(isEnabled));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteTwitchBanSyncRuleAsync(long twitchUserId, long ruleId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/bans/auto-sync/{ruleId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

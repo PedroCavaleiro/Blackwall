@@ -25,6 +25,7 @@ public sealed class TwitchChannelsController(
     TwitchOAuthService twitchOAuthService,
     TwitchChannelService twitchChannelService,
     TwitchBotService twitchBotService,
+    TwitchBanSyncService twitchBanSyncService,
     [FromKeyedServices("twitch")] LinkProtectionService linkProtectionService,
     BlackwallDbContext dbContext,
     IOptions<TwitchOptions> twitchOptions,
@@ -167,6 +168,7 @@ public sealed class TwitchChannelsController(
             instance.ProfileImageUrl,
             instance.IsActive,
             isOwner,
+            instance.ShareBanList,
             config.IsEnabled,
             config.IsDryRun,
             config.AutoAddManagers,
@@ -287,6 +289,7 @@ public sealed class TwitchChannelsController(
             instance.ProfileImageUrl,
             instance.IsActive,
             isOwner,
+            instance.ShareBanList,
             config.IsEnabled,
             config.IsDryRun,
             config.AutoAddManagers,
@@ -1342,6 +1345,474 @@ public sealed class TwitchChannelsController(
         config.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    [HttpGet("{twitchUserId:long}/bans")]
+    [ProducesResponseType(typeof(IReadOnlyList<TwitchChannelBanResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<TwitchChannelBanResponse>>> GetBans(
+        long twitchUserId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .Include(x => x.Bans)
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        return Ok(instance.Bans
+            .Select(b => new TwitchChannelBanResponse(b.Id, b.TwitchUserId, b.Username, b.Reason, b.BannedAtUtc))
+            .OrderByDescending(b => b.BannedAtUtc)
+            .ToList());
+    }
+
+    [HttpPost("{twitchUserId:long}/bans/sync")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SyncBans(
+        long twitchUserId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        try {
+            var count = await twitchBanSyncService.SyncBansAsync(twitchUserId, cancellationToken);
+            return Ok(new { Message = $"Synced {count} bans.", Count = count });
+        } catch (Exception ex) {
+            logger.LogError(ex, "Failed to sync bans for Twitch channel {TwitchUserId}", twitchUserId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails {
+                Title = "Failed to sync bans.",
+                Detail = ex.Message,
+                Status = StatusCodes.Status500InternalServerError
+            });
+        }
+    }
+
+    [HttpPut("{twitchUserId:long}/bans/share")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateShareBanList(
+        long twitchUserId,
+        [FromBody] UpdateTwitchShareBanListRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        instance.ShareBanList = request.ShareBanList;
+        instance.UpdatedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    [HttpGet("{twitchUserId:long}/bans/shared-channels")]
+    [ProducesResponseType(typeof(IReadOnlyList<SharedBanListTwitchChannelResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IReadOnlyList<SharedBanListTwitchChannelResponse>>> GetSharedBanListChannels(
+        long twitchUserId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var sharedChannels = await dbContext.TwitchChannelInstances
+            .Where(x => x.IsActive && x.ShareBanList && x.TwitchUserId != twitchUserId)
+            .Select(x => new {
+                x.TwitchUserId,
+                x.Username,
+                x.DisplayName,
+                x.ProfileImageUrl,
+                BanCount = x.Bans.Count
+            })
+            .OrderBy(x => x.DisplayName)
+            .ToListAsync(cancellationToken);
+
+        return Ok(sharedChannels
+            .Select(x => new SharedBanListTwitchChannelResponse(x.TwitchUserId, x.Username, x.DisplayName, x.ProfileImageUrl, x.BanCount))
+            .ToList());
+    }
+
+    [HttpGet("{twitchUserId:long}/bans/source/{sourceTwitchUserId:long}")]
+    [ProducesResponseType(typeof(IReadOnlyList<TwitchChannelBanResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<TwitchChannelBanResponse>>> GetSourceChannelBans(
+        long twitchUserId,
+        long sourceTwitchUserId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var sourceInstance = await dbContext.TwitchChannelInstances
+            .Include(x => x.Bans)
+            .FirstOrDefaultAsync(x => x.TwitchUserId == sourceTwitchUserId && x.IsActive, cancellationToken);
+
+        if (sourceInstance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Source channel not found.",
+                Detail = "No Twitch channel instance exists for the source user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        if (!sourceInstance.ShareBanList)
+            return Forbid();
+
+        return Ok(sourceInstance.Bans
+            .Select(b => new TwitchChannelBanResponse(b.Id, b.TwitchUserId, b.Username, b.Reason, b.BannedAtUtc))
+            .OrderByDescending(b => b.BannedAtUtc)
+            .ToList());
+    }
+
+    [HttpPost("{twitchUserId:long}/bans/import")]
+    [ProducesResponseType(typeof(ImportTwitchBansResultResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ImportTwitchBansResultResponse>> ImportBans(
+        long twitchUserId,
+        [FromBody] ImportTwitchBansRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        if (request.SourceTwitchUserId == twitchUserId)
+            return BadRequest(new ProblemDetails {
+                Title = "Cannot import from self.",
+                Detail = "The source channel cannot be the same as the target channel.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        var (imported, skipped, failed, errors) = await twitchBanSyncService.ImportBansAsync(
+            twitchUserId, request.SourceTwitchUserId, request.TwitchUserIds, cancellationToken);
+
+        return Ok(new ImportTwitchBansResultResponse(imported, skipped, failed, errors));
+    }
+
+    [HttpGet("{twitchUserId:long}/bans/auto-sync")]
+    [ProducesResponseType(typeof(IReadOnlyList<TwitchBanSyncRuleResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IReadOnlyList<TwitchBanSyncRuleResponse>>> GetBanSyncRules(
+        long twitchUserId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .Include(x => x.BanSyncRules)
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var sourceIds = instance.BanSyncRules.Select(r => r.SourceTwitchUserId).ToHashSet();
+        var sourceChannels = await dbContext.TwitchChannelInstances
+            .Where(x => sourceIds.Contains(x.TwitchUserId))
+            .ToDictionaryAsync(x => x.TwitchUserId, cancellationToken);
+
+        return Ok(instance.BanSyncRules
+            .Select(r => new TwitchBanSyncRuleResponse(
+                r.Id,
+                r.SourceTwitchUserId,
+                sourceChannels.TryGetValue(r.SourceTwitchUserId, out var src) ? src.DisplayName : "Unknown",
+                r.IsEnabled,
+                r.LastSyncedAtUtc == DateTime.MinValue ? null : r.LastSyncedAtUtc
+            ))
+            .OrderBy(r => r.SourceChannelName)
+            .ToList());
+    }
+
+    [HttpPost("{twitchUserId:long}/bans/auto-sync")]
+    [ProducesResponseType(typeof(TwitchBanSyncRuleResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TwitchBanSyncRuleResponse>> AddBanSyncRule(
+        long twitchUserId,
+        [FromBody] AddTwitchBanSyncRuleRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        if (request.SourceTwitchUserId == twitchUserId)
+            return BadRequest(new ProblemDetails {
+                Title = "Cannot auto-sync from self.",
+                Detail = "The source channel cannot be the same as the target channel.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        var instance = await dbContext.TwitchChannelInstances
+            .Include(x => x.BanSyncRules)
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var sourceChannel = await dbContext.TwitchChannelInstances
+            .FirstOrDefaultAsync(x => x.TwitchUserId == request.SourceTwitchUserId && x.IsActive, cancellationToken);
+
+        if (sourceChannel is null)
+            return BadRequest(new ProblemDetails {
+                Title = "Source channel not found.",
+                Detail = "The source channel does not exist or is not active.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        if (!sourceChannel.ShareBanList)
+            return BadRequest(new ProblemDetails {
+                Title = "Ban list not shared.",
+                Detail = "The source channel does not have ban list sharing enabled.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        if (instance.BanSyncRules.Any(r => r.SourceTwitchUserId == request.SourceTwitchUserId))
+            return BadRequest(new ProblemDetails {
+                Title = "Rule already exists.",
+                Detail = "An auto-sync rule for this source channel already exists.",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        var rule = new TwitchChannelBanSyncRule {
+            TargetTwitchChannelInstanceId = instance.Id,
+            SourceTwitchUserId = request.SourceTwitchUserId,
+            IsEnabled = true
+        };
+
+        dbContext.TwitchChannelBanSyncRules.Add(rule);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new TwitchBanSyncRuleResponse(rule.Id, rule.SourceTwitchUserId, sourceChannel.DisplayName, rule.IsEnabled, null));
+    }
+
+    [HttpPut("{twitchUserId:long}/bans/auto-sync/{ruleId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateBanSyncRule(
+        long twitchUserId,
+        long ruleId,
+        [FromBody] UpdateTwitchBanSyncRuleRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var rule = await dbContext.TwitchChannelBanSyncRules
+            .FirstOrDefaultAsync(x => x.Id == ruleId && x.TargetTwitchChannelInstanceId == instance.Id, cancellationToken);
+
+        if (rule is null)
+            return NotFound(new ProblemDetails {
+                Title = "Auto-sync rule not found.",
+                Detail = "No auto-sync rule exists with the specified ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        rule.IsEnabled = request.IsEnabled;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    [HttpDelete("{twitchUserId:long}/bans/auto-sync/{ruleId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteBanSyncRule(
+        long twitchUserId,
+        long ruleId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var instance = await dbContext.TwitchChannelInstances
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var rule = await dbContext.TwitchChannelBanSyncRules
+            .FirstOrDefaultAsync(x => x.Id == ruleId && x.TargetTwitchChannelInstanceId == instance.Id, cancellationToken);
+
+        if (rule is null)
+            return NotFound(new ProblemDetails {
+                Title = "Auto-sync rule not found.",
+                Detail = "No auto-sync rule exists with the specified ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        dbContext.TwitchChannelBanSyncRules.Remove(rule);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return NoContent();

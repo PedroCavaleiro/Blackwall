@@ -1,0 +1,352 @@
+@inject BlackwallApiService Api
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">BAN LIST SHARING</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">
+            When enabled, your channel's ban list becomes visible to other channels managed by Blackwall. Other channel admins can import your bans into their channel. You control whether your bans are shared &mdash; importing is always available.
+        </p>
+
+        <div class="bw-field bw-field-last">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Share ban list</div>
+                <div class="form-text">When on, other Blackwall-managed channels can see and import your bans.</div>
+            </div>
+            <div class="form-check form-switch">
+                <input type="checkbox" class="form-check-input bw-switch" id="twitchShareBanList"
+                       checked="@_shareBanList" disabled="@_banBusy" @onchange="ToggleShareBanListAsync" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">YOUR BAN LIST</div>
+    <div class="p-4">
+        <p class="font-mono mb-3 bw-desc">
+            @if (_bans.Any()) {
+                <text>@_bans.Count ban(s) synced. Sync now to pull the latest bans from Twitch.</text>
+            } else {
+                <text>No bans synced yet. Click SYNC to pull the current ban list from Twitch.</text>
+            }
+        </p>
+
+        <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-xs mb-3"
+                disabled="@_banBusy" @onclick="SyncBansAsync">
+            @(_banBusy ? "SYNCING..." : "SYNC FROM TWITCH")
+        </button>
+
+        @if (_bans.Any()) {
+            <div style="max-height:400px;overflow-y:auto">
+                @foreach (var ban in _bans) {
+                    <div class="d-flex align-items-start justify-content-between border-bottom py-2">
+                        <div>
+                            <div class="font-mono bw-ban-user">@(ban.Username ?? "Unknown") <span class="bw-text-muted">(@ban.TwitchUserId)</span></div>
+                            @if (!string.IsNullOrWhiteSpace(ban.Reason)) {
+                                <div class="font-mono bw-desc">@ban.Reason</div>
+                            }
+                            @if (ban.BannedAtUtc.HasValue) {
+                                <div class="font-mono bw-meta">@ban.BannedAtUtc.Value.ToString("yyyy-MM-dd HH:mm UTC")</div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">IMPORT BANS</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">
+            Import bans from other Blackwall-managed channels that have ban list sharing enabled. You can import the entire list or select individual bans. Users already banned in your channel are automatically skipped.
+        </p>
+
+        @if (_sharedChannels.Any()) {
+            <div class="mb-3">
+                <label class="form-label font-mono bw-label">SELECT SOURCE CHANNEL</label>
+                <select class="form-select mb-2" @bind="_selectedSourceChannelId" disabled="@_banBusy">
+                    <option value="0">&mdash; Select a channel &mdash;</option>
+                    @foreach (var c in _sharedChannels) {
+                        <option value="@c.TwitchUserId">@c.DisplayName (@c.BanCount bans)</option>
+                    }
+                </select>
+            </div>
+
+            @if (_selectedSourceChannelId > 0) {
+                <div class="mb-3">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <label class="form-label font-mono mb-0 bw-label">SOURCE BANS</label>
+                        <button type="button" class="btn btn-sm btn-outline-secondary font-display bw-btn-xxs"
+                                disabled="@_banBusy" @onclick="LoadSourceBansAsync">
+                            LOAD BANS
+                        </button>
+                    </div>
+
+                    @if (_sourceBans.Any()) {
+                        <div style="max-height:300px;overflow-y:auto;border:1px solid var(--bs-border-color);border-radius:0.25rem;padding:0.5rem">
+                            @foreach (var ban in _sourceBans) {
+                                <div class="d-flex align-items-center justify-content-between border-bottom py-1">
+                                    <div class="font-mono" style="font-size:0.72rem">
+                                        <input type="checkbox" class="form-check-input me-2"
+                                               id="twitch-ban-@ban.TwitchUserId"
+                                               checked="@_selectedImportUserIds.Contains(ban.TwitchUserId)"
+                                               @onchange="@(e => ToggleImportUser(ban.TwitchUserId, (bool?)e.Value))" />
+                                        <label for="twitch-ban-@ban.TwitchUserId">@(ban.Username ?? "Unknown") (@ban.TwitchUserId)</label>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <div class="mt-2 d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary font-display bw-btn-xxs"
+                                    disabled="@_banBusy" @onclick="SelectAllSourceBans">SELECT ALL</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary font-display bw-btn-xxs"
+                                    disabled="@_banBusy" @onclick="ClearSelectedImportUsers">CLEAR</button>
+                        </div>
+                    } else if (_sourceBansLoaded) {
+                        <div class="font-mono bw-desc">No bans found in source channel.</div>
+                    }
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-primary cut-corner font-display bw-btn-sm"
+                            disabled="@(_banBusy || _selectedSourceChannelId == 0)"
+                            @onclick="ImportAllBansAsync">
+                        @(_banBusy ? "IMPORTING..." : "IMPORT ALL")
+                    </button>
+                    @if (_selectedImportUserIds.Count > 0) {
+                        <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-sm"
+                                disabled="@_banBusy" @onclick="ImportSelectedBansAsync">
+                            @(_banBusy ? "IMPORTING..." : $"IMPORT SELECTED ({_selectedImportUserIds.Count})")
+                        </button>
+                    }
+                </div>
+            }
+        } else {
+            <div class="font-mono bw-desc">No other channels have ban list sharing enabled.</div>
+        }
+
+        @if (_importResult is not null) {
+            <div class="alert alert-success font-mono my-4 bw-alert-text">
+                // IMPORT COMPLETE: @_importResult.Imported imported, @_importResult.Skipped skipped (already banned), @_importResult.Failed failed.
+                @if (_importResult.Errors.Count > 0) {
+                    <br />@string.Join("; ", _importResult.Errors.Take(5))
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">AUTO-SYNC</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">
+            Automatically import bans from selected channels on a regular schedule. New bans added by the source channel will be imported automatically. Users already banned in your channel are skipped.
+        </p>
+
+        @if (_banSyncRules.Any()) {
+            <div class="mb-3">
+                @foreach (var rule in _banSyncRules) {
+                    <div class="d-flex align-items-center justify-content-between border-bottom py-2">
+                        <div>
+                            <div class="font-mono bw-ban-user">@rule.SourceChannelName <span class="bw-text-muted">(@rule.SourceTwitchUserId)</span></div>
+                            @if (rule.LastSyncedAtUtc.HasValue) {
+                                <div class="font-mono bw-meta">Last synced: @rule.LastSyncedAtUtc.Value.ToString("yyyy-MM-dd HH:mm UTC")</div>
+                            } else {
+                                <div class="font-mono bw-meta">Not yet synced</div>
+                            }
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="form-check form-switch">
+                                <input type="checkbox" class="form-check-input" id="twitch-rule-@rule.Id" style="width:2em;height:1.05em"
+                                       checked="@rule.IsEnabled" disabled="@_banBusy"
+                                       @onchange="@(e => ToggleBanSyncRuleAsync(rule.Id, (bool)e.Value!))" />
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger bw-btn-remove"
+                                    disabled="@_banBusy" @onclick="() => RemoveBanSyncRuleAsync(rule.Id)">
+                                REMOVE
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        } else {
+            <div class="font-mono mb-3 bw-desc">No auto-sync rules configured.</div>
+        }
+
+        @if (_sharedChannels.Any()) {
+            <div>
+                <label class="form-label font-mono bw-label">ADD AUTO-SYNC SOURCE</label>
+                <div class="d-flex gap-2">
+                    <select class="form-select" @bind="_selectedAutoSyncSourceId" disabled="@_banBusy">
+                        <option value="0">&mdash; Select a channel &mdash;</option>
+                        @foreach (var c in _sharedChannels) {
+                            <option value="@c.TwitchUserId">@c.DisplayName (@c.BanCount bans)</option>
+                        }
+                    </select>
+                    <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-xs-nowrap"
+                            disabled="@(_selectedAutoSyncSourceId == 0 || _banBusy)" @onclick="AddBanSyncRuleAsync">
+                        ADD
+                    </button>
+                </div>
+            </div>
+        } else {
+            <div class="font-mono bw-desc">No shared ban lists available to auto-sync from.</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required long TwitchUserId { get; set; }
+    [Parameter] public bool InitialShareBanList { get; set; }
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private bool _shareBanList;
+    private bool _banBusy;
+    private IReadOnlyList<TwitchChannelBanResponse> _bans = [];
+    private IReadOnlyList<SharedBanListTwitchChannelResponse> _sharedChannels = [];
+    private long _selectedSourceChannelId;
+    private IReadOnlyList<TwitchChannelBanResponse> _sourceBans = [];
+    private bool _sourceBansLoaded;
+    private HashSet<long> _selectedImportUserIds = [];
+    private ImportTwitchBansResultResponse? _importResult;
+    private IReadOnlyList<TwitchBanSyncRuleResponse> _banSyncRules = [];
+    private long _selectedAutoSyncSourceId;
+
+    protected override async Task OnInitializedAsync() {
+        _shareBanList = InitialShareBanList;
+        try {
+            _bans = await Api.GetTwitchChannelBansAsync(TwitchUserId);
+            _sharedChannels = await Api.GetSharedBanListTwitchChannelsAsync(TwitchUserId);
+            _banSyncRules = await Api.GetTwitchBanSyncRulesAsync(TwitchUserId);
+        } catch {
+            _bans = [];
+            _sharedChannels = [];
+            _banSyncRules = [];
+        }
+    }
+
+    private async Task ToggleShareBanListAsync(ChangeEventArgs e) {
+        _banBusy = true;
+        try {
+            _shareBanList = (bool)e.Value!;
+            await Api.UpdateTwitchShareBanListAsync(TwitchUserId, _shareBanList);
+            _sharedChannels = await Api.GetSharedBanListTwitchChannelsAsync(TwitchUserId);
+        } catch (Exception ex) {
+            _shareBanList = !_shareBanList;
+            await OnError.InvokeAsync($"Failed to update ban sharing: {ex.Message}");
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task SyncBansAsync() {
+        _banBusy = true;
+        try {
+            await Api.SyncTwitchBansAsync(TwitchUserId);
+            _bans = await Api.GetTwitchChannelBansAsync(TwitchUserId);
+            _sharedChannels = await Api.GetSharedBanListTwitchChannelsAsync(TwitchUserId);
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to sync bans: {ex.Message}");
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task LoadSourceBansAsync() {
+        if (_selectedSourceChannelId == 0) return;
+        _banBusy = true;
+        try {
+            _sourceBans = await Api.GetSourceTwitchChannelBansAsync(TwitchUserId, _selectedSourceChannelId);
+            _sourceBansLoaded = true;
+            _selectedImportUserIds.Clear();
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to load source bans: {ex.Message}");
+            _sourceBans = [];
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private void ToggleImportUser(long userId, bool? value) {
+        if (value == true)
+            _selectedImportUserIds.Add(userId);
+        else
+            _selectedImportUserIds.Remove(userId);
+    }
+
+    private void SelectAllSourceBans() {
+        _selectedImportUserIds = _sourceBans.Select(b => b.TwitchUserId).ToHashSet();
+    }
+
+    private void ClearSelectedImportUsers() {
+        _selectedImportUserIds.Clear();
+    }
+
+    private async Task ImportAllBansAsync() {
+        if (_selectedSourceChannelId == 0) return;
+        _banBusy = true;
+        _importResult = null;
+        try {
+            _importResult = await Api.ImportTwitchBansAsync(TwitchUserId, _selectedSourceChannelId);
+            _bans = await Api.GetTwitchChannelBansAsync(TwitchUserId);
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to import bans: {ex.Message}");
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task ImportSelectedBansAsync() {
+        if (_selectedSourceChannelId == 0 || _selectedImportUserIds.Count == 0) return;
+        _banBusy = true;
+        _importResult = null;
+        try {
+            _importResult = await Api.ImportTwitchBansAsync(TwitchUserId, _selectedSourceChannelId, _selectedImportUserIds.ToList());
+            _bans = await Api.GetTwitchChannelBansAsync(TwitchUserId);
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to import bans: {ex.Message}");
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task AddBanSyncRuleAsync() {
+        if (_selectedAutoSyncSourceId == 0) return;
+        _banBusy = true;
+        try {
+            await Api.AddTwitchBanSyncRuleAsync(TwitchUserId, _selectedAutoSyncSourceId);
+            _banSyncRules = await Api.GetTwitchBanSyncRulesAsync(TwitchUserId);
+            _selectedAutoSyncSourceId = 0;
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to add auto-sync rule: {ex.Message}");
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task ToggleBanSyncRuleAsync(long ruleId, bool enabled) {
+        _banBusy = true;
+        try {
+            await Api.UpdateTwitchBanSyncRuleAsync(TwitchUserId, ruleId, enabled);
+            _banSyncRules = await Api.GetTwitchBanSyncRulesAsync(TwitchUserId);
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to update auto-sync rule: {ex.Message}");
+        } finally {
+            _banBusy = false;
+        }
+    }
+
+    private async Task RemoveBanSyncRuleAsync(long ruleId) {
+        _banBusy = true;
+        try {
+            await Api.DeleteTwitchBanSyncRuleAsync(TwitchUserId, ruleId);
+            _banSyncRules = await Api.GetTwitchBanSyncRulesAsync(TwitchUserId);
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to remove auto-sync rule: {ex.Message}");
+        } finally {
+            _banBusy = false;
+        }
+    }
+}
