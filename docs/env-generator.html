@@ -389,6 +389,51 @@ const sections = [
         default: "openid user:read:email",
         desc: "Scopes for the Twitch OAuth2 user login flow.",
         help: "Default <code>openid user:read:email</code> &mdash; allows reading the user's profile and email."
+      },
+      {
+        key: "TWITCH__BOT_SCOPES",
+        label: "TWITCH__BOT_SCOPES",
+        required: false,
+        type: "text",
+        default: "",
+        desc: "Scopes requested when a channel owner installs the bot on their channel.",
+        help: "Comma-separated list of Twitch scopes. These are requested during the bot authorization flow when a channel owner adds the bot. See the <a href='https://dev.twitch.tv/docs/authentication/scopes/' target='_blank'>Twitch scopes documentation</a> for available scopes."
+      },
+      {
+        key: "TWITCH__BOT_REDIRECT_URI",
+        label: "TWITCH__BOT_REDIRECT_URI",
+        required: false,
+        type: "text",
+        placeholder: "https://your-domain.tld/api/auth/twitch/bot/callback",
+        desc: "OAuth2 callback URL for the Twitch bot authorization flow.",
+        help: "Must match a redirect URI configured in your Twitch application under <strong>OAuth Redirect URLs</strong>. The path is <code>/api/auth/twitch/bot/callback</code> on your API base URL. Used when channel owners authorize the bot on their channel."
+      },
+      {
+        key: "TWITCH__BOT_USERNAME",
+        label: "TWITCH__BOT_USERNAME",
+        required: false,
+        type: "text",
+        placeholder: "BlackwallBot",
+        desc: "Dedicated bot account username for IRC chat and moderation API calls.",
+        help: "Create a separate Twitch account for the bot (e.g. <code>BlackwallBot</code>). The bot account must be added as a moderator (<code>/mod BlackwallBot</code>) in each channel. If left empty, the bot falls back to connecting as the channel owner (not recommended)."
+      },
+      {
+        key: "TWITCH__BOT_ACCESS_TOKEN",
+        label: "TWITCH__BOT_ACCESS_TOKEN",
+        required: false,
+        type: "password",
+        placeholder: "abcdefghijklmnopqrstuvwxyz",
+        desc: "Bot account OAuth access token (without the oauth: prefix).",
+        help: "Generate tokens at <a href='https://twitchtokengenerator.com/' target='_blank'>twitchtokengenerator.com</a> &mdash; log in with your BOT ACCOUNT credentials, select <strong>Helix</strong> token type, select <code>chat:read</code> and <code>chat:edit</code> scopes, then click <strong>Generate Token</strong>. Do NOT include the <code>oauth:</code> prefix."
+      },
+      {
+        key: "TWITCH__BOT_REFRESH_TOKEN",
+        label: "TWITCH__BOT_REFRESH_TOKEN",
+        required: false,
+        type: "password",
+        placeholder: "abcdefghijklmnopqrstuvwxyz0123456789",
+        desc: "Bot account OAuth refresh token for auto-renewal.",
+        help: "Copy the refresh token from the same token generation page. Enables auto-renewal &mdash; without it, the access token expires in ~4 hours."
       }
     ]
   },
@@ -575,15 +620,6 @@ const sections = [
         placeholder: "123456789012345678",
         desc: "Discord user ID of the instance owner.",
         help: "The owner is always allowed to register. To find your Discord user ID, enable Developer Mode in Discord settings, right-click your profile, and select <strong>Copy User ID</strong>."
-      },
-      {
-        key: "APP__AI_SENTINEL_ENABLED",
-        label: "APP__AI_SENTINEL_ENABLED",
-        required: false,
-        type: "bool",
-        default: true,
-        desc: "Globally enable or disable the AI Sentinel module.",
-        help: "When <code>false</code>, the AI Sentinel tab is hidden in the dashboard and all AI endpoints return a disabled response. Default is <code>true</code>."
       }
     ]
   },
@@ -674,6 +710,30 @@ const sections = [
         default: "15",
         desc: "Sync interval in minutes.",
         help: "Default <code>15</code>. Lower values mean more frequent Discord API calls."
+      }
+    ]
+  },
+  {
+    title: "Twitch Sync",
+    icon: "&#128260;",
+    fields: [
+      {
+        key: "TWITCH_SYNC__ENABLED",
+        label: "TWITCH_SYNC__ENABLED",
+        required: false,
+        type: "bool",
+        default: true,
+        desc: "Enable the Twitch ban sync background service.",
+        help: "When enabled, the bot periodically synchronises shared ban lists across Blackwall-managed Twitch channels."
+      },
+      {
+        key: "TWITCH_SYNC__INTERVAL_MINUTES",
+        label: "TWITCH_SYNC__INTERVAL_MINUTES",
+        required: false,
+        type: "number",
+        default: "15",
+        desc: "Sync interval in minutes.",
+        help: "Default <code>15</code>. Lower values mean more frequent Twitch API calls."
       }
     ]
   },

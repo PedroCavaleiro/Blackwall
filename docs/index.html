@@ -120,7 +120,6 @@
       <a href="#account-scoring">Account Scoring</a>
       <a href="#content-guard">Content Guard</a>
       <a href="#netwatch-snare">NetWatchSnare</a>
-      <a href="#ai-sentinel">AI Sentinel</a>
       <a href="#modules">Modules</a>
       <a href="#custom-modules">Custom Modules</a>
       <a href="#api-docs">API Documentation</a>
@@ -138,7 +137,7 @@
       <!-- Hero -->
       <div class="hero" id="overview">
         <h1>Blackwall <span>Wiki</span></h1>
-        <p>A self-hosted Discord anti-spam system combining a real-time bot for spam detection with a web dashboard for guild configuration &mdash; all backed by Discord OAuth2 authentication. Includes bot allowlist protection against automated attacks that disguise themselves as bot accounts.</p>
+        <p>A self-hosted anti-spam and moderation platform for Discord and Twitch, combining real-time bots for spam detection with a web dashboard for server and channel configuration &mdash; all backed by Discord and Twitch OAuth2 authentication. Includes bot allowlist protection against automated attacks that disguise themselves as bot accounts.</p>
         <div class="hero-badges">
           <span class="hero-badge">.NET 10</span>
           <span class="hero-badge">PostgreSQL 17</span>
@@ -168,26 +167,30 @@
           <div class="card"><h4><span class="card-icon">&#128221;</span> Message Audit</h4><p>Records deleted messages and infraction events with configurable retention for review in the dashboard.</p></div>
           <div class="card"><h4><span class="card-icon">&#9989;</span> Bot Allowlist</h4><p>Only trusted bots bypass spam detection. All other bot-flagged accounts &mdash; including attack tools disguised as bots &mdash; are scanned.</p></div>
           <div class="card"><h4><span class="card-icon">&#129514;</span> Dry Run Mode</h4><p>Test detection rules without taking action against users. Detections are logged only.</p></div>
-          <div class="card"><h4><span class="card-icon">&#127760;</span> Per-guild Configuration</h4><p>Each server gets its own spam thresholds, module toggles, and actions managed through the web dashboard.</p></div>
+          <div class="card"><h4><span class="card-icon">&#127760;</span> Per-guild / Per-channel Configuration</h4><p>Each Discord server and Twitch channel gets its own spam thresholds, module toggles, and actions managed through the web dashboard.</p></div>
           <div class="card"><h4><span class="card-icon">&#128273;</span> Discord &amp; Twitch OAuth2 Login</h4><p>Users authenticate via Discord or Twitch. Accounts can be linked, unlinked, and merged. JWT tokens are issued for API and Web access.</p></div>
           <div class="card"><h4><span class="card-icon">&#128260;</span> Guild Permission Sync</h4><p>A background service periodically synchronises guild manager permissions from Discord.</p></div>
-          <div class="card"><h4><span class="card-icon">&#128187;</span> Web Dashboard</h4><p>Blazor Server UI for guild owners and managers to configure spam rules visually.</p></div>
-          <div class="card"><h4><span class="card-icon">&#129504;</span> AI Sentinel</h4><p>AI-powered content moderation that runs as the last step in the protection pipeline. Supports OpenAI, Anthropic, Google Gemini, and self-hosted Ollama with training mode and per-guild configuration.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128260;</span> Twitch Ban Sync</h4><p>A background service synchronises shared ban lists across Blackwall-managed Twitch channels.</p></div>
+          <div class="card"><h4><span class="card-icon">&#128187;</span> Web Dashboard</h4><p>Blazor Server UI for guild and channel owners to configure spam rules visually.</p></div>
+          <div class="card"><h4><span class="card-icon">&#129514;</span> Third-Party Modules</h4><p>Extend detection capabilities with community-built .NET modules loaded dynamically from Git repositories. Supports Discord, Twitch, or both platforms simultaneously.</p></div>
         </div>
       </section>
 
       <!-- Architecture -->
       <section class="content-section" id="architecture">
         <h2>Architecture</h2>
-        <p>Blackwall is a .NET 10 solution split into five projects:</p>
+        <p>Blackwall is a .NET 10 solution split into the following projects:</p>
         <table>
           <thead><tr><th>Project</th><th>Description</th></tr></thead>
           <tbody>
             <tr><td><code>Blackwall.Core</code></td><td>Shared entities, DTOs, and configuration models</td></tr>
             <tr><td><code>Blackwall.Infrastructure</code></td><td>PostgreSQL persistence (EF Core) and Redis caching</td></tr>
             <tr><td><code>Blackwall.Bot.Discord</code></td><td>Discord gateway client &mdash; spam detection, guild events, background sync</td></tr>
-            <tr><td><code>Blackwall.Api</code></td><td>ASP.NET Core Web API &mdash; OAuth flows, JWT auth, guild management endpoints</td></tr>
+            <tr><td><code>Blackwall.Bot.Twitch</code></td><td>Twitch IRC client &mdash; spam detection, channel moderation, module evaluation</td></tr>
+            <tr><td><code>Blackwall.Api</code></td><td>ASP.NET Core Web API &mdash; OAuth flows, JWT auth, guild/channel management endpoints</td></tr>
             <tr><td><code>Blackwall.Web</code></td><td>Blazor Server dashboard &mdash; authenticates against the API</td></tr>
+            <tr><td><code>Blackwall.Modules.Abstractions</code></td><td>Module SDK &mdash; interfaces, manifests, and data structures for third-party modules</td></tr>
+            <tr><td><code>Blackwall.Modules.Runtime</code></td><td>Shared runtime &mdash; module loading, evaluation, and build helpers</td></tr>
           </tbody>
         </table>
         <div class="callout callout-info">
@@ -304,12 +307,26 @@ cd Blackwall</code></pre>
             <tr><td><code>TWITCH__CLIENT_SECRET</code></td><td>No</td><td>&mdash;</td><td>Twitch OAuth2 client secret</td></tr>
             <tr><td><code>TWITCH__REDIRECT_URI</code></td><td>No</td><td>&mdash;</td><td>OAuth2 callback URL (e.g. <code>https://your-domain.tld/api/auth/twitch/callback</code>)</td></tr>
             <tr><td><code>TWITCH__LOGIN_SCOPES</code></td><td>No</td><td><code>openid user:read:email</code></td><td>Scopes for the Twitch OAuth2 user login flow</td></tr>
+            <tr><td><code>TWITCH__BOT_SCOPES</code></td><td>No</td><td>&mdash;</td><td>Scopes requested when a channel owner installs the bot on their channel</td></tr>
+            <tr><td><code>TWITCH__BOT_REDIRECT_URI</code></td><td>No</td><td>&mdash;</td><td>OAuth2 callback URL for the bot authorization flow (e.g. <code>https://your-domain.tld/api/auth/twitch/bot/callback</code>)</td></tr>
+            <tr><td><code>TWITCH__BOT_USERNAME</code></td><td>No</td><td>&mdash;</td><td>Dedicated bot account username for IRC chat and moderation API calls. If empty, falls back to connecting as the channel owner (not recommended)</td></tr>
+            <tr><td><code>TWITCH__BOT_ACCESS_TOKEN</code></td><td>No</td><td>&mdash;</td><td>Bot account OAuth access token (without <code>oauth:</code> prefix). Generate at <a href="https://twitchtokengenerator.com/" target="_blank">twitchtokengenerator.com</a> with <code>chat:read</code> and <code>chat:edit</code> scopes</td></tr>
+            <tr><td><code>TWITCH__BOT_REFRESH_TOKEN</code></td><td>No</td><td>&mdash;</td><td>Bot account OAuth refresh token for auto-renewal. Without it, the access token expires in ~4 hours</td></tr>
           </tbody>
         </table>
         <div class="callout callout-info">
           <strong>Optional provider</strong>
           Twitch login is entirely optional. If <code>TWITCH__CLIENT_ID</code> is left blank, the Twitch login button is not shown and all Twitch endpoints return a disabled response. Users who logged in with Discord can link their Twitch account later from the dashboard.
         </div>
+
+        <h3>Twitch Sync</h3>
+        <table>
+          <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>TWITCH_SYNC__ENABLED</code></td><td>No</td><td><code>true</code></td><td>Enable the Twitch ban sync background service</td></tr>
+            <tr><td><code>TWITCH_SYNC__INTERVAL_MINUTES</code></td><td>No</td><td><code>15</code></td><td>Sync interval in minutes</td></tr>
+          </tbody>
+        </table>
 
         <h3>Google Safe Browsing</h3>
         <table>
@@ -340,7 +357,6 @@ cd Blackwall</code></pre>
             <tr><td><code>APP__DISABLE_NEW_USERS</code></td><td>No</td><td><code>false</code></td><td>When <code>true</code>, only the instance owner can register new accounts</td></tr>
             <tr><td><code>APP__PRIVATE_INSTANCE</code></td><td>No</td><td><code>false</code></td><td>When <code>true</code> (and DISABLE_NEW_USERS is false), only allowed users and the owner can register</td></tr>
             <tr><td><code>APP__INSTANCE_OWNER</code></td><td>No</td><td>&mdash;</td><td>Discord user ID of the instance owner. The owner is always allowed to register</td></tr>
-            <tr><td><code>APP__AI_SENTINEL_ENABLED</code></td><td>No</td><td><code>true</code></td><td>When <code>false</code>, the AI Sentinel module is globally disabled &mdash; the tab is hidden in the dashboard and all AI endpoints return a disabled response</td></tr>
           </tbody>
         </table>
 
@@ -728,130 +744,10 @@ dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
         </div>
       </section>
 
-      <!-- AI Sentinel -->
-      <section class="content-section" id="ai-sentinel">
-        <h2>AI Sentinel <span class="hero-badge" style="font-size:0.7rem;vertical-align:middle;">Optional</span></h2>
-        <p>AI Sentinel is an <strong>optional</strong> AI-powered content moderation module that runs as the <strong>last step</strong> in the protection pipeline. Only messages that pass all other filters (rate limiting, duplicate detection, Content Guard, link blocking, etc.) are sent to the AI for analysis. This minimises API calls and ensures the AI only sees content that traditional heuristics could not catch.</p>
-
-        <div class="callout callout-warning">
-          <strong>Off by default</strong>
-          AI Sentinel is disabled by default for every guild. Even when the global toggle <code>APP__AI_SENTINEL_ENABLED</code> is <code>true</code> (the default, which makes the feature <em>available</em>), each server must explicitly enable it from the dashboard and configure a provider. No AI calls are made until a guild admin turns it on.
-        </div>
-
-        <div class="callout callout-info">
-          <strong>Server-side toggle</strong>
-          The global toggle <code>APP__AI_SENTINEL_ENABLED</code> (defaults to <code>true</code>) controls whether the feature is available at all. When <code>false</code>, the AI Sentinel tab is hidden in the dashboard and all AI endpoints return a disabled response.
-        </div>
-
-        <h3>Supported Providers</h3>
-        <p>AI Sentinel supports four AI providers, configurable per guild:</p>
-        <table>
-          <thead><tr><th>Provider</th><th>Authentication</th><th>Notes</th></tr></thead>
-          <tbody>
-            <tr><td><strong>OpenAI</strong></td><td>API key (Bearer token)</td><td>Uses the <code>/v1/chat/completions</code> endpoint. Models are auto-loaded from <code>/v1/models</code>.</td></tr>
-            <tr><td><strong>Anthropic</strong></td><td>API key (<code>x-api-key</code> header)</td><td>Uses the <code>/v1/messages</code> endpoint with <code>anthropic-version: 2023-06-01</code>. Models are auto-loaded from <code>/v1/models</code>.</td></tr>
-            <tr><td><strong>Google Gemini</strong></td><td>API key (query parameter)</td><td>Uses the <code>v1beta/models/{model}:generateContent</code> endpoint. Models are auto-loaded from <code>v1beta/models</code>.</td></tr>
-            <tr><td><strong>Ollama</strong></td><td>URL + optional custom headers</td><td>For self-hosted or cloud Ollama instances. Uses <code>/api/chat</code> for analysis and <code>/api/tags</code> for model listing. Supports up to 3 custom headers for authentication or routing (e.g. Ollama Cloud proxies).</td></tr>
-          </tbody>
-        </table>
-
-        <h3>How It Works</h3>
-        <ol>
-          <li>A message arrives and passes through all traditional protection modules (rate limiting, Content Guard, link blocking, etc.).</li>
-          <li>If no module triggered an infraction, and AI Sentinel is enabled with a valid model and credentials, the message content (including embeds) is sent to the configured AI provider.</li>
-          <li>The AI analyses the message and returns a <strong>classification</strong> and <strong>reasoning</strong>.</li>
-          <li>If the classification is anything other than <code>clean</code>, the configured action is applied (unless dry run or training mode is active).</li>
-        </ol>
-
-        <h3>Classifications</h3>
-        <p>The AI classifies each message as exactly one of the following:</p>
-        <table>
-          <thead><tr><th>Classification</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td><strong>Clean</strong></td><td>The message does not appear to be malicious. No action is taken.</td></tr>
-            <tr><td><strong>Spam</strong></td><td>Unsolicited repetitive advertising, mass mentions, or rate-limit abuse.</td></tr>
-            <tr><td><strong>Duplicate</strong></td><td>Repeated identical or near-identical content posted across channels.</td></tr>
-            <tr><td><strong>Virus</strong></td><td>Links or attachments intended to distribute malware or harmful payloads.</td></tr>
-            <tr><td><strong>Scam</strong></td><td>Phishing, social engineering, fake giveaways, or deceptive links targeting users.</td></tr>
-          </tbody>
-        </table>
-
-        <h3>Operating Modes</h3>
-        <table>
-          <thead><tr><th>Mode</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td><strong>Dry run</strong></td><td>When enabled, AI Sentinel will not take any action regardless of the classification. When disabled, it respects the global dry-run setting. Useful for testing the AI without affecting users.</td></tr>
-            <tr><td><strong>Training mode</strong></td><td>When enabled, <em>all</em> messages are analysed and logged but no actions are taken. You can review each result in the Training Log and mark it as <em>correct</em> or <em>incorrect</em>. Only results that would have triggered an action are logged to the audit channel. Activating AI Sentinel starts in training mode automatically.</td></tr>
-          </tbody>
-        </table>
-
-        <div class="callout callout-tip">
-          <strong>Recommended workflow</strong>
-          Start with training mode enabled. Review the Training Log to verify the AI is classifying messages correctly. Once you're confident, disable training mode and configure the desired action. Keep dry run enabled initially to observe actions without affecting users, then disable it to go live.
-        </div>
-
-        <h3>Training Log</h3>
-        <p>When training mode is active, the Training Log section appears in the dashboard. It shows recent AI analysis results &mdash; including the user, channel, classification, reasoning, provider, and model used. Each entry can be marked as <strong>Correct</strong> or <strong>Incorrect</strong> to build a feedback dataset for future fine-tuning.</p>
-        <p>Only results that <em>would have triggered an action</em> (i.e. classification is not <code>clean</code>) are shown in the Training Log. All analysed messages are persisted to the database with a configurable retention period (7&ndash;90 days, matching the message audit retention setting).</p>
-
-        <h3>Module Actions</h3>
-        <p>AI Sentinel has its own configurable action, independent of other modules:</p>
-        <table>
-          <thead><tr><th>Setting</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td><strong>Action</strong></td><td>Action taken when AI Sentinel flags a message: <em>Delete only</em>, <em>Timeout</em>, <em>Kick</em>, <em>Soft ban</em> (ban + unban), or <em>Ban</em>.</td></tr>
-            <tr><td><strong>Timeout (minutes)</strong></td><td>How long the user is timed out. Minimum: 1 minute. Only shown when action is <em>Timeout</em>.</td></tr>
-            <tr><td><strong>Delete messages (days)</strong></td><td>Number of days of message history to purge when banning. Maximum is 7 days. Only shown when action is <em>Ban</em> or <em>Soft ban</em>.</td></tr>
-            <tr><td><strong>Auto-lockdown</strong></td><td>Whether to trigger a server lockdown when AI Sentinel fires.</td></tr>
-          </tbody>
-        </table>
-
-        <h3>Provider Configuration</h3>
-        <table>
-          <thead><tr><th>Setting</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td><strong>Provider</strong></td><td>Select the AI provider: OpenAI, Anthropic, Google Gemini, or Ollama.</td></tr>
-            <tr><td><strong>API Key</strong></td><td>API key for the selected provider (OpenAI, Anthropic, Gemini). Leave blank to keep the existing key. Keys are encrypted at rest using AES.</td></tr>
-            <tr><td><strong>Ollama URL</strong></td><td>Base URL of the Ollama instance (e.g. <code>http://localhost:11434</code> or <code>https://your-ollama-cloud.com</code>). Only shown for Ollama.</td></tr>
-            <tr><td><strong>Custom headers (1&ndash;3)</strong></td><td>Optional custom headers for Ollama authentication or routing. Useful for Ollama Cloud or reverse proxies. Each header has a name and value. Values are encrypted at rest.</td></tr>
-            <tr><td><strong>Model</strong></td><td>The model to use for analysis. Models are auto-loaded when credentials are entered. Click <em>Refresh</em> to reload the model list manually.</td></tr>
-          </tbody>
-        </table>
-
-        <div class="callout callout-warning">
-          <strong>Security &mdash; encrypted credentials</strong>
-          API keys and Ollama header values are encrypted at rest using AES with the <code>APP__ENC_KEY</code> and <code>APP__ENC_IV</code> environment variables. They are never exposed in the API response &mdash; the GET endpoint returns a masked placeholder. Only the POST endpoint with explicit credentials can test new keys.
-        </div>
-
-        <h3>Audit &amp; Logging</h3>
-        <p>When AI Sentinel flags a message (classification is not <code>clean</code>), the following happens:</p>
-        <ul>
-          <li>An embed is sent to the configured <strong>audit log channel</strong> with the user, channel, classification, reasoning, model, and action taken (or <em>[DRY RUN]</em> when applicable).</li>
-          <li>If <strong>message audit</strong> is enabled, the event is recorded with the <code>ai_sentinel_&lt;classification&gt;</code> tag for review in the dashboard event viewer.</li>
-          <li>The full analysis result (including message content, embeds, classification, reasoning, provider, model, and training feedback) is persisted to the AI Sentinel log store with a retention period matching the message audit retention (7&ndash;90 days). A background service automatically purges expired logs.</li>
-        </ul>
-
-        <h3>API Endpoints</h3>
-        <p>AI Sentinel exposes the following REST endpoints under <code>/api/guilds/{discordGuildId}/ai-sentinel</code>:</p>
-        <table>
-          <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td><code>GET</code></td><td><code>/config</code></td><td>Returns the AI Sentinel configuration (API key is masked).</td></tr>
-            <tr><td><code>PUT</code></td><td><code>/config</code></td><td>Updates the AI Sentinel configuration.</td></tr>
-            <tr><td><code>GET</code></td><td><code>/models</code></td><td>Lists available models using the saved credentials.</td></tr>
-            <tr><td><code>POST</code></td><td><code>/models</code></td><td>Lists available models using provided credentials (without saving). Used for live model loading.</td></tr>
-            <tr><td><code>GET</code></td><td><code>/logs</code></td><td>Returns a paginated list of AI Sentinel log summaries.</td></tr>
-            <tr><td><code>GET</code></td><td><code>/logs/{logId}</code></td><td>Returns the full detail of a specific log entry.</td></tr>
-            <tr><td><code>PUT</code></td><td><code>/logs/{logId}/feedback</code></td><td>Updates the training feedback for a specific log entry.</td></tr>
-          </tbody>
-        </table>
-        <p>All endpoints return a disabled response when <code>APP__AI_SENTINEL_ENABLED=false</code>.</p>
-      </section>
-
       <!-- Modules -->
       <section class="content-section" id="modules">
         <h2>Modules</h2>
-        <p>Blackwall is organised into independent modules, each configurable per guild through the dashboard. Every module can be toggled on or off, and most support configurable actions (delete only, timeout, kick, or ban) with optional auto-lockdown. Modules stack &mdash; a single message can trigger multiple filters simultaneously.</p>
+        <p>Blackwall is organised into independent modules, each configurable per Discord guild or per Twitch channel through the dashboard. Every module can be toggled on or off, and most support configurable actions (delete only, timeout, kick, or ban) with optional auto-lockdown. Modules stack &mdash; a single message can trigger multiple filters simultaneously.</p>
 
         <h3>General</h3>
         <p>Master controls for barrier activation, enforcement mode, and bot allowlist.</p>
@@ -981,19 +877,6 @@ dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
           </tbody>
         </table>
 
-        <h3>AI Sentinel</h3>
-        <p>AI-powered content moderation that runs as the last step in the protection pipeline. Only messages that pass all other filters are analysed. Supports OpenAI, Anthropic, Google Gemini, and self-hosted or cloud Ollama. See the <a href="#ai-sentinel">AI Sentinel</a> section above for the full guide.</p>
-        <table>
-          <thead><tr><th>Setting</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td><strong>Enable AI Sentinel</strong></td><td>Master toggle for the AI Sentinel module. Independent from other protection modules.</td></tr>
-            <tr><td><strong>Dry run</strong></td><td>When enabled, no action is taken. When disabled, respects the global dry-run setting.</td></tr>
-            <tr><td><strong>Training mode</strong></td><td>All messages are analysed and logged but no actions are taken. Results can be marked as correct or incorrect. Activating AI Sentinel starts in training mode automatically.</td></tr>
-            <tr><td><strong>Provider</strong></td><td>AI provider: OpenAI, Anthropic, Google Gemini, or Ollama.</td></tr>
-            <tr><td><strong>Model</strong></td><td>The model to use for analysis. Auto-loaded when credentials are entered.</td></tr>
-          </tbody>
-        </table>
-
         <div class="callout callout-info">
           <strong>Module actions</strong>
           Most modules support the following action types: <strong>Delete only</strong> (removes the message), <strong>Timeout</strong> (temporarily mutes the user), <strong>Kick</strong> (removes the user from the server), and <strong>Ban</strong> (permanently bans the user, with optional message history purge up to 7 days). Each module can also independently trigger a server <strong>auto-lockdown</strong> when it fires.
@@ -1003,11 +886,11 @@ dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
       <!-- Custom Modules -->
       <section class="content-section" id="custom-modules">
         <h2>Custom Modules (3rd-Party)</h2>
-        <p>Blackwall supports loading external modules at runtime. A custom module is a .NET 10 assembly that implements the <code>IBlackwallModule</code> interface and is packaged as a Git repository with a manifest file. Modules are cloned, built, and installed per guild through the dashboard or API, then loaded into a collectible <code>AssemblyLoadContext</code> so they can be hot-reloaded without restarting the bot.</p>
+        <p>Blackwall supports loading external modules at runtime. A custom module is a .NET 10 assembly that implements the <code>IBlackwallModule</code> interface and is packaged as a Git repository with a manifest file. Modules are cloned, built, and installed per guild or per Twitch channel through the dashboard or API, then loaded into a collectible <code>AssemblyLoadContext</code> so they can be hot-reloaded without restarting the bot. A module can target Discord, Twitch, or both platforms simultaneously.</p>
 
         <div class="callout callout-info">
           <strong>How it works</strong>
-          When a message arrives, the bot fetches all enabled module installations for the guild from cache, loads each module's assembly (if not already cached), calls <code>EvaluateAsync</code> with a 5-second timeout, and collects verdicts. Each verdict is mapped to an infraction action and applied alongside the built-in filters. Modules stack with each other and with all built-in detection.
+          When a message arrives, the bot fetches all enabled module installations for the guild or Twitch channel from cache, loads each module's assembly (if not already cached), calls <code>EvaluateAsync</code> with a 5-second timeout, and collects verdicts. Each verdict is mapped to an infraction action and applied alongside the built-in filters. Modules stack with each other and with all built-in detection.
         </div>
 
         <h3>Module Lifecycle</h3>
@@ -1065,6 +948,7 @@ dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
             <tr><td><code>description</code></td><td>string?</td><td>Short description shown in the dashboard. Optional.</td></tr>
             <tr><td><code>entryPoint</code></td><td>string</td><td>Filename of the compiled DLL (e.g. <code>MyModule.dll</code>). Must match the assembly name in the <code>.csproj</code>.</td></tr>
             <tr><td><code>canPerformActions</code></td><td>bool</td><td>Declares whether the module is intended to return verdicts with actions. Stored on the installation record.</td></tr>
+            <tr><td><code>platforms</code></td><td>array</td><td>Which platforms this module supports. Valid values: <code>"discord"</code>, <code>"twitch"</code>. Use both for cross-platform modules. Blackwall will refuse to install a module on a platform that isn't listed.</td></tr>
             <tr><td><code>settingsSchema</code></td><td>object?</td><td>Defines the settings UI rendered in the dashboard. Optional &mdash; if omitted, the module receives an empty settings dictionary. See below.</td></tr>
           </tbody>
         </table>
@@ -1147,12 +1031,13 @@ dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
         <table>
           <thead><tr><th>Property</th><th>Type</th><th>Description</th></tr></thead>
           <tbody>
-            <tr><td><code>DiscordGuildId</code></td><td>long</td><td>Guild ID where the message was sent.</td></tr>
-            <tr><td><code>DiscordUserId</code></td><td>long</td><td>ID of the message author.</td></tr>
-            <tr><td><code>DiscordChannelId</code></td><td>long</td><td>Channel ID where the message was sent.</td></tr>
+            <tr><td><code>Platform</code></td><td>ModulePlatform</td><td>The platform the message came from: <code>Discord</code> or <code>Twitch</code>. Use this to write platform-specific logic.</td></tr>
+            <tr><td><code>CommunityId</code></td><td>long</td><td>Discord guild ID or Twitch channel user ID where the message was sent.</td></tr>
+            <tr><td><code>UserId</code></td><td>long</td><td>ID of the message author (platform-specific user ID).</td></tr>
+            <tr><td><code>ChannelId</code></td><td>long</td><td>Discord channel ID or Twitch channel user ID where the message was sent.</td></tr>
             <tr><td><code>ChannelName</code></td><td>string</td><td>Name of the channel.</td></tr>
             <tr><td><code>Username</code></td><td>string</td><td>Username of the author.</td></tr>
-            <tr><td><code>IsBot</code></td><td>bool</td><td>Whether the author is a bot account (note: allowed bots are already filtered out before evaluation).</td></tr>
+            <tr><td><code>IsBot</code></td><td>bool</td><td>Whether the author is a bot/broadcaster account (note: allowed bots are already filtered out before evaluation).</td></tr>
             <tr><td><code>Content</code></td><td>string</td><td>Full message content including embed descriptions and attachment filenames (extracted via <code>ExtractFullContent</code>).</td></tr>
             <tr><td><code>Attachments</code></td><td>IReadOnlyList&lt;ModuleAttachment&gt;</td><td>Message attachments with filename, size, URL, and dimensions.</td></tr>
             <tr><td><code>Embeds</code></td><td>IReadOnlyList&lt;ModuleEmbed&gt;</td><td>Message embeds with title, description, URL, type, image, and thumbnail URLs.</td></tr>
@@ -1300,6 +1185,7 @@ public sealed partial class EmojiSpamModule : IBlackwallModule
   "description": "Detects messages with excessive emoji.",
   "entryPoint": "MyModule.dll",
   "canPerformActions": true,
+  "platforms": ["discord", "twitch"],
   "settingsSchema": {
     "cards": [
       {
@@ -1336,10 +1222,12 @@ public sealed partial class EmojiSpamModule : IBlackwallModule
         </div>
 
         <h3>Installing a Custom Module</h3>
-        <p>Modules are installed per guild through the dashboard's Modules tab or via the API:</p>
+        <p>Modules are installed per guild or per Twitch channel through the dashboard's Modules tab or via the API:</p>
         <ul>
-          <li><strong>Dashboard</strong> &mdash; Navigate to your guild &rarr; Modules &rarr; Install, and paste the HTTPS Git URL of your module repository.</li>
-          <li><strong>API</strong> &mdash; <code>POST /guilds/{discordGuildId}/modules/install</code> with a JSON body <code>{ "gitUrl": "https://github.com/..." }</code>.</li>
+          <li><strong>Dashboard (Discord)</strong> &mdash; Navigate to your guild &rarr; Modules &rarr; Install, and paste the HTTPS Git URL of your module repository.</li>
+          <li><strong>Dashboard (Twitch)</strong> &mdash; Navigate to your channel &rarr; Modules &rarr; Install, and paste the HTTPS Git URL of your module repository.</li>
+          <li><strong>API (Discord)</strong> &mdash; <code>POST /guilds/{discordGuildId}/modules/install</code> with a JSON body <code>{ "gitUrl": "https://github.com/..." }</code>.</li>
+          <li><strong>API (Twitch)</strong> &mdash; <code>POST /twitchchannels/{twitchUserId}/modules/install</code> with a JSON body <code>{ "gitUrl": "https://github.com/..." }</code>.</li>
         </ul>
         <p>The Git URL must be a valid HTTPS URL. Blackwall clones the repository with <code>--depth 1</code>, so no full history is needed. After installation, the module appears in the Modules tab where you can configure its settings, update it to the latest repository version, or uninstall it.</p>
 
@@ -1371,14 +1259,19 @@ public sealed partial class EmojiSpamModule : IBlackwallModule
         <h2>Project Structure</h2>
         <pre><code>Blackwall/
 ├── src/
-│   ├── Blackwall.Api/              # Web API + Discord bot host
-│   ├── Blackwall.Bot.Discord/        # Discord bot worker, handlers, background services
-│   ├── Blackwall.Core/             # Entities, DTOs, configuration
-│   ├── Blackwall.Infrastructure/   # EF Core DbContext, Redis cache
-│   └── Blackwall.Web/              # Blazor Server dashboard
-├── docs/                           # Wiki & .env generator
-│   ├── index.html                  # This wiki
-│   └── env-generator.html          # Interactive .env generator
+│   ├── Blackwall.Api/                  # Web API + Discord/Twitch bot host
+│   ├── Blackwall.Bot.Discord/          # Discord bot worker, handlers, background services
+│   ├── Blackwall.Bot.Twitch/           # Twitch IRC client, moderation, module evaluation
+│   ├── Blackwall.Core/                 # Entities, DTOs, configuration
+│   ├── Blackwall.Infrastructure/       # EF Core DbContext, Redis cache
+│   ├── Blackwall.Modules.Abstractions/ # Module SDK — interfaces, manifests, data structures
+│   ├── Blackwall.Modules.Runtime/      # Shared runtime — module loading, evaluation, build helpers
+│   └── Blackwall.Web/                  # Blazor Server dashboard
+├── examples/
+│   └── Blackwall.EmojiSpamModule/      # Example third-party module (Discord + Twitch)
+├── docs/                               # Wiki & .env generator
+│   ├── index.html                      # This wiki
+│   └── env-generator.html              # Interactive .env generator
 ├── infra/
 │   └── lxc/                        # Proxmox LXC provisioning & deploy scripts
 │       ├── setup.sh                # Container provisioning
