@@ -17,8 +17,8 @@
         <div class="font-mono mb-4 bw-err bw-typewriter">&gt; SIGNAL LOST: Guild not found or access denied.</div>
         <a href="/dashboard" class="btn btn-primary cut-corner font-display bw-btn-sm">RETURN TO GRID</a>
     } else {
-        <a href="/dashboard" class="d-inline-flex align-items-center gap-2 mb-4 font-mono text-decoration-none bw-status bw-text-muted">
-            &#8592; BACK TO GRID
+        <a href="/dashboard?tab=discord" class="d-inline-flex align-items-center gap-2 mb-4 font-mono text-decoration-none bw-status bw-text-muted">
+            &#8592; BACK TO SERVER OVERVIEW
         </a>
 
         <div class="d-flex align-items-center gap-3 mb-5">
@@ -69,9 +69,6 @@
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "scoring" ? "active" : "")" @onclick='() => _activeTab = "scoring"'>SCORING</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "bans" ? "active" : "")" @onclick='() => _activeTab = "bans"'>BANS</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "netWatchSnare" ? "active" : "")" @onclick='() => _activeTab = "netWatchSnare"'>NETWATCH SNARE</button>
-                    @if (AppCfg.Value.AiSentinelEnabled) {
-                        <button type="button" class="bw-sidebar-btn @(_activeTab == "aisentinel" ? "active" : "")" @onclick='() => _activeTab = "aisentinel"'>AI SENTINEL</button>
-                    }
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "audit" ? "active" : "")" @onclick='() => _activeTab = "audit"'>AUDIT</button>
                     @foreach (var mod in _installedModules) {
                         var tabLabel = (mod.ReadableName ?? mod.ModuleName).ToUpperInvariant();
@@ -106,9 +103,6 @@
                     @if (_activeTab == "netWatchSnare") {
                         <NetWatchSnareTab DiscordGuildId="DiscordGuildId" OnError="HandleError" />
                     }
-                    @if (_activeTab == "aisentinel") {
-                        <AiSentinelTab Form="AiForm" DiscordGuildId="DiscordGuildId" OnError="HandleError" />
-                    }
                     @if (_activeTab == "audit") {
                         <AuditTab Form="Form" DiscordGuildId="DiscordGuildId" />
                     }
@@ -125,7 +119,7 @@
                         <button type="submit" class="btn btn-primary cut-corner font-display bw-btn-md">
                             COMMIT CHANGES
                         </button>
-                        <a href="/dashboard" class="btn btn-outline-secondary font-display bw-btn-md">
+                        <a href="/dashboard?tab=discord" class="btn btn-outline-secondary font-display bw-btn-md">
                             CANCEL
                         </a>
                     </div>
@@ -180,7 +174,6 @@
     private string _activeTab = "general";
 
     private SpamConfigForm Form { get; set; } = new();
-    private AiSentinelForm AiForm { get; set; } = new();
     private bool _isLockedDown;
     private bool _lockdownBusy;
     private bool _isDirty;
@@ -257,31 +250,6 @@
                 Form.IsMessageAuditEnabled = s.IsMessageAuditEnabled;
                 Form.MessageAuditRetentionDays = s.MessageAuditRetentionDays;
                 _isLockedDown = s.IsLockedDown;
-            }
-
-            try {
-                var ai = await Api.GetAiSentinelConfigAsync(DiscordGuildId);
-                if (ai is not null) {
-                    AiForm.IsEnabled = ai.IsEnabled;
-                    AiForm.IsDryRun = ai.IsDryRun;
-                    AiForm.IsTrainingMode = ai.IsTrainingMode;
-                    AiForm.Provider = ai.Provider;
-                    AiForm.ApiKey = null;
-                    AiForm.OllamaUrl = ai.OllamaUrl;
-                    AiForm.OllamaHeader1Key = ai.OllamaHeader1Key;
-                    AiForm.OllamaHeader1Value = ai.OllamaHeader1Value;
-                    AiForm.OllamaHeader2Key = ai.OllamaHeader2Key;
-                    AiForm.OllamaHeader2Value = ai.OllamaHeader2Value;
-                    AiForm.OllamaHeader3Key = ai.OllamaHeader3Key;
-                    AiForm.OllamaHeader3Value = ai.OllamaHeader3Value;
-                    AiForm.Model = ai.Model;
-                    AiForm.Action = ai.Action;
-                    AiForm.AutoLockdown = ai.AutoLockdown;
-                    AiForm.TimeoutMinutes = ai.TimeoutMinutes;
-                    AiForm.MessageDeleteDays = ai.MessageDeleteDays;
-                }
-            } catch {
-                // AI sentinel config not available yet — defaults are fine
             }
 
             try {
@@ -387,30 +355,6 @@
             _isDirty = false;
             _settings = await Api.GetGuildSettingsAsync(DiscordGuildId);
 
-            try {
-                await Api.UpdateAiSentinelConfigAsync(DiscordGuildId, new UpdateAiSentinelConfigurationRequest(
-                    AiForm.IsEnabled,
-                    AiForm.IsDryRun,
-                    AiForm.IsTrainingMode,
-                    AiForm.Provider,
-                    AiForm.ApiKey,
-                    AiForm.OllamaUrl,
-                    AiForm.OllamaHeader1Key,
-                    AiForm.OllamaHeader1Value,
-                    AiForm.OllamaHeader2Key,
-                    AiForm.OllamaHeader2Value,
-                    AiForm.OllamaHeader3Key,
-                    AiForm.OllamaHeader3Value,
-                    AiForm.Model,
-                    AiForm.Action,
-                    AiForm.AutoLockdown,
-                    AiForm.TimeoutMinutes,
-                    AiForm.MessageDeleteDays
-                ));
-            } catch (Exception ex) {
-                _error = $"Failed to save AI Sentinel settings: {ex.Message}";
-            }
-
             if (_activeModuleTab is not null) {
                 try {
                     await _activeModuleTab.SaveSettingsAsync();
@@ -431,7 +375,7 @@
 
         try {
             await Api.RemoveBotAsync(DiscordGuildId);
-            Nav.NavigateTo("/dashboard", forceLoad: true);
+            Nav.NavigateTo("/dashboard?tab=discord", forceLoad: true);
         } catch (Exception ex) {
             _error = $"Failed to remove bot: {ex.Message}";
             _confirmRemove = false;

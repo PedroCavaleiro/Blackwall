@@ -1,3 +1,9 @@
+// ReSharper disable CollectionNeverUpdated.Global
+// ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
+// ReSharper disable NullableWarningSuppressionIsUsed
+// ReSharper disable PropertyCanBeMadeInitOnly.Global
+// ReSharper disable UnusedMember.Global
+// ReSharper disable UnusedAutoPropertyAccessor.Global
 namespace Blackwall.Modules.Abstractions;
 
 public sealed class ModuleFieldOption {
@@ -32,5 +38,6 @@ public sealed class BlackwallModuleManifest {
     public string? Description { get; set; }
     public string EntryPoint { get; set; } = null!;
     public bool CanPerformActions { get; set; }
+    public List<ModulePlatform> Platforms { get; set; } = [ModulePlatform.Discord];
     public ModuleSettingsSchema? SettingsSchema { get; set; }
 }

@@ -11,9 +11,15 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Blackwall.DiscordBot\Blackwall.DiscordBot.csproj" />
+      <ProjectReference Include="..\Blackwall.Bot.Discord\Blackwall.Bot.Discord.csproj" />
+      <ProjectReference Include="..\Blackwall.Bot.Twitch\Blackwall.Bot.Twitch.csproj" />
       <ProjectReference Include="..\Blackwall.Core\Blackwall.Core.csproj" />
       <ProjectReference Include="..\Blackwall.Infrastructure\Blackwall.Infrastructure.csproj" />
+      <ProjectReference Include="..\Blackwall.Modules.Runtime\Blackwall.Modules.Runtime.csproj" />
+      <ProjectReference Include="..\Blackwall.Modules.LinkProtection\Blackwall.Modules.LinkProtection.csproj" />
+      <ProjectReference Include="..\Blackwall.Modules.DetectionMatrix\Blackwall.Modules.DetectionMatrix.csproj" />
+      <ProjectReference Include="..\Blackwall.Modules.ContentGuard\Blackwall.Modules.ContentGuard.csproj" />
+      <ProjectReference Include="..\Blackwall.Modules.Banlist\Blackwall.Modules.Banlist.csproj" />
     </ItemGroup>
 
     <ItemGroup>

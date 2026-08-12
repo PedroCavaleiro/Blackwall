@@ -22,196 +22,6 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Blackwall.Core.Entities.AiSentinelConfiguration", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<int>("Action")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<string>("ApiKey")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<bool>("AutoLockdown")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("GuildInstanceId")
-                        .HasColumnType("bigint");
-
-                    b.Property<bool>("IsDryRun")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("IsTrainingMode")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<int>("MessageDeleteDays")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<string>("Model")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("OllamaHeader1Key")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("OllamaHeader1Value")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<string>("OllamaHeader2Key")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("OllamaHeader2Value")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<string>("OllamaHeader3Key")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("OllamaHeader3Value")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<string>("OllamaUrl")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<int>("Provider")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<int>("TimeoutMinutes")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(10);
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GuildInstanceId")
-                        .IsUnique();
-
-                    b.ToTable("AiSentinelConfigurations");
-                });
-
-            modelBuilder.Entity("Blackwall.Core.Entities.AiSentinelLog", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("AiSentinelConfigurationId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("AvatarHash")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ChannelName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<int>("Classification")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("DiscordChannelId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("DiscordMessageId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("DiscordUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("EmbedsJson")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDryRun")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("MessageTimestampUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Model")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<int>("Provider")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Reasoning")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("TrainingFeedback")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<string>("Username")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<bool>("WouldAction")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AiSentinelConfigurationId");
-
-                    b.HasIndex("ExpiresAtUtc");
-
-                    b.HasIndex("AiSentinelConfigurationId", "CreatedAtUtc");
-
-                    b.ToTable("AiSentinelLogs");
-                });
-
             modelBuilder.Entity("Blackwall.Core.Entities.AppUser", b =>
                 {
                     b.Property<long>("Id")
@@ -253,6 +63,9 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.Property<string>("TwitchDisplayName")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TwitchProfileImageUrl")
+                        .HasColumnType("text");
 
                     b.Property<string>("TwitchRefreshToken")
                         .HasColumnType("text");
@@ -397,6 +210,11 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsRegex")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<long>("SpamConfigurationId")
                         .HasColumnType("bigint");
@@ -1082,26 +900,574 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.ToTable("SpamConfigurations");
                 });
 
-            modelBuilder.Entity("Blackwall.Core.Entities.AiSentinelConfiguration", b =>
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchAllowedBot", b =>
                 {
-                    b.HasOne("Blackwall.Core.Entities.GuildInstance", "GuildInstance")
-                        .WithOne("AiSentinelConfiguration")
-                        .HasForeignKey("Blackwall.Core.Entities.AiSentinelConfiguration", "GuildInstanceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
 
-                    b.Navigation("GuildInstance");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BotUsername")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("TwitchChannelConfigurationId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TwitchChannelConfigurationId", "BotUsername")
+                        .IsUnique();
+
+                    b.ToTable("TwitchAllowedBots");
                 });
 
-            modelBuilder.Entity("Blackwall.Core.Entities.AiSentinelLog", b =>
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelBan", b =>
                 {
-                    b.HasOne("Blackwall.Core.Entities.AiSentinelConfiguration", "AiSentinelConfiguration")
-                        .WithMany("Logs")
-                        .HasForeignKey("AiSentinelConfigurationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
 
-                    b.Navigation("AiSentinelConfiguration");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("BannedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<long>("TwitchChannelInstanceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("TwitchUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TwitchChannelInstanceId", "TwitchUserId")
+                        .IsUnique();
+
+                    b.ToTable("TwitchChannelBans");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelBanSyncRule", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("LastSyncedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("SourceTwitchUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("TargetTwitchChannelInstanceId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TargetTwitchChannelInstanceId", "SourceTwitchUserId")
+                        .IsUnique();
+
+                    b.ToTable("TwitchChannelBanSyncRules");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelBannedWord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsRegex")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<long>("TwitchChannelConfigurationId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Word")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TwitchChannelConfigurationId", "Word")
+                        .IsUnique();
+
+                    b.ToTable("TwitchChannelBannedWords");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelBlacklist", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("TwitchChannelConfigurationId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TwitchChannelConfigurationId", "Url")
+                        .IsUnique();
+
+                    b.ToTable("TwitchChannelBlacklists");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelConfiguration", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("AutoAddManagers")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("BlockSuspiciousLinks")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("CommandTrigger")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)");
+
+                    b.Property<int>("ContentGuardAction")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("ContentGuardFuzzyMatching")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ContentGuardFuzzyThreshold")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ContentGuardTimeoutMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DuplicateAction")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DuplicateMessageThreshold")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DuplicateTimeoutMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DuplicateWindowSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsContentGuardEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDryRun")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsMessageAuditEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("LinkWhitelistMode")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("MaxMessagesPerWindow")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MentionLimit")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MentionLimitAction")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MentionLimitTimeoutMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MessageAuditRetentionDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RateLimitAction")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RateLimitTimeoutMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RateLimitWindowSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("SafeBrowsingBlockUnsure")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("SafeBrowsingEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("SuspiciousLinkAction")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SuspiciousLinkTimeoutMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("TwitchChannelInstanceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TwitchChannelInstanceId")
+                        .IsUnique();
+
+                    b.ToTable("TwitchChannelConfigurations");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelDomainRule", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Rule")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("TwitchChannelConfigurationId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TwitchChannelConfigurationId", "Rule")
+                        .IsUnique();
+
+                    b.ToTable("TwitchChannelDomainRules");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelInstance", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BotAccessToken")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BotRefreshToken")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("BotTokenExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<long?>("OwnerUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ProfileImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("ShareBanList")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("TwitchUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.HasIndex("TwitchUserId")
+                        .IsUnique();
+
+                    b.ToTable("TwitchChannelInstances");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelManager", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsAdmin")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("TwitchChannelInstanceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TwitchChannelInstanceId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("TwitchChannelManagers");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelModuleInstallation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("CanPerformActions")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EntryPoint")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("GitUrl")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("ManifestJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ModuleAuthor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ModuleName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ModuleVersion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("SettingsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("TwitchChannelInstanceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TwitchChannelInstanceId", "ModuleName")
+                        .IsUnique();
+
+                    b.ToTable("TwitchChannelModuleInstallations");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchMessageAuditEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDryRun")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("TwitchChannelInstanceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("TwitchUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Violations")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TwitchChannelInstanceId", "CreatedAtUtc");
+
+                    b.ToTable("TwitchMessageAuditEvents");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchMessageAuditRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DiscordMessageId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<long>("EventId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("MessageTimestampUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("TwitchUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId");
+
+                    b.HasIndex("ExpiresAtUtc");
+
+                    b.ToTable("TwitchMessageAuditRecords");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchRemovedManager", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("TwitchChannelInstanceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TwitchChannelInstanceId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("TwitchRemovedManagers");
                 });
 
             modelBuilder.Entity("Blackwall.Core.Entities.GuildAllowedBot", b =>
@@ -1254,23 +1620,158 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.Navigation("GuildInstance");
                 });
 
-            modelBuilder.Entity("Blackwall.Core.Entities.AiSentinelConfiguration", b =>
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchAllowedBot", b =>
                 {
-                    b.Navigation("Logs");
+                    b.HasOne("Blackwall.Core.Entities.TwitchChannelConfiguration", "TwitchChannelConfiguration")
+                        .WithMany("AllowedBots")
+                        .HasForeignKey("TwitchChannelConfigurationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TwitchChannelConfiguration");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelBan", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.TwitchChannelInstance", "TwitchChannelInstance")
+                        .WithMany("Bans")
+                        .HasForeignKey("TwitchChannelInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TwitchChannelInstance");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelBanSyncRule", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.TwitchChannelInstance", "TargetTwitchChannelInstance")
+                        .WithMany("BanSyncRules")
+                        .HasForeignKey("TargetTwitchChannelInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TargetTwitchChannelInstance");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelBannedWord", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.TwitchChannelConfiguration", "TwitchChannelConfiguration")
+                        .WithMany("BannedWords")
+                        .HasForeignKey("TwitchChannelConfigurationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TwitchChannelConfiguration");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelBlacklist", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.TwitchChannelConfiguration", "TwitchChannelConfiguration")
+                        .WithMany("Blacklists")
+                        .HasForeignKey("TwitchChannelConfigurationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TwitchChannelConfiguration");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelConfiguration", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.TwitchChannelInstance", "TwitchChannelInstance")
+                        .WithOne("Configuration")
+                        .HasForeignKey("Blackwall.Core.Entities.TwitchChannelConfiguration", "TwitchChannelInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TwitchChannelInstance");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelDomainRule", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.TwitchChannelConfiguration", "TwitchChannelConfiguration")
+                        .WithMany("DomainRules")
+                        .HasForeignKey("TwitchChannelConfigurationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TwitchChannelConfiguration");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelInstance", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.AppUser", "OwnerUser")
+                        .WithMany("OwnedTwitchChannels")
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("OwnerUser");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelManager", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.TwitchChannelInstance", "TwitchChannelInstance")
+                        .WithMany("Managers")
+                        .HasForeignKey("TwitchChannelInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Blackwall.Core.Entities.AppUser", "User")
+                        .WithMany("ManagedTwitchChannels")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TwitchChannelInstance");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelModuleInstallation", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.TwitchChannelInstance", "TwitchChannelInstance")
+                        .WithMany()
+                        .HasForeignKey("TwitchChannelInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TwitchChannelInstance");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchMessageAuditEvent", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.TwitchChannelInstance", "TwitchChannelInstance")
+                        .WithMany("MessageAuditEvents")
+                        .HasForeignKey("TwitchChannelInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TwitchChannelInstance");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchMessageAuditRecord", b =>
+                {
+                    b.HasOne("Blackwall.Core.Entities.TwitchMessageAuditEvent", "Event")
+                        .WithMany("Records")
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Event");
                 });
 
             modelBuilder.Entity("Blackwall.Core.Entities.AppUser", b =>
                 {
                     b.Navigation("ManagedGuilds");
 
+                    b.Navigation("ManagedTwitchChannels");
+
                     b.Navigation("OwnedGuilds");
+
+                    b.Navigation("OwnedTwitchChannels");
                 });
 
             modelBuilder.Entity("Blackwall.Core.Entities.GuildInstance", b =>
                 {
-                    b.Navigation("AiSentinelConfiguration")
-                        .IsRequired();
-
                     b.Navigation("BanSyncRules");
 
                     b.Navigation("Bans");
@@ -1297,6 +1798,35 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.Navigation("Blacklists");
 
                     b.Navigation("NetWatchSnareChannels");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelConfiguration", b =>
+                {
+                    b.Navigation("AllowedBots");
+
+                    b.Navigation("BannedWords");
+
+                    b.Navigation("Blacklists");
+
+                    b.Navigation("DomainRules");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchChannelInstance", b =>
+                {
+                    b.Navigation("BanSyncRules");
+
+                    b.Navigation("Bans");
+
+                    b.Navigation("Configuration");
+
+                    b.Navigation("Managers");
+
+                    b.Navigation("MessageAuditEvents");
+                });
+
+            modelBuilder.Entity("Blackwall.Core.Entities.TwitchMessageAuditEvent", b =>
+                {
+                    b.Navigation("Records");
                 });
 #pragma warning restore 612, 618
         }

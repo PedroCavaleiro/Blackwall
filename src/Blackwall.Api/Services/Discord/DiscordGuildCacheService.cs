@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Blackwall.Core.DTOs;
 using StackExchange.Redis;
+// ReSharper disable NullableWarningSuppressionIsUsed
 
 namespace Blackwall.Api.Services.Discord;
 

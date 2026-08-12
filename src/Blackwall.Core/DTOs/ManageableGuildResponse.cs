@@ -1,4 +1,5 @@
-﻿namespace Blackwall.Core.DTOs;
+﻿// ReSharper disable NotAccessedPositionalProperty.Global
+namespace Blackwall.Core.DTOs;
 
 public sealed record ManageableGuildResponse(
     long DiscordGuildId,

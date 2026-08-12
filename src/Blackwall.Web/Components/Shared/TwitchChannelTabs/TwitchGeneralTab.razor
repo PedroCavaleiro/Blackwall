@@ -1,0 +1,126 @@
+@inject BlackwallApiService Api
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">BARRIER CONTROL</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">Master controls for barrier activation and enforcement mode.</p>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Enable barrier</div>
+                <div class="form-text">When off, the bot will not process any messages in this channel.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="isEnabled" @bind-Value="Form.IsEnabled" />
+            </div>
+        </div>
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Dry run</div>
+                <div class="form-text">Detections are logged to the audit log but no action is taken against the user.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="isDryRun" @bind-Value="Form.IsDryRun" />
+            </div>
+        </div>
+        <div class="bw-field bw-field-last">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Command trigger</div>
+                <div class="form-text">The prefix for bot commands in Twitch chat. Defaults to "!" and can be up to 2 characters.</div>
+            </div>
+            <div style="max-width:80px">
+                <InputText class="form-control font-mono" id="commandTrigger" @bind-Value="Form.CommandTrigger" maxlength="2" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">ALLOWED BOTS</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">
+            Bots on this list are skipped by the spam detection pipeline. Add only bots you trust (moderation bots, logging bots, etc.).
+        </p>
+
+        @if (_allowedBots.Any()) {
+            <div class="mb-3">
+                @foreach (var bot in _allowedBots) {
+                    <div class="d-flex align-items-center justify-content-between border-bottom py-2">
+                        <div class="font-mono" style="font-size:0.75rem">
+                            <span class="bw-text-primary">@bot.BotUsername</span>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger ms-2 bw-btn-remove"
+                                disabled="@_botBusy"
+                                @onclick="() => RemoveAllowedBotAsync(bot.Id)">
+                            REMOVE
+                        </button>
+                    </div>
+                }
+            </div>
+        } else {
+            <div class="font-mono mb-3 bw-desc">No allowed bots configured. All bot-flagged accounts will be processed by the spam filter.</div>
+        }
+
+        <div>
+            <label class="form-label font-mono bw-label">ADD BOT</label>
+            <div class="d-flex gap-2 mb-2">
+                <input type="text" class="form-control" placeholder="Bot username (e.g. Nightbot)"
+                       @bind="_newBotName" disabled="@_botBusy" />
+                <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-xs-nowrap"
+                        disabled="@(string.IsNullOrWhiteSpace(_newBotName) || _botBusy)"
+                        @onclick="AddAllowedBotAsync">
+                    ADD
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required TwitchChannelConfigForm Form { get; set; }
+    [Parameter, EditorRequired] public required long TwitchUserId { get; set; }
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private IReadOnlyList<TwitchAllowedBotResponse> _allowedBots = [];
+    private string _newBotName = "";
+    private bool _botBusy;
+
+    protected override async Task OnInitializedAsync() {
+        try {
+            _allowedBots = await Api.GetTwitchAllowedBotsAsync(TwitchUserId);
+        } catch {
+            _allowedBots = [];
+            await OnError.InvokeAsync("Failed to load allowed bots.");
+        }
+    }
+
+    private async Task AddAllowedBotAsync() {
+        if (string.IsNullOrWhiteSpace(_newBotName)) {
+            await OnError.InvokeAsync("Bot username cannot be empty.");
+            return;
+        }
+
+        _botBusy = true;
+        try {
+            await Api.AddTwitchAllowedBotAsync(TwitchUserId, _newBotName.Trim());
+            _allowedBots = await Api.GetTwitchAllowedBotsAsync(TwitchUserId);
+            _newBotName = "";
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to add bot: {ex.Message}");
+        } finally {
+            _botBusy = false;
+        }
+    }
+
+    private async Task RemoveAllowedBotAsync(long botId) {
+        _botBusy = true;
+        try {
+            await Api.RemoveTwitchAllowedBotAsync(TwitchUserId, botId);
+            _allowedBots = await Api.GetTwitchAllowedBotsAsync(TwitchUserId);
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to remove bot: {ex.Message}");
+        } finally {
+            _botBusy = false;
+        }
+    }
+}

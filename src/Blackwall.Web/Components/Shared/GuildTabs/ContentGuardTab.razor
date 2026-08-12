@@ -1,3 +1,4 @@
+@using System.Text.RegularExpressions
 @using Blackwall.Core.Entities
 @inject BlackwallApiService Api
 
@@ -96,13 +97,18 @@
 <div class="cut-corner border mb-4 bw-card">
     <div class="card-header">BANNED WORDS</div>
     <div class="p-4">
-        <p class="font-mono mb-4 bw-desc">Per-guild list of banned words. Words are matched case-insensitively after leetspeak normalisation. Add individual words or short phrases (spaces are preserved).</p>
+        <p class="font-mono mb-4 bw-desc">Per-guild list of banned words. Words are matched case-insensitively after leetspeak normalisation. Add individual words or short phrases (spaces are preserved). Enable regex mode to add a regular expression pattern instead of a literal word.</p>
 
         @if (_bannedWords.Any()) {
             <div class="mb-3">
                 @foreach (var word in _bannedWords) {
                     <div class="d-flex align-items-center justify-content-between border-bottom py-2">
-                        <span class="font-mono bw-ban-user">@word.Word</span>
+                        <div class="d-flex align-items-center gap-2">
+                            @if (word.IsRegex) {
+                                <span class="badge bg-info font-mono">REGEX</span>
+                            }
+                            <span class="font-mono bw-ban-user">@word.Word</span>
+                        </div>
                         <button type="button" class="btn btn-outline-danger bw-btn-remove"
                                 disabled="@_wordBusy"
                                 @onclick="() => RemoveBannedWordAsync(word.Id)">
@@ -117,11 +123,23 @@
             </div>
         }
 
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input type="checkbox" class="form-check-input bw-switch" id="cgRegexMode"
+                       @bind="_newWordIsRegex" disabled="@(!Form.IsContentGuardEnabled)" />
+                <label class="form-check-label font-mono bw-desc" for="cgRegexMode">Regex mode — treat the input as a regular expression pattern</label>
+            </div>
+        </div>
+
+        @if (_newWordIsRegex && !string.IsNullOrWhiteSpace(_newWord) && _regexValidationError is not null) {
+            <div class="alert alert-danger font-mono bw-desc mb-3">@_regexValidationError</div>
+        }
+
         <div class="d-flex gap-2">
-            <input type="text" class="form-control" placeholder="Enter a word or phrase to ban..."
+            <input type="text" class="form-control" placeholder="@(_newWordIsRegex ? "Enter a regex pattern to ban..." : "Enter a word or phrase to ban...")"
                    @bind="_newWord" disabled="@(!Form.IsContentGuardEnabled)" />
             <button type="button" class="btn btn-primary cut-corner font-display bw-btn-sm"
-                    disabled="@(_wordBusy || string.IsNullOrWhiteSpace(_newWord) || !Form.IsContentGuardEnabled)"
+                    disabled="@(_wordBusy || string.IsNullOrWhiteSpace(_newWord) || !Form.IsContentGuardEnabled || (_newWordIsRegex && _regexValidationError is not null))"
                     @onclick="AddBannedWordAsync">
                 ADD
             </button>
@@ -184,6 +202,8 @@
 
     private IReadOnlyList<BannedWordResponse> _bannedWords = [];
     private string _newWord = "";
+    private bool _newWordIsRegex;
+    private string? _regexValidationError;
     private bool _wordBusy;
 
     protected override async Task OnInitializedAsync() {
@@ -197,11 +217,25 @@
 
     private async Task AddBannedWordAsync() {
         if (string.IsNullOrWhiteSpace(_newWord)) return;
+
+        if (_newWordIsRegex) {
+            try {
+                _ = Regex.Match(string.Empty, _newWord, RegexOptions.None, TimeSpan.FromMilliseconds(500));
+                _regexValidationError = null;
+            } catch (ArgumentException) {
+                _regexValidationError = "The provided regex pattern is not valid.";
+                return;
+            }
+        } else {
+            _regexValidationError = null;
+        }
+
         _wordBusy = true;
         try {
-            await Api.AddBannedWordAsync(DiscordGuildId, _newWord);
+            await Api.AddBannedWordAsync(DiscordGuildId, _newWord, _newWordIsRegex);
             _bannedWords = await Api.GetBannedWordsAsync(DiscordGuildId);
             _newWord = "";
+            _newWordIsRegex = false;
         } catch (Exception ex) {
             await OnError.InvokeAsync($"Failed to add banned word: {ex.Message}");
         } finally {

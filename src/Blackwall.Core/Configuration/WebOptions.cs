@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+// ReSharper disable NullableWarningSuppressionIsUsed
 
 namespace Blackwall.Core.Configuration;
 

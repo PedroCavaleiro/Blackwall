@@ -4,11 +4,22 @@ using Blackwall.Api.Helpers;
 using Blackwall.Api.Middleware;
 using Blackwall.Api.Services;
 using Blackwall.Api.Services.Discord;
-using Blackwall.DiscordBot;
-using Blackwall.DiscordBot.Background;
-using Blackwall.DiscordBot.Handlers;
-using Blackwall.DiscordBot.Services;
+using Blackwall.Bot.Discord;
+using Blackwall.Bot.Discord.Background;
+using Blackwall.Bot.Discord.Handlers;
+using Blackwall.Bot.Discord.Services;
+using Blackwall.Modules.DetectionMatrix;
+using Blackwall.Modules.ContentGuard;
+using Blackwall.Bot.Twitch;
+using Blackwall.Bot.Twitch.Services;
+using Blackwall.Modules.LinkProtection;
+using Blackwall.Modules.Banlist;
+using Blackwall.Modules.Runtime;
+using Blackwall.Modules.LinkProtection.Background;
+using Blackwall.Modules.LinkProtection.Services;
+using Blackwall.Api.Services.Twitch;
 using Blackwall.Core.Configuration;
+using Blackwall.Core.Services;
 using Blackwall.Infrastructure;
 using Discord;
 using Discord.WebSocket;
@@ -17,7 +28,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
+using StackExchange.Redis;
 
 if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("POSTGRES__CONNECTION_STRING")))
     try { Env.TraversePath().Load(); } catch { /* .env not readable — vars injected by systemd */ }
@@ -41,6 +54,7 @@ builder.Services.AddHttpClient<DiscordOAuthService>();
 
 builder.Services.Configure<TwitchOptions>(builder.Configuration.GetSection(TwitchOptions.SectionName));
 builder.Services.AddHttpClient<TwitchOAuthService>();
+builder.Services.Configure<TwitchSyncOptions>(builder.Configuration.GetSection(TwitchSyncOptions.SectionName));
 
 builder.Services.Configure<ApiOptions>(
     builder.Configuration.GetSection(ApiOptions.SectionName));
@@ -92,7 +106,6 @@ builder.Services.AddSingleton<DiscordSocketClient>(_ => new DiscordSocketClient(
 builder.Services.AddSingleton<GuildHandler>();
 builder.Services.AddSingleton<MessageHandler>();
 builder.Services.AddSingleton<GuildMemberHandler>();
-builder.Services.AddSingleton<SpamDetectionService>();
 builder.Services.AddSingleton<RaidDetectionService>();
 builder.Services.AddSingleton<AccountScoringService>();
 builder.Services.AddSingleton<LockdownService>();
@@ -103,24 +116,81 @@ builder.Services.AddScoped<GuildClaimService>();
 builder.Services.AddScoped<AccountLinkingService>();
 builder.Services.AddScoped<GuildPermissionSyncService>();
 builder.Services.AddSingleton<DiscordGuildCacheService>();
-builder.Services.AddScoped<BlacklistService>();
-builder.Services.AddSingleton<BanSyncService>();
+builder.Services.AddKeyedSingleton<IBanPlatformProvider, DiscordBanPlatformProvider>("discord");
+builder.Services.AddKeyedSingleton<IBanSyncDataAccess, DiscordBanSyncDataAccess>("discord");
+builder.Services.AddKeyedSingleton<BanSyncService>("discord", (sp, _) => {
+    var provider = sp.GetRequiredKeyedService<IBanPlatformProvider>("discord");
+    var dataAccess = sp.GetRequiredKeyedService<IBanSyncDataAccess>("discord");
+    var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
+    var logger = sp.GetRequiredService<ILogger<BanSyncService>>();
+    return new BanSyncService(provider, dataAccess, scopeFactory, logger);
+});
+builder.Services.AddSingleton<DiscordBanSyncService>(sp => {
+    var inner = sp.GetRequiredKeyedService<BanSyncService>("discord");
+    return new DiscordBanSyncService(inner);
+});
 builder.Services.AddSingleton<SafeBrowsingService>();
+builder.Services.AddSingleton<ISafeBrowsingService>(sp => sp.GetRequiredService<SafeBrowsingService>());
 builder.Services.AddSingleton<ContentGuardService>();
 builder.Services.AddSingleton<AllowedBotService>();
 builder.Services.AddSingleton<NetWatchSnareService>();
-builder.Services.AddSingleton<AiSentinelService>();
 builder.Services.AddScoped<SafeBrowsingSyncService>();
 builder.Services.AddScoped<MessageAuditService>();
 builder.Services.AddSingleton<ModuleRunnerService>();
 builder.Services.AddScoped<ModuleInstallationService>();
+builder.Services.AddSingleton<ModuleRuntimeService>();
+builder.Services.AddSingleton<TwitchModuleRunnerService>();
+builder.Services.AddScoped<TwitchModuleInstallationService>();
+builder.Services.AddScoped<TwitchChannelService>();
+builder.Services.AddSingleton<TwitchBotService>();
+builder.Services.AddScoped<TwitchMessageAuditService>();
+builder.Services.AddKeyedSingleton<IBanPlatformProvider, TwitchBanPlatformProvider>("twitch");
+builder.Services.AddKeyedSingleton<IBanSyncDataAccess, TwitchBanSyncDataAccess>("twitch");
+builder.Services.AddKeyedSingleton<BanSyncService>("twitch", (sp, _) => {
+    var provider = sp.GetRequiredKeyedService<IBanPlatformProvider>("twitch");
+    var dataAccess = sp.GetRequiredKeyedService<IBanSyncDataAccess>("twitch");
+    var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
+    var logger = sp.GetRequiredService<ILogger<BanSyncService>>();
+    return new BanSyncService(provider, dataAccess, scopeFactory, logger);
+});
+builder.Services.AddSingleton<TwitchBanSyncService>(sp => {
+    var inner = sp.GetRequiredKeyedService<BanSyncService>("twitch");
+    return new TwitchBanSyncService(inner);
+});
+builder.Services.AddKeyedSingleton<DetectionService>("discord", (sp, _) => {
+    var redis = sp.GetRequiredService<IConnectionMultiplexer>();
+    return new DetectionService("spam:", redis);
+});
+builder.Services.AddKeyedSingleton<DetectionService>("twitch", (sp, _) => {
+    var redis = sp.GetRequiredService<IConnectionMultiplexer>();
+    return new DetectionService("twitch:", redis);
+});
+builder.Services.AddKeyedSingleton<ILinkConfigProvider, DiscordLinkConfigProvider>("discord");
+builder.Services.AddKeyedSingleton<ILinkConfigProvider, TwitchLinkConfigProvider>("twitch");
+builder.Services.AddKeyedSingleton<LinkProtectionService>("discord", (sp, _) => {
+    var redis = sp.GetRequiredService<IConnectionMultiplexer>();
+    var configProvider = sp.GetRequiredKeyedService<ILinkConfigProvider>("discord");
+    var blacklistOptions = sp.GetRequiredService<IOptions<BlacklistOptions>>();
+    var options = new LinkProtectionOptions { RedisKeyPrefix = "blacklist" };
+    var logger = sp.GetRequiredService<ILogger<LinkProtectionService>>();
+    return new LinkProtectionService(redis, configProvider, blacklistOptions, options, logger);
+});
+builder.Services.AddKeyedSingleton<LinkProtectionService>("twitch", (sp, _) => {
+    var redis = sp.GetRequiredService<IConnectionMultiplexer>();
+    var configProvider = sp.GetRequiredKeyedService<ILinkConfigProvider>("twitch");
+    var blacklistOptions = sp.GetRequiredService<IOptions<BlacklistOptions>>();
+    var options = new LinkProtectionOptions { RedisKeyPrefix = "twitch" };
+    var logger = sp.GetRequiredService<ILogger<LinkProtectionService>>();
+    return new LinkProtectionService(redis, configProvider, blacklistOptions, options, logger);
+});
 builder.Services.AddHostedService<SafeBrowsingSyncBackgroundService>();
 builder.Services.AddHostedService<MessageAuditPurgeBackgroundService>();
-builder.Services.AddHostedService<AiSentinelPurgeBackgroundService>();
 builder.Services.AddHostedService<BotWorker>();
 builder.Services.AddHostedService<GuildPermissionSyncBackgroundService>();
 builder.Services.AddHostedService<BlacklistRefreshBackgroundService>();
-builder.Services.AddHostedService<BanSyncBackgroundService>();
+builder.Services.AddHostedService<DiscordBanSyncBackgroundService>();
+builder.Services.AddHostedService<TwitchBotWorker>();
+builder.Services.AddHostedService<TwitchBanSyncBackgroundService>();
 
 builder.Services.AddAuthorization();
 

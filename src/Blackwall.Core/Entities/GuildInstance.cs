@@ -13,7 +13,6 @@ public sealed class GuildInstance: EntityBase {
     public DateTime UpdatedAtUtc { get; set; }
 
     public SpamConfiguration SpamConfiguration { get; set; } = null!;
-    public AiSentinelConfiguration AiSentinelConfiguration { get; set; } = null!;
     public ICollection<GuildManager> Managers { get; set; } = [];
     public ICollection<GuildBan> Bans { get; set; } = [];
     public ICollection<GuildBanSyncRule> BanSyncRules { get; set; } = [];

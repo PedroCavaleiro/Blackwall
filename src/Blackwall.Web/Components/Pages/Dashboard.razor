@@ -1,94 +1,216 @@
 @page "/dashboard"
 @attribute [Authorize]
 @inject BlackwallApiService Api
+@inject NavigationManager Nav
 
 <PageTitle>Grid — Blackwall</PageTitle>
 
 <div style="max-width:1200px;margin:0 auto;padding:2.5rem 1.5rem">
 
     <div class="mb-5">
-        <div class="font-mono mb-2" style="font-size:0.68rem;letter-spacing:0.18em;color:var(--bw-primary)">// GRID OVERVIEW</div>
-        <h1 class="font-display mb-1" style="font-size:2.2rem;letter-spacing:0.04em">YOUR SERVERS</h1>
-        <p class="font-mono mb-0 bw-alert-text bw-text-muted">Servers where you hold MANAGE_GUILD authority.</p>
+        <div class="font-mono mb-2" style="font-size:0.68rem;letter-spacing:0.18em;color:var(--bw-primary)">// @(_activeTab == "discord" ? "SERVER OVERVIEW" : "CHANNEL OVERVIEW")</div>
+        <h1 class="font-display mb-1" style="font-size:2.2rem;letter-spacing:0.04em">YOUR @(_activeTab == "discord" ? "SERVERS" : "CHANNELS")</h1>
+        <p class="font-mono mb-0 bw-alert-text bw-text-muted">@(_activeTab == "discord" ? "Servers where you hold MANAGE_GUILD authority." : "Channels where you are the owner or a manager.")</p>
     </div>
 
-    @if (_loading) {
-        <div class="font-mono bw-loading bw-typewriter">&gt; Scanning grid...</div>
-    } else if (_guilds is null) {
-        <div class="font-mono bw-err bw-typewriter">&gt; Connection error. Could not retrieve server list.</div>
-    } else {
-        <!-- DEPLOYED section -->
-        <section class="mb-5">
-            <div class="d-flex align-items-center gap-3 mb-3 font-mono bw-section-label">
-                <span class="rounded-circle bw-pulse" style="width:7px;height:7px;background:var(--bw-success);flex-shrink:0;display:inline-block"></span>
-                <span class="bw-text-primary">DEPLOYED</span>
-                <span class="bw-text-muted">[<span>@_deployed.Count.ToString("D2")</span>]</span>
-                <div class="flex-grow-1 bw-divider"></div>
-            </div>
-            @if (_deployed.Count == 0) {
-                <div class="font-mono bw-empty-box">&gt; No active deployments.</div>
-            } else {
-                <div class="row g-3">
-                    @foreach (var guild in _deployed) {
-                        <div class="col-sm-6 col-lg-4">
-                            <a href="/guild/@guild.DiscordGuildId" class="bw-guild-card cut-corner d-block text-decoration-none">
-                                <div class="d-flex align-items-start gap-3">
-                                    <GuildAvatar Name="@guild.Name" Icon="@guild.Icon" GuildId="@guild.DiscordGuildId" />
-                                    <div class="min-w-0 flex-grow-1">
-                                        <div class="font-display bw-guild-name">@guild.Name</div>
-                                        @if (guild.Owner) {
-                                            <div class="font-mono mt-1 bw-role">OWNER</div>
-                                        } else {
-                                            <div class="font-mono mt-1 bw-role">MANAGER</div>
-                                        }
-                                        <div class="d-flex align-items-center gap-1 mt-2 font-mono bw-status">
-                                            <span class="rounded-circle" style="width:5px;height:5px;background:var(--bw-success);display:inline-block"></span>
-                                            <span style="color:var(--bw-success)">ACTIVE</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </a>
-                        </div>
-                    }
-                </div>
-            }
-        </section>
+    <!-- Tab selector -->
+    <div class="d-flex gap-2 mb-4 font-mono">
+        <button type="button" class="btn @(_activeTab == "discord" ? "btn-primary" : "btn-outline-secondary") btn-sm cut-corner font-display"
+                style="font-size:0.62rem;padding:0.3rem 1rem;letter-spacing:0.1em"
+                @onclick='() => SwitchTab("discord")'>
+            DISCORD
+        </button>
+        <button type="button" class="btn @(_activeTab == "twitch" ? "btn-primary" : "btn-outline-secondary") btn-sm cut-corner font-display"
+                style="font-size:0.62rem;padding:0.3rem 1rem;letter-spacing:0.1em"
+                @onclick='() => SwitchTab("twitch")'>
+            TWITCH
+        </button>
+    </div>
 
-        <!-- AVAILABLE section -->
-        <section>
-            <div class="d-flex align-items-center gap-3 mb-3 font-mono bw-section-label">
-                <span class="rounded-circle" style="width:7px;height:7px;background:var(--bw-muted);flex-shrink:0;display:inline-block"></span>
-                <span class="bw-text-primary">AVAILABLE</span>
-                <span class="bw-text-muted">[<span>@_available.Count.ToString("D2")</span>]</span>
-                <div class="flex-grow-1 bw-divider"></div>
-            </div>
-            @if (_available.Count == 0) {
-                <div class="font-mono bw-empty-box">&gt; Every server you manage is protected.</div>
-            } else {
-                <div class="row g-3">
-                    @foreach (var guild in _available) {
-                        <div class="col-sm-6 col-lg-4">
-                            <a href="/bot/invite?guildId=@guild.DiscordGuildId" target="_blank" class="bw-guild-card cut-corner d-block text-decoration-none">
-                                <div class="d-flex align-items-start gap-3">
-                                    <GuildAvatar Name="@guild.Name" Icon="@guild.Icon" GuildId="@guild.DiscordGuildId" />
-                                    <div class="min-w-0 flex-grow-1">
-                                        <div class="font-display bw-guild-name">@guild.Name</div>
-                                        @if (guild.Owner) {
-                                            <div class="font-mono mt-1 bw-role">OWNER</div>
-                                        } else {
-                                            <div class="font-mono mt-1 bw-role">MANAGER</div>
-                                        }
-                                        <div class="d-flex align-items-center gap-1 mt-2 font-mono bw-status">
-                                            <span class="bw-text-primary">+ DEPLOY</span>
+    @if (_activeTab == "discord") {
+        @if (_loading) {
+            <div class="font-mono bw-loading bw-typewriter">&gt; Scanning grid...</div>
+        } else if (_guilds is null) {
+            <div class="font-mono bw-err bw-typewriter">&gt; Connection error. Could not retrieve server list.</div>
+        } else {
+            <!-- DEPLOYED section -->
+            <section class="mb-5">
+                <div class="d-flex align-items-center gap-3 mb-3 font-mono bw-section-label">
+                    <span class="rounded-circle bw-pulse" style="width:7px;height:7px;background:var(--bw-success);flex-shrink:0;display:inline-block"></span>
+                    <span class="bw-text-primary">DEPLOYED</span>
+                    <span class="bw-text-muted">[<span>@_deployed.Count.ToString("D2")</span>]</span>
+                    <div class="flex-grow-1 bw-divider"></div>
+                </div>
+                @if (_deployed.Count == 0) {
+                    <div class="font-mono bw-empty-box">&gt; No active deployments.</div>
+                } else {
+                    <div class="row g-3">
+                        @foreach (var guild in _deployed) {
+                            <div class="col-sm-6 col-lg-4">
+                                <a href="/guild/@guild.DiscordGuildId" class="bw-guild-card cut-corner d-block text-decoration-none">
+                                    <div class="d-flex align-items-start gap-3">
+                                        <GuildAvatar Name="@guild.Name" Icon="@guild.Icon" GuildId="@guild.DiscordGuildId" />
+                                        <div class="min-w-0 flex-grow-1">
+                                            <div class="font-display bw-guild-name">@guild.Name</div>
+                                            @if (guild.Owner) {
+                                                <div class="font-mono mt-1 bw-role">OWNER</div>
+                                            } else {
+                                                <div class="font-mono mt-1 bw-role">MANAGER</div>
+                                            }
+                                            <div class="d-flex align-items-center gap-1 mt-2 font-mono bw-status">
+                                                <span class="rounded-circle" style="width:5px;height:5px;background:var(--bw-success);display:inline-block"></span>
+                                                <span style="color:var(--bw-success)">ACTIVE</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+
+            <!-- AVAILABLE section -->
+            <section>
+                <div class="d-flex align-items-center gap-3 mb-3 font-mono bw-section-label">
+                    <span class="rounded-circle" style="width:7px;height:7px;background:var(--bw-muted);flex-shrink:0;display:inline-block"></span>
+                    <span class="bw-text-primary">AVAILABLE</span>
+                    <span class="bw-text-muted">[<span>@_available.Count.ToString("D2")</span>]</span>
+                    <div class="flex-grow-1 bw-divider"></div>
+                </div>
+                @if (_available.Count == 0) {
+                    <div class="font-mono bw-empty-box">&gt; Every server you manage is protected.</div>
+                } else {
+                    <div class="row g-3">
+                        @foreach (var guild in _available) {
+                            <div class="col-sm-6 col-lg-4">
+                                <a href="/bot/invite?guildId=@guild.DiscordGuildId" class="bw-guild-card cut-corner d-block text-decoration-none">
+                                    <div class="d-flex align-items-start gap-3">
+                                        <GuildAvatar Name="@guild.Name" Icon="@guild.Icon" GuildId="@guild.DiscordGuildId" />
+                                        <div class="min-w-0 flex-grow-1">
+                                            <div class="font-display bw-guild-name">@guild.Name</div>
+                                            @if (guild.Owner) {
+                                                <div class="font-mono mt-1 bw-role">OWNER</div>
+                                            } else {
+                                                <div class="font-mono mt-1 bw-role">MANAGER</div>
+                                            }
+                                            <div class="d-flex align-items-center gap-1 mt-2 font-mono bw-status">
+                                                <span class="bw-text-primary">+ DEPLOY</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+        }
+    } else if (_activeTab == "twitch") {
+        @if (_twitchLoading) {
+            <div class="font-mono bw-loading bw-typewriter">&gt; Scanning channels...</div>
+        } else if (_twitchChannels is null) {
+            <div class="font-mono bw-err bw-typewriter">&gt; Connection error. Could not retrieve channel list.</div>
+        } else if (_twitchChannels.Count == 0) {
+            <div class="font-mono bw-empty-box">&gt; No Twitch account linked. Link your Twitch account to get started.</div>
+        } else {
+            <!-- DEPLOYED section -->
+            <section class="mb-5">
+                <div class="d-flex align-items-center gap-3 mb-3 font-mono bw-section-label">
+                    <span class="rounded-circle bw-pulse" style="width:7px;height:7px;background:var(--bw-success);flex-shrink:0;display:inline-block"></span>
+                    <span class="bw-text-primary">DEPLOYED</span>
+                    <span class="bw-text-muted">[<span>@_twitchDeployed.Count.ToString("D2")</span>]</span>
+                    <div class="flex-grow-1 bw-divider"></div>
+                </div>
+                @if (_twitchDeployed.Count == 0) {
+                    <div class="font-mono bw-empty-box">&gt; No active deployments.</div>
+                } else {
+                    <div class="row g-3">
+                        @foreach (var channel in _twitchDeployed) {
+                            <div class="col-sm-6 col-lg-4">
+                                <a href="/channel/@channel.TwitchUserId" class="bw-guild-card cut-corner d-block text-decoration-none">
+                                    <div class="d-flex align-items-start gap-3">
+                                        <TwitchAvatar DisplayName="@channel.DisplayName" ProfileImageUrl="@channel.ProfileImageUrl" />
+                                        <div class="min-w-0 flex-grow-1">
+                                            <div class="font-display bw-guild-name">@channel.DisplayName</div>
+                                            <div class="font-mono mt-1 bw-role">@@@channel.Username</div>
+                                            <div class="d-flex align-items-center gap-1 mt-2 font-mono bw-status">
+                                                <span class="rounded-circle" style="width:5px;height:5px;background:var(--bw-success);display:inline-block"></span>
+                                                <span style="color:var(--bw-success)">ACTIVE</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+
+            <!-- AVAILABLE section (own channel without bot) -->
+            <section class="mb-5">
+                <div class="d-flex align-items-center gap-3 mb-3 font-mono bw-section-label">
+                    <span class="rounded-circle" style="width:7px;height:7px;background:var(--bw-muted);flex-shrink:0;display:inline-block"></span>
+                    <span class="bw-text-primary">AVAILABLE</span>
+                    <span class="bw-text-muted">[<span>@_twitchAvailable.Count.ToString("D2")</span>]</span>
+                    <div class="flex-grow-1 bw-divider"></div>
+                </div>
+                @if (_twitchAvailable.Count == 0) {
+                    <div class="font-mono bw-empty-box">&gt; No channels available to deploy.</div>
+                } else {
+                    <div class="row g-3">
+                        @foreach (var channel in _twitchAvailable) {
+                            <div class="col-sm-6 col-lg-4">
+                                <div role="button" tabindex="0" class="bw-guild-card cut-corner d-block"
+                                        @onclick="() => InstallTwitchBot(channel)"
+                                        @onkeypress="() => InstallTwitchBot(channel)">
+                                    <div class="d-flex align-items-start gap-3">
+                                        <TwitchAvatar DisplayName="@channel.DisplayName" ProfileImageUrl="@channel.ProfileImageUrl" />
+                                        <div class="min-w-0 flex-grow-1">
+                                            <div class="font-display bw-guild-name">@channel.DisplayName</div>
+                                            <div class="font-mono mt-1 bw-role">@@@channel.Username</div>
+                                            <div class="d-flex align-items-center gap-1 mt-2 font-mono bw-status">
+                                                <span class="bw-text-primary">+ INSTALL</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </a>
-                        </div>
-                    }
-                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+
+            <!-- MANAGED section -->
+            @if (_twitchManaged.Count > 0) {
+                <section>
+                    <div class="d-flex align-items-center gap-3 mb-3 font-mono bw-section-label">
+                        <span class="rounded-circle" style="width:7px;height:7px;background:var(--bw-primary);flex-shrink:0;display:inline-block;opacity:0.5"></span>
+                        <span class="bw-text-primary">MANAGED</span>
+                        <span class="bw-text-muted">[<span>@_twitchManaged.Count.ToString("D2")</span>]</span>
+                        <div class="flex-grow-1 bw-divider"></div>
+                    </div>
+                    <div class="row g-3">
+                        @foreach (var channel in _twitchManaged) {
+                            <div class="col-sm-6 col-lg-4">
+                                <div class="bw-guild-card cut-corner d-block">
+                                    <div class="d-flex align-items-start gap-3">
+                                        <TwitchAvatar DisplayName="@channel.DisplayName" ProfileImageUrl="@channel.ProfileImageUrl" />
+                                        <div class="min-w-0 flex-grow-1">
+                                            <div class="font-display bw-guild-name">@channel.DisplayName</div>
+                                            <div class="font-mono mt-1 bw-role">@@@channel.Username</div>
+                                            <div class="d-flex align-items-center gap-1 mt-2 font-mono bw-status">
+                                                <span class="bw-text-muted">MANAGER</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </section>
             }
-        </section>
+        }
     }
 </div>
 
@@ -107,12 +229,30 @@
 </script>
 
 @code {
+    private string _activeTab = "discord";
+
     private IReadOnlyList<ManageableGuildResponse>? _guilds;
     private List<ManageableGuildResponse> _deployed  = [];
     private List<ManageableGuildResponse> _available = [];
     private bool _loading = true;
 
+    private IReadOnlyList<ManageableTwitchChannelResponse>? _twitchChannels;
+    private List<ManageableTwitchChannelResponse> _twitchDeployed  = [];
+    private List<ManageableTwitchChannelResponse> _twitchAvailable = [];
+    private List<ManageableTwitchChannelResponse> _twitchManaged   = [];
+    private bool _twitchLoading = true;
+
     protected override async Task OnInitializedAsync() {
+        var query = System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query);
+        var tab = query["tab"];
+        if (tab == "twitch" || tab == "discord")
+            _activeTab = tab;
+
+        await LoadDiscordAsync();
+        await LoadTwitchAsync();
+    }
+
+    private async Task LoadDiscordAsync() {
         try {
             _guilds = await Api.GetGuildsAsync();
             if (_guilds is not null) {
@@ -125,4 +265,35 @@
             _loading = false;
         }
     }
+
+    private async Task LoadTwitchAsync() {
+        try {
+            _twitchChannels = await Api.GetTwitchChannelsAsync();
+            if (_twitchChannels is not null) {
+                _twitchDeployed  = _twitchChannels.Where(c => c.BotInstalled && c.IsOwner).ToList();
+                _twitchAvailable = _twitchChannels.Where(c => !c.BotInstalled && c.IsOwner).ToList();
+                _twitchManaged   = _twitchChannels.Where(c => !c.IsOwner).ToList();
+            }
+        } catch {
+            _twitchChannels = null;
+        } finally {
+            _twitchLoading = false;
+        }
+    }
+
+    private void SwitchTab(string tab) {
+        _activeTab = tab;
+    }
+
+    private async Task InstallTwitchBot(ManageableTwitchChannelResponse channel) {
+        try {
+            var url = await Api.GetTwitchBotInstallUrlAsync();
+            if (!string.IsNullOrWhiteSpace(url)) {
+                Nav.NavigateTo(url, forceLoad: true);
+            }
+        } catch {
+            // Silently fail
+        }
+    }
 }
+

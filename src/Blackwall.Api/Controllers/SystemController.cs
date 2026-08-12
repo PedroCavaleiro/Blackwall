@@ -1,4 +1,5 @@
-using Blackwall.DiscordBot.Services;
+using Blackwall.Bot.Discord.Services;
+using Blackwall.Modules.LinkProtection.Services;
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
 using Blackwall.Infrastructure.Cache.Discord;
@@ -216,7 +217,7 @@ public sealed class SystemController(
             .AddField("User", $"{user.Mention} (`{user.Id}`)", true)
             .AddField("Score", result.Score.ToString(), true)
             .AddField("Account age", $"{(int)(DateTimeOffset.UtcNow - user.CreatedAt).TotalDays} day(s)", true)
-            .AddField("Risk factors", result.Factors.Count > 0 ? string.Join("\n", result.Factors) : "None", false)
+            .AddField("Risk factors", result.Factors.Count > 0 ? string.Join("\n", result.Factors) : "None")
             .WithFooter("Manual test via API")
             .WithTimestamp(DateTimeOffset.UtcNow)
             .Build();

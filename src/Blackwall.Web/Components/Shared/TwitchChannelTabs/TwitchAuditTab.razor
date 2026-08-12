@@ -1,0 +1,65 @@
+@inject BlackwallApiService Api
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">MESSAGE AUDIT</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">
+            When enabled, Blackwall stores the content of messages that trigger a protection so you can review them later from the web dashboard.
+        </p>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Enable message audit</div>
+                <div class="form-text">Stores triggered messages for review in the web dashboard.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="twitchMsgAuditEnabled" @bind-Value="Form.IsMessageAuditEnabled" />
+            </div>
+        </div>
+        <div class="bw-field bw-field-last">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Retention (days)</div>
+                <div class="form-text">How long to keep each audited message. Minimum 7, maximum 90.</div>
+            </div>
+            <InputNumber class="form-control bw-input-narrow" @bind-Value="Form.MessageAuditRetentionDays" min="7" max="90" />
+        </div>
+    </div>
+</div>
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">AUDIT EVENTS</div>
+    <div class="p-4">
+        <p class="font-mono mb-3 bw-desc">
+            Browse protection events and the messages that triggered them.
+        </p>
+        <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-sm"
+                disabled="@( !Form.IsMessageAuditEnabled )"
+                @onclick="OpenAuditModal">
+            OPEN EVENT VIEWER
+        </button>
+        @if (!Form.IsMessageAuditEnabled) {
+            <div class="font-mono mt-2 bw-desc">
+                // Enable message audit above to start recording events.
+            </div>
+        }
+    </div>
+</div>
+
+@if (_auditModalOpen) {
+    <TwitchAuditModal TwitchUserId="TwitchUserId" OnClose="CloseAuditModal" />
+}
+
+@code {
+    [Parameter, EditorRequired] public required TwitchChannelConfigForm Form { get; set; }
+    [Parameter, EditorRequired] public required long TwitchUserId { get; set; }
+
+    private bool _auditModalOpen;
+
+    private void OpenAuditModal() {
+        _auditModalOpen = true;
+    }
+
+    private void CloseAuditModal() {
+        _auditModalOpen = false;
+    }
+}

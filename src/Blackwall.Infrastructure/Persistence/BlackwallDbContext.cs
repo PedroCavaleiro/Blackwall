@@ -19,9 +19,20 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<MessageAuditEvent> MessageAuditEvents => Set<MessageAuditEvent>();
     public DbSet<MessageAuditRecord> MessageAuditRecords => Set<MessageAuditRecord>();
     public DbSet<NetWatchSnareChannel> NetWatchSnareChannels => Set<NetWatchSnareChannel>();
-    public DbSet<AiSentinelConfiguration> AiSentinelConfigurations => Set<AiSentinelConfiguration>();
-    public DbSet<AiSentinelLog> AiSentinelLogs => Set<AiSentinelLog>();
     public DbSet<GuildModuleInstallation> GuildModuleInstallations => Set<GuildModuleInstallation>();
+    public DbSet<TwitchChannelModuleInstallation> TwitchChannelModuleInstallations => Set<TwitchChannelModuleInstallation>();
+    public DbSet<TwitchChannelInstance> TwitchChannelInstances => Set<TwitchChannelInstance>();
+    public DbSet<TwitchChannelManager> TwitchChannelManagers => Set<TwitchChannelManager>();
+    public DbSet<TwitchChannelConfiguration> TwitchChannelConfigurations => Set<TwitchChannelConfiguration>();
+    public DbSet<TwitchAllowedBot> TwitchAllowedBots => Set<TwitchAllowedBot>();
+    public DbSet<TwitchChannelBlacklist> TwitchChannelBlacklists => Set<TwitchChannelBlacklist>();
+    public DbSet<TwitchChannelDomainRule> TwitchChannelDomainRules => Set<TwitchChannelDomainRule>();
+    public DbSet<TwitchChannelBannedWord> TwitchChannelBannedWords => Set<TwitchChannelBannedWord>();
+    public DbSet<TwitchRemovedManager> TwitchRemovedManagers => Set<TwitchRemovedManager>();
+    public DbSet<TwitchChannelBan> TwitchChannelBans => Set<TwitchChannelBan>();
+    public DbSet<TwitchChannelBanSyncRule> TwitchChannelBanSyncRules => Set<TwitchChannelBanSyncRule>();
+    public DbSet<TwitchMessageAuditEvent> TwitchMessageAuditEvents => Set<TwitchMessageAuditEvent>();
+    public DbSet<TwitchMessageAuditRecord> TwitchMessageAuditRecords => Set<TwitchMessageAuditRecord>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -96,11 +107,6 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.HasOne(e => e.SpamConfiguration)
                   .WithOne(e => e.GuildInstance)
                   .HasForeignKey<SpamConfiguration>(e => e.GuildInstanceId)
-                  .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(e => e.AiSentinelConfiguration)
-                  .WithOne(e => e.GuildInstance)
-                  .HasForeignKey<AiSentinelConfiguration>(e => e.GuildInstanceId)
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasMany(e => e.Bans)
@@ -437,6 +443,9 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .IsRequired()
                   .HasMaxLength(100);
 
+            entity.Property(e => e.IsRegex)
+                  .HasDefaultValue(false);
+
             entity.HasIndex(e => new { e.SpamConfigurationId, e.Word })
                   .IsUnique();
         });
@@ -519,6 +528,62 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.HasIndex(e => e.ExpiresAtUtc);
         });
 
+        modelBuilder.Entity<TwitchMessageAuditEvent>(entity => {
+            entity.Property(e => e.TwitchUserId)
+                  .IsRequired();
+
+            entity.Property(e => e.Username)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.Violations)
+                  .IsRequired()
+                  .HasMaxLength(500);
+
+            entity.Property(e => e.Action)
+                  .IsRequired();
+
+            entity.Property(e => e.IsDryRun)
+                  .IsRequired();
+
+            entity.HasOne(e => e.TwitchChannelInstance)
+                  .WithMany(e => e.MessageAuditEvents)
+                  .HasForeignKey(e => e.TwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.Records)
+                  .WithOne(e => e.Event)
+                  .HasForeignKey(e => e.EventId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.TwitchChannelInstanceId, e.CreatedAtUtc });
+        });
+
+        modelBuilder.Entity<TwitchMessageAuditRecord>(entity => {
+            entity.Property(e => e.DiscordMessageId)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(e => e.TwitchUserId)
+                  .IsRequired();
+
+            entity.Property(e => e.Username)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.Content)
+                  .IsRequired();
+
+            entity.Property(e => e.MessageTimestampUtc)
+                  .IsRequired();
+
+            entity.Property(e => e.ExpiresAtUtc)
+                  .IsRequired();
+
+            entity.HasIndex(e => e.EventId);
+            entity.HasIndex(e => e.ExpiresAtUtc);
+        });
+
         modelBuilder.Entity<NetWatchSnareChannel>(entity => {
             entity.Property(e => e.DiscordChannelId)
                   .IsRequired();
@@ -546,127 +611,177 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .IsUnique();
         });
 
-        modelBuilder.Entity<AiSentinelConfiguration>(entity => {
-            entity.Property(e => e.IsEnabled)
-                  .IsRequired()
-                  .HasDefaultValue(false);
-
-            entity.Property(e => e.IsDryRun)
-                  .IsRequired()
-                  .HasDefaultValue(true);
-
-            entity.Property(e => e.IsTrainingMode)
-                  .IsRequired()
-                  .HasDefaultValue(true);
-
-            entity.Property(e => e.Provider)
-                  .IsRequired()
-                  .HasDefaultValue(AiSentinelProvider.OpenAi);
-
-            entity.Property(e => e.ApiKey)
-                  .HasMaxLength(512);
-
-            entity.Property(e => e.OllamaUrl)
-                  .HasMaxLength(512);
-
-            entity.Property(e => e.OllamaHeader1Key)
-                  .HasMaxLength(100);
-
-            entity.Property(e => e.OllamaHeader1Value)
-                  .HasMaxLength(512);
-
-            entity.Property(e => e.OllamaHeader2Key)
-                  .HasMaxLength(100);
-
-            entity.Property(e => e.OllamaHeader2Value)
-                  .HasMaxLength(512);
-
-            entity.Property(e => e.OllamaHeader3Key)
-                  .HasMaxLength(100);
-
-            entity.Property(e => e.OllamaHeader3Value)
-                  .HasMaxLength(512);
-
-            entity.Property(e => e.Model)
-                  .HasMaxLength(200);
-
-            entity.Property(e => e.Action)
-                  .IsRequired()
-                  .HasDefaultValue(InfractionAction.DeleteOnly);
-
-            entity.Property(e => e.AutoLockdown)
-                  .IsRequired()
-                  .HasDefaultValue(false);
-
-            entity.Property(e => e.TimeoutMinutes)
-                  .IsRequired()
-                  .HasDefaultValue(10);
-
-            entity.Property(e => e.MessageDeleteDays)
-                  .IsRequired()
-                  .HasDefaultValue(0);
-
-            entity.Property(e => e.UpdatedAtUtc);
-
-            entity.HasMany(e => e.Logs)
-                  .WithOne(e => e.AiSentinelConfiguration)
-                  .HasForeignKey(e => e.AiSentinelConfigurationId)
-                  .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<AiSentinelLog>(entity => {
-            entity.Property(e => e.DiscordMessageId)
-                  .IsRequired();
-
-            entity.Property(e => e.DiscordUserId)
-                  .IsRequired();
+        modelBuilder.Entity<TwitchChannelInstance>(entity => {
+            entity.HasIndex(e => e.TwitchUserId)
+                  .IsUnique();
 
             entity.Property(e => e.Username)
                   .IsRequired()
-                  .HasMaxLength(200);
+                  .HasMaxLength(100);
 
-            entity.Property(e => e.ChannelName)
+            entity.Property(e => e.DisplayName)
                   .IsRequired()
-                  .HasMaxLength(200);
+                  .HasMaxLength(100);
 
-            entity.Property(e => e.Content)
-                  .IsRequired();
+            entity.Property(e => e.ProfileImageUrl)
+                  .HasMaxLength(500);
 
-            entity.Property(e => e.EmbedsJson)
-                  .IsRequired();
+            entity.Property(e => e.UpdatedAtUtc);
 
-            entity.Property(e => e.Classification)
-                  .IsRequired();
+            entity.HasOne(e => e.OwnerUser)
+                  .WithMany(e => e.OwnedTwitchChannels)
+                  .HasForeignKey(e => e.OwnerUserId)
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.SetNull);
 
-            entity.Property(e => e.Reasoning)
-                  .IsRequired();
+            entity.HasMany(e => e.Managers)
+                  .WithOne(e => e.TwitchChannelInstance)
+                  .HasForeignKey(e => e.TwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
 
-            entity.Property(e => e.Provider)
-                  .IsRequired();
+            entity.HasOne(e => e.Configuration)
+                  .WithOne(e => e.TwitchChannelInstance)
+                  .HasForeignKey<TwitchChannelConfiguration>(e => e.TwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
 
-            entity.Property(e => e.Model)
+            entity.HasMany(e => e.Bans)
+                  .WithOne(e => e.TwitchChannelInstance)
+                  .HasForeignKey(e => e.TwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.BanSyncRules)
+                  .WithOne(e => e.TargetTwitchChannelInstance)
+                  .HasForeignKey(e => e.TargetTwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.MessageAuditEvents)
+                  .WithOne(e => e.TwitchChannelInstance)
+                  .HasForeignKey(e => e.TwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TwitchChannelConfiguration>(entity => {
+            entity.Property(e => e.CommandTrigger)
                   .IsRequired()
-                  .HasMaxLength(200);
+                  .HasMaxLength(2);
+
+            entity.Property(e => e.IsEnabled)
+                  .IsRequired();
 
             entity.Property(e => e.IsDryRun)
                   .IsRequired();
 
-            entity.Property(e => e.WouldAction)
+            entity.Property(e => e.AutoAddManagers)
                   .IsRequired();
 
-            entity.Property(e => e.TrainingFeedback)
+            entity.Property(e => e.UpdatedAtUtc);
+
+            entity.HasMany(e => e.AllowedBots)
+                  .WithOne(e => e.TwitchChannelConfiguration)
+                  .HasForeignKey(e => e.TwitchChannelConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.Blacklists)
+                  .WithOne(e => e.TwitchChannelConfiguration)
+                  .HasForeignKey(e => e.TwitchChannelConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.DomainRules)
+                  .WithOne(e => e.TwitchChannelConfiguration)
+                  .HasForeignKey(e => e.TwitchChannelConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.BannedWords)
+                  .WithOne(e => e.TwitchChannelConfiguration)
+                  .HasForeignKey(e => e.TwitchChannelConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TwitchChannelBlacklist>(entity => {
+            entity.Property(e => e.Url)
                   .IsRequired()
-                  .HasDefaultValue(AiSentinelTrainingFeedback.None);
+                  .HasMaxLength(2000);
 
-            entity.Property(e => e.MessageTimestampUtc)
+            entity.HasIndex(e => new { e.TwitchChannelConfigurationId, e.Url })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<TwitchChannelDomainRule>(entity => {
+            entity.Property(e => e.Rule)
+                  .IsRequired()
+                  .HasMaxLength(500);
+
+            entity.HasIndex(e => new { e.TwitchChannelConfigurationId, e.Rule })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<TwitchAllowedBot>(entity => {
+            entity.Property(e => e.BotUsername)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.HasIndex(e => new { e.TwitchChannelConfigurationId, e.BotUsername })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<TwitchChannelBannedWord>(entity => {
+            entity.Property(e => e.Word)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(e => e.IsRegex)
+                  .HasDefaultValue(false);
+
+            entity.HasIndex(e => new { e.TwitchChannelConfigurationId, e.Word })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<TwitchChannelManager>(entity => {
+            entity.Property(e => e.IsAdmin)
                   .IsRequired();
 
-            entity.Property(e => e.ExpiresAtUtc)
+            entity.HasOne(e => e.TwitchChannelInstance)
+                  .WithMany(e => e.Managers)
+                  .HasForeignKey(e => e.TwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                  .WithMany(e => e.ManagedTwitchChannels)
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.TwitchChannelInstanceId, e.UserId })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<TwitchRemovedManager>(entity => {
+            entity.HasIndex(e => new { e.TwitchChannelInstanceId, e.UserId })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<TwitchChannelBan>(entity => {
+            entity.Property(e => e.TwitchUserId)
                   .IsRequired();
 
-            entity.HasIndex(e => e.AiSentinelConfigurationId);
-            entity.HasIndex(e => e.ExpiresAtUtc);
-            entity.HasIndex(e => new { e.AiSentinelConfigurationId, e.CreatedAtUtc });
+            entity.Property(e => e.Username)
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.Reason)
+                  .HasMaxLength(2000);
+
+            entity.HasIndex(e => new { e.TwitchChannelInstanceId, e.TwitchUserId })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<TwitchChannelBanSyncRule>(entity => {
+            entity.Property(e => e.SourceTwitchUserId)
+                  .IsRequired();
+
+            entity.Property(e => e.IsEnabled)
+                  .IsRequired();
+
+            entity.HasIndex(e => new { e.TargetTwitchChannelInstanceId, e.SourceTwitchUserId })
+                  .IsUnique();
         });
 
         modelBuilder.Entity<GuildModuleInstallation>(entity => {
@@ -710,6 +825,50 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(e => new { e.GuildInstanceId, e.ModuleName })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<TwitchChannelModuleInstallation>(entity => {
+            entity.Property(e => e.ModuleName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.ModuleVersion)
+                  .IsRequired()
+                  .HasMaxLength(50);
+
+            entity.Property(e => e.ModuleAuthor)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.EntryPoint)
+                  .IsRequired()
+                  .HasMaxLength(500);
+
+            entity.Property(e => e.GitUrl)
+                  .HasMaxLength(1000);
+
+            entity.Property(e => e.CanPerformActions)
+                  .IsRequired();
+
+            entity.Property(e => e.IsEnabled)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.SettingsJson)
+                  .IsRequired();
+
+            entity.Property(e => e.ManifestJson)
+                  .IsRequired();
+
+            entity.Property(e => e.UpdatedAtUtc);
+
+            entity.HasOne(e => e.TwitchChannelInstance)
+                  .WithMany()
+                  .HasForeignKey(e => e.TwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.TwitchChannelInstanceId, e.ModuleName })
                   .IsUnique();
         });
 

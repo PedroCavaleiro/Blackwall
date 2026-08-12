@@ -1,0 +1,179 @@
+@using System.Text.RegularExpressions
+@using Blackwall.Core.Entities
+@inject BlackwallApiService Api
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">CONTENT GUARD</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">Banned word filtering and fuzzy matching for Twitch chat. Words are matched case-insensitively after leetspeak normalisation. Enable fuzzy matching to catch intentional misspellings.</p>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Enable Content Guard</div>
+                <div class="form-text">Master toggle for Content Guard. When off, no banned word filtering runs.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="twitchCgEnable" @bind-Value="Form.IsContentGuardEnabled" />
+            </div>
+        </div>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Levenshtein fuzzy matching</div>
+                <div class="form-text">Uses fuzzy string matching to catch intentional misspellings and leetspeak (e.g. replacing 'i' with '1' or 'e' with '3'). Tokens within the edit distance threshold of a banned word are flagged.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="twitchCgFuzzy" @bind-Value="Form.ContentGuardFuzzyMatching" disabled="@(!Form.IsContentGuardEnabled)" />
+            </div>
+        </div>
+        <div class="bw-field bw-field-last">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Fuzzy match threshold (edit distance)</div>
+                <div class="form-text">Maximum Levenshtein edit distance allowed when comparing tokens to banned words. Lower values are stricter, higher values catch more variations but may produce false positives. Range: 1&ndash;5.</div>
+            </div>
+            <InputNumber class="form-control bw-input-narrow" min="1" max="5" @bind-Value="Form.ContentGuardFuzzyThreshold" disabled="@(!Form.IsContentGuardEnabled || !Form.ContentGuardFuzzyMatching)" />
+        </div>
+    </div>
+</div>
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">BANNED WORDS</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">Per-channel list of banned words. Words are matched case-insensitively after leetspeak normalisation. Add individual words or short phrases (spaces are preserved). Enable regex mode to add a regular expression pattern instead of a literal word.</p>
+
+        @if (_bannedWords.Any()) {
+            <div class="mb-3">
+                @foreach (var word in _bannedWords) {
+                    <div class="d-flex align-items-center justify-content-between border-bottom py-2">
+                        <div class="d-flex align-items-center gap-2">
+                            @if (word.IsRegex) {
+                                <span class="badge bg-info font-mono">REGEX</span>
+                            }
+                            <span class="font-mono bw-ban-user">@word.Word</span>
+                        </div>
+                        <button type="button" class="btn btn-outline-danger bw-btn-remove"
+                                disabled="@_wordBusy"
+                                @onclick="() => RemoveBannedWordAsync(word.Id)">
+                            REMOVE
+                        </button>
+                    </div>
+                }
+            </div>
+        } else {
+            <div class="font-mono mb-3 bw-desc">
+                // No banned words configured. Add words below to enable blacklist filtering.
+            </div>
+        }
+
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input type="checkbox" class="form-check-input bw-switch" id="twitchCgRegexMode"
+                       @bind="_newWordIsRegex" disabled="@(!Form.IsContentGuardEnabled)" />
+                <label class="form-check-label font-mono bw-desc" for="twitchCgRegexMode">Regex mode — treat the input as a regular expression pattern</label>
+            </div>
+        </div>
+
+        @if (_newWordIsRegex && !string.IsNullOrWhiteSpace(_newWord) && _regexValidationError is not null) {
+            <div class="alert alert-danger font-mono bw-desc mb-3">@_regexValidationError</div>
+        }
+
+        <div class="d-flex gap-2">
+            <input type="text" class="form-control" placeholder="@(_newWordIsRegex ? "Enter a regex pattern to ban..." : "Enter a word or phrase to ban...")"
+                   @bind="_newWord" disabled="@(!Form.IsContentGuardEnabled)" />
+            <button type="button" class="btn btn-primary cut-corner font-display bw-btn-sm"
+                    disabled="@(_wordBusy || string.IsNullOrWhiteSpace(_newWord) || !Form.IsContentGuardEnabled || (_newWordIsRegex && _regexValidationError is not null))"
+                    @onclick="AddBannedWordAsync">
+                ADD
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="cut-corner border mb-4 bw-card-danger">
+    <div class="card-header bw-header-danger">MODULE ACTIONS</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">Configure the action for Content Guard violations. Twitch supports delete, timeout, and ban.</p>
+
+        <div class="bw-field">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Content Guard &mdash; action</div>
+                <div class="form-text">Action taken when Content Guard flags a message.</div>
+            </div>
+            <InputSelect class="form-select bw-input-select" @bind-Value="Form.ContentGuardAction" disabled="@(!Form.IsContentGuardEnabled)">
+                <option value="@InfractionAction.DeleteOnly">Delete only</option>
+                <option value="@InfractionAction.Timeout">Timeout</option>
+                <option value="@InfractionAction.Ban">Ban</option>
+            </InputSelect>
+        </div>
+        @if (Form.ContentGuardAction is InfractionAction.Timeout) {
+            <div class="bw-field bw-field-last">
+                <div class="bw-field-label">
+                    <div class="form-label mb-1">Content Guard &mdash; timeout (minutes)</div>
+                    <div class="form-text">How long the user is timed out. Minimum: 1 minute.</div>
+                </div>
+                <InputNumber class="form-control bw-input-narrow" min="1" @bind-Value="Form.ContentGuardTimeoutMinutes" disabled="@(!Form.IsContentGuardEnabled)" />
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required TwitchChannelConfigForm Form { get; set; }
+    [Parameter, EditorRequired] public required long TwitchUserId { get; set; }
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private IReadOnlyList<TwitchBannedWordResponse> _bannedWords = [];
+    private string _newWord = "";
+    private bool _newWordIsRegex;
+    private string? _regexValidationError;
+    private bool _wordBusy;
+
+    protected override async Task OnInitializedAsync() {
+        try {
+            _bannedWords = await Api.GetTwitchBannedWordsAsync(TwitchUserId);
+        } catch {
+            _bannedWords = [];
+            await OnError.InvokeAsync("Failed to load banned words.");
+        }
+    }
+
+    private async Task AddBannedWordAsync() {
+        if (string.IsNullOrWhiteSpace(_newWord)) return;
+
+        if (_newWordIsRegex) {
+            try {
+                _ = Regex.Match(string.Empty, _newWord, RegexOptions.None, TimeSpan.FromMilliseconds(500));
+                _regexValidationError = null;
+            } catch (ArgumentException) {
+                _regexValidationError = "The provided regex pattern is not valid.";
+                return;
+            }
+        } else {
+            _regexValidationError = null;
+        }
+
+        _wordBusy = true;
+        try {
+            await Api.AddTwitchBannedWordAsync(TwitchUserId, _newWord, _newWordIsRegex);
+            _bannedWords = await Api.GetTwitchBannedWordsAsync(TwitchUserId);
+            _newWord = "";
+            _newWordIsRegex = false;
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to add banned word: {ex.Message}");
+        } finally {
+            _wordBusy = false;
+        }
+    }
+
+    private async Task RemoveBannedWordAsync(long wordId) {
+        _wordBusy = true;
+        try {
+            await Api.RemoveTwitchBannedWordAsync(TwitchUserId, wordId);
+            _bannedWords = await Api.GetTwitchBannedWordsAsync(TwitchUserId);
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to remove banned word: {ex.Message}");
+        } finally {
+            _wordBusy = false;
+        }
+    }
+}

@@ -324,10 +324,10 @@ public sealed class BlackwallApiService(
         return await response.Content.ReadFromJsonAsync<IReadOnlyList<BannedWordResponse>>(ct) ?? [];
     }
 
-    public async Task<BannedWordResponse?> AddBannedWordAsync(long discordGuildId, string word, CancellationToken ct = default) {
+    public async Task<BannedWordResponse?> AddBannedWordAsync(long discordGuildId, string word, bool isRegex = false, CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/banned-words");
         ApplyAuth(request);
-        request.Content = JsonContent.Create(new AddBannedWordRequest(word));
+        request.Content = JsonContent.Create(new AddBannedWordRequest(word, isRegex));
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<BannedWordResponse>(ct);
@@ -430,63 +430,6 @@ public sealed class BlackwallApiService(
     public async Task DeleteAllNetWatchSnareChannelsAsync(long discordGuildId, CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/guilds/{discordGuildId}/netWatchSnares");
         ApplyAuth(request);
-        var response = await httpClient.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public async Task<AiSentinelConfigurationDto?> GetAiSentinelConfigAsync(long discordGuildId, CancellationToken ct = default) {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/ai-sentinel/config");
-        ApplyAuth(request);
-        var response = await httpClient.SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode) return null;
-        return await response.Content.ReadFromJsonAsync<AiSentinelConfigurationDto>(ct);
-    }
-
-    public async Task UpdateAiSentinelConfigAsync(long discordGuildId, UpdateAiSentinelConfigurationRequest dto, CancellationToken ct = default) {
-        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/guilds/{discordGuildId}/ai-sentinel/config");
-        ApplyAuth(request);
-        request.Content = JsonContent.Create(dto);
-        var response = await httpClient.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public async Task<IReadOnlyList<AiSentinelModelDto>> GetAiSentinelModelsAsync(long discordGuildId, CancellationToken ct = default) {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/ai-sentinel/models");
-        ApplyAuth(request);
-        var response = await httpClient.SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode) return [];
-        return await response.Content.ReadFromJsonAsync<IReadOnlyList<AiSentinelModelDto>>(ct) ?? [];
-    }
-
-    public async Task<IReadOnlyList<AiSentinelModelDto>> GetAiSentinelModelsWithCredentialsAsync(long discordGuildId, ListAiSentinelModelsRequest request, CancellationToken ct = default) {
-        using var req = new HttpRequestMessage(HttpMethod.Post, $"api/guilds/{discordGuildId}/ai-sentinel/models");
-        ApplyAuth(req);
-        req.Content = JsonContent.Create(request);
-        var response = await httpClient.SendAsync(req, ct);
-        if (!response.IsSuccessStatusCode) return [];
-        return await response.Content.ReadFromJsonAsync<IReadOnlyList<AiSentinelModelDto>>(ct) ?? [];
-    }
-
-    public async Task<IReadOnlyList<AiSentinelLogSummaryDto>> GetAiSentinelLogsAsync(long discordGuildId, int page = 1, int pageSize = 20, CancellationToken ct = default) {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/ai-sentinel/logs?page={page}&pageSize={pageSize}");
-        ApplyAuth(request);
-        var response = await httpClient.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<IReadOnlyList<AiSentinelLogSummaryDto>>(ct) ?? [];
-    }
-
-    public async Task<AiSentinelLogDetailDto?> GetAiSentinelLogDetailAsync(long discordGuildId, long logId, CancellationToken ct = default) {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/guilds/{discordGuildId}/ai-sentinel/logs/{logId}");
-        ApplyAuth(request);
-        var response = await httpClient.SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode) return null;
-        return await response.Content.ReadFromJsonAsync<AiSentinelLogDetailDto>(ct);
-    }
-
-    public async Task UpdateAiSentinelTrainingFeedbackAsync(long discordGuildId, long logId, AiSentinelTrainingFeedback feedback, CancellationToken ct = default) {
-        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/guilds/{discordGuildId}/ai-sentinel/logs/{logId}/feedback");
-        ApplyAuth(request);
-        request.Content = JsonContent.Create(new UpdateAiSentinelTrainingFeedbackRequest(feedback));
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
@@ -602,6 +545,352 @@ public sealed class BlackwallApiService(
     public async Task DismissLinkAccountsWarningAsync(CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Post, "api/users/accounts/link-warning/dismiss");
         ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<ManageableTwitchChannelResponse>?> GetTwitchChannelsAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/twitchchannels");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<ManageableTwitchChannelResponse>>(ct);
+    }
+
+    public async Task<string?> GetTwitchBotInstallUrlAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/twitchchannels/install");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        var result = await response.Content.ReadFromJsonAsync<TwitchBotInstallResponse>(ct);
+        return result?.Url;
+    }
+
+    public async Task<TwitchChannelSettingsResponse?> GetTwitchChannelSettingsAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/settings");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<TwitchChannelSettingsResponse>(ct);
+    }
+
+    public async Task<TwitchChannelSettingsResponse?> UpdateTwitchChannelSettingsAsync(long twitchUserId, UpdateTwitchChannelSettingsRequest body, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/twitchchannels/{twitchUserId}/settings");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(body);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TwitchChannelSettingsResponse>(ct);
+    }
+
+    public async Task<IReadOnlyList<TwitchAllowedBotResponse>> GetTwitchAllowedBotsAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/allowed-bots");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchAllowedBotResponse>>(ct) ?? [];
+    }
+
+    public async Task<TwitchAllowedBotResponse?> AddTwitchAllowedBotAsync(long twitchUserId, string botUsername, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/allowed-bots");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddTwitchAllowedBotRequest(botUsername));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TwitchAllowedBotResponse>(ct);
+    }
+
+    public async Task RemoveTwitchAllowedBotAsync(long twitchUserId, long botId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/allowed-bots/{botId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task RemoveTwitchBotAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<TwitchChannelManagerResponse>> GetTwitchChannelManagersAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/managers");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchChannelManagerResponse>>(ct) ?? [];
+    }
+
+    public async Task<TwitchChannelManagerResponse?> AddTwitchChannelManagerAsync(long twitchUserId, string username, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/managers");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddTwitchChannelManagerRequest(username));
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct);
+            throw new Exception(problem?.Detail ?? problem?.Title ?? $"HTTP {response.StatusCode}");
+        }
+        return await response.Content.ReadFromJsonAsync<TwitchChannelManagerResponse>(ct);
+    }
+
+    public async Task RemoveTwitchChannelManagerAsync(long twitchUserId, long managerId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/managers/{managerId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<DefaultBlacklistResponse>> GetTwitchDefaultBlacklistsAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/twitchchannels/blacklists/defaults");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<DefaultBlacklistResponse>>(ct) ?? [];
+    }
+
+    public async Task<IReadOnlyList<TwitchChannelBlacklistResponse>> GetTwitchBlacklistsAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/blacklists");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchChannelBlacklistResponse>>(ct) ?? [];
+    }
+
+    public async Task<TwitchChannelBlacklistResponse?> AddTwitchBlacklistAsync(long twitchUserId, string url, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/blacklists");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddTwitchChannelBlacklistRequest(url));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TwitchChannelBlacklistResponse>(ct);
+    }
+
+    public async Task RemoveTwitchBlacklistAsync(long twitchUserId, long blacklistId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/blacklists/{blacklistId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task RefreshTwitchBlacklistsAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/blacklists/refresh");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<TwitchChannelDomainRuleResponse>> GetTwitchDomainRulesAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/domain-rules");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchChannelDomainRuleResponse>>(ct) ?? [];
+    }
+
+    public async Task<TwitchChannelDomainRuleResponse?> AddTwitchDomainRuleAsync(long twitchUserId, string rule, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/domain-rules");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddTwitchChannelDomainRuleRequest(rule));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TwitchChannelDomainRuleResponse>(ct);
+    }
+
+    public async Task RemoveTwitchDomainRuleAsync(long twitchUserId, long ruleId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/domain-rules/{ruleId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<TwitchBannedWordResponse>> GetTwitchBannedWordsAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/banned-words");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchBannedWordResponse>>(ct) ?? [];
+    }
+
+    public async Task<TwitchBannedWordResponse?> AddTwitchBannedWordAsync(long twitchUserId, string word, bool isRegex = false, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/banned-words");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddTwitchBannedWordRequest(word, isRegex));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TwitchBannedWordResponse>(ct);
+    }
+
+    public async Task RemoveTwitchBannedWordAsync(long twitchUserId, long wordId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/banned-words/{wordId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<TwitchChannelBanResponse>> GetTwitchChannelBansAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/bans");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchChannelBanResponse>>(ct) ?? [];
+    }
+
+    public async Task SyncTwitchBansAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/bans/sync");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) {
+            var detail = await response.Content.ReadAsStringAsync(ct);
+            throw new Exception(detail);
+        }
+    }
+
+    public async Task UpdateTwitchShareBanListAsync(long twitchUserId, bool shareBanList, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/twitchchannels/{twitchUserId}/bans/share");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new UpdateTwitchShareBanListRequest(shareBanList));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<SharedBanListTwitchChannelResponse>> GetSharedBanListTwitchChannelsAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/bans/shared-channels");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<SharedBanListTwitchChannelResponse>>(ct) ?? [];
+    }
+
+    public async Task<IReadOnlyList<TwitchChannelBanResponse>> GetSourceTwitchChannelBansAsync(long twitchUserId, long sourceTwitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/bans/source/{sourceTwitchUserId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchChannelBanResponse>>(ct) ?? [];
+    }
+
+    public async Task<ImportTwitchBansResultResponse?> ImportTwitchBansAsync(long twitchUserId, long sourceTwitchUserId, IReadOnlyList<long>? twitchUserIds = null, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/bans/import");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new ImportTwitchBansRequest(sourceTwitchUserId, twitchUserIds));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ImportTwitchBansResultResponse>(ct);
+    }
+
+    public async Task<IReadOnlyList<TwitchBanSyncRuleResponse>> GetTwitchBanSyncRulesAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/bans/auto-sync");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchBanSyncRuleResponse>>(ct) ?? [];
+    }
+
+    public async Task<TwitchBanSyncRuleResponse?> AddTwitchBanSyncRuleAsync(long twitchUserId, long sourceTwitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/bans/auto-sync");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new AddTwitchBanSyncRuleRequest(sourceTwitchUserId));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TwitchBanSyncRuleResponse>(ct);
+    }
+
+    public async Task UpdateTwitchBanSyncRuleAsync(long twitchUserId, long ruleId, bool isEnabled, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/twitchchannels/{twitchUserId}/bans/auto-sync/{ruleId}");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new UpdateTwitchBanSyncRuleRequest(isEnabled));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteTwitchBanSyncRuleAsync(long twitchUserId, long ruleId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/bans/auto-sync/{ruleId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<TwitchMessageAuditEventSummaryDto>> GetTwitchAuditEventsAsync(long twitchUserId, int page = 1, int pageSize = 20, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/audit/events?page={page}&pageSize={pageSize}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchMessageAuditEventSummaryDto>>(ct) ?? [];
+    }
+
+    public async Task<TwitchMessageAuditEventDetailDto?> GetTwitchAuditEventDetailAsync(long twitchUserId, long eventId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/audit/events/{eventId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<TwitchMessageAuditEventDetailDto>(ct);
+    }
+
+    public async Task DeleteTwitchAuditEventAsync(long twitchUserId, long eventId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/audit/events/{eventId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteTwitchAuditRecordAsync(long twitchUserId, long eventId, long recordId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/audit/events/{eventId}/records/{recordId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<TwitchChannelModuleInstallationDto>> GetTwitchModulesAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/modules");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchChannelModuleInstallationDto>>(ct) ?? [];
+    }
+
+    public async Task<TwitchChannelModuleInstallationDto?> InstallTwitchModuleAsync(long twitchUserId, string gitUrl, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/modules/install");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new InstallModuleRequest(gitUrl));
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct);
+            throw new Exception(problem?.Detail ?? problem?.Title ?? $"HTTP {response.StatusCode}");
+        }
+        return await response.Content.ReadFromJsonAsync<TwitchChannelModuleInstallationDto>(ct);
+    }
+
+    public async Task UninstallTwitchModuleAsync(long twitchUserId, string moduleName, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/modules/{Uri.EscapeDataString(moduleName)}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<TwitchChannelModuleInstallationDto?> UpdateTwitchModuleAsync(long twitchUserId, string moduleName, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/modules/{Uri.EscapeDataString(moduleName)}/update");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct);
+            throw new Exception(problem?.Detail ?? problem?.Title ?? $"HTTP {response.StatusCode}");
+        }
+        return await response.Content.ReadFromJsonAsync<TwitchChannelModuleInstallationDto>(ct);
+    }
+
+    public async Task SetTwitchModuleEnabledAsync(long twitchUserId, string moduleName, bool isEnabled, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/twitchchannels/{twitchUserId}/modules/{Uri.EscapeDataString(moduleName)}/enabled");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new UpdateModuleEnabledRequest(isEnabled));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task UpdateTwitchModuleSettingsAsync(long twitchUserId, string moduleName, string settingsJson, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/twitchchannels/{twitchUserId}/modules/{Uri.EscapeDataString(moduleName)}/settings");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new UpdateModuleSettingsRequest(settingsJson));
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }

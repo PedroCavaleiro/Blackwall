@@ -21,11 +21,9 @@ public sealed class TwitchOAuthService(
     private readonly TwitchOptions _options = options.Value;
     private readonly IDatabase _db = redis.GetDatabase();
     private const string OAuthStateKeyPrefix = "oauth:state:twitch:";
+    private const string BotInstallStateKeyPrefix = "oauth:state:twitch:bot:";
     private const string TwitchApiBase = "https://api.twitch.tv/helix";
     private const string TwitchOauthBase = "https://id.twitch.tv/oauth2";
-
-    private readonly JsonSerializerOptions _serializerOptions =
-        new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
     public string BuildLoginUrl(string state) {
         var query = new Dictionary<string, string> {
@@ -181,5 +179,82 @@ public sealed class TwitchOAuthService(
         var key = $"{OAuthStateKeyPrefix}{state}";
         var exists = await _db.StringGetDeleteAsync(key);
         return exists.HasValue;
+    }
+
+    public string BuildBotInstallUrl(string state) {
+        var redirectUri = !string.IsNullOrWhiteSpace(_options.BotRedirectUri)
+            ? _options.BotRedirectUri
+            : _options.RedirectUri;
+
+        var query = new Dictionary<string, string> {
+            ["client_id"] = _options.ClientId,
+            ["redirect_uri"] = redirectUri,
+            ["response_type"] = "code",
+            ["scope"] = _options.BotScopes,
+            ["state"] = state,
+            ["force_verify"] = "true"
+        };
+
+        var queryString = string.Join("&",
+            query.Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value)}"));
+
+        return $"{TwitchOauthBase}/authorize?{queryString}";
+    }
+
+    public async Task<string> CreateBotInstallStateAsync(long appUserId) {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        var state = Convert.ToBase64String(bytes)
+                           .Replace("+", "-")
+                           .Replace("/", "_")
+                           .Replace("=", "");
+
+        await _db.StringSetAsync(
+            $"{BotInstallStateKeyPrefix}{state}",
+            appUserId.ToString(),
+            TimeSpan.FromMinutes(10)
+        );
+
+        return state;
+    }
+
+    public async Task<long?> ConsumeBotInstallStateAsync(string state) {
+        var key = $"{BotInstallStateKeyPrefix}{state}";
+        var value = await _db.StringGetDeleteAsync(key);
+        return value.HasValue ? long.TryParse((string?)value, out var id) ? id : null : null;
+    }
+
+    public async Task<(string AccessToken, string RefreshToken, DateTime ExpiresAt)> ExchangeBotCodeAsync(string code, CancellationToken cancellationToken = default) {
+        var redirectUri = !string.IsNullOrWhiteSpace(_options.BotRedirectUri)
+            ? _options.BotRedirectUri
+            : _options.RedirectUri;
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{TwitchOauthBase}/token");
+
+        request.Content = new FormUrlEncodedContent(new Dictionary<string, string> {
+            ["client_id"] = _options.ClientId,
+            ["client_secret"] = _options.ClientSecret,
+            ["grant_type"] = "authorization_code",
+            ["code"] = code,
+            ["redirect_uri"] = redirectUri
+        });
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+
+        var root = document.RootElement;
+
+        var accessToken = root.GetProperty("access_token").GetString()
+                          ?? throw new InvalidOperationException("Twitch access token was missing.");
+
+        var refreshToken = root.GetProperty("refresh_token").GetString()
+                           ?? throw new InvalidOperationException("Twitch refresh token was missing.");
+
+        var expiresInSeconds = root.GetProperty("expires_in").GetInt32();
+        var expiresAt = DateTime.UtcNow.AddSeconds(expiresInSeconds);
+
+        return (accessToken, refreshToken, expiresAt);
     }
 }

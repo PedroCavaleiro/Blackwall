@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+// ReSharper disable UnusedAutoPropertyAccessor.Global
 
 namespace Blackwall.Core.Configuration;
 

@@ -1,0 +1,114 @@
+@inject BlackwallApiService Api
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">MANAGER ACCESS</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">Control who can manage this channel's Blackwall configuration.</p>
+
+        <div class="bw-field bw-field-last">
+            <div class="bw-field-label">
+                <div class="form-label mb-1">Automatically add managers</div>
+                <div class="form-text">When enabled, Twitch moderators of this channel who have a Blackwall account are automatically added as managers.</div>
+            </div>
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input bw-switch" id="autoAddManagers" @bind-Value="Form.AutoAddManagers" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="cut-corner border mb-4 bw-card">
+    <div class="card-header">MANAGERS</div>
+    <div class="p-4">
+        <p class="font-mono mb-4 bw-desc">
+            Managers can view and edit this channel's Blackwall configuration. Add a user by their Twitch username — they must have a Blackwall account.
+        </p>
+
+        @if (_managers.Any()) {
+            <div class="mb-3">
+                @foreach (var manager in _managers) {
+                    <div class="d-flex align-items-center justify-content-between border-bottom py-2">
+                        <div class="d-flex align-items-center gap-2">
+                            @if (!string.IsNullOrWhiteSpace(manager.ProfileImageUrl)) {
+                                <img src="@manager.ProfileImageUrl" alt="" style="width:28px;height:28px;border-radius:4px" />
+                            }
+                            <div class="font-mono" style="font-size:0.75rem">
+                                <span class="bw-text-primary">@manager.DisplayName</span>
+                                <span class="bw-text-muted"> @@@manager.Username</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger ms-2 bw-btn-remove"
+                                disabled="@_busy"
+                                @onclick="() => RemoveManagerAsync(manager.Id)">
+                            REMOVE
+                        </button>
+                    </div>
+                }
+            </div>
+        } else {
+            <div class="font-mono mb-3 bw-desc">No managers configured. Only the channel owner can manage this channel.</div>
+        }
+
+        <div>
+            <label class="form-label font-mono bw-label">ADD MANAGER</label>
+            <div class="d-flex gap-2 mb-2">
+                <input type="text" class="form-control" placeholder="Twitch username (e.g. Nightbot)"
+                       @bind="_newManagerName" disabled="@_busy" />
+                <button type="button" class="btn btn-outline-primary cut-corner font-display bw-btn-xs-nowrap"
+                        disabled="@(string.IsNullOrWhiteSpace(_newManagerName) || _busy)"
+                        @onclick="AddManagerAsync">
+                    ADD
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required TwitchChannelConfigForm Form { get; set; }
+    [Parameter, EditorRequired] public required long TwitchUserId { get; set; }
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private IReadOnlyList<TwitchChannelManagerResponse> _managers = [];
+    private string _newManagerName = "";
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() {
+        try {
+            _managers = await Api.GetTwitchChannelManagersAsync(TwitchUserId);
+        } catch {
+            _managers = [];
+            await OnError.InvokeAsync("Failed to load managers.");
+        }
+    }
+
+    private async Task AddManagerAsync() {
+        if (string.IsNullOrWhiteSpace(_newManagerName)) {
+            await OnError.InvokeAsync("Username cannot be empty.");
+            return;
+        }
+
+        _busy = true;
+        try {
+            await Api.AddTwitchChannelManagerAsync(TwitchUserId, _newManagerName.Trim());
+            _managers = await Api.GetTwitchChannelManagersAsync(TwitchUserId);
+            _newManagerName = "";
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to add manager: {ex.Message}");
+        } finally {
+            _busy = false;
+        }
+    }
+
+    private async Task RemoveManagerAsync(long managerId) {
+        _busy = true;
+        try {
+            await Api.RemoveTwitchChannelManagerAsync(TwitchUserId, managerId);
+            _managers = await Api.GetTwitchChannelManagersAsync(TwitchUserId);
+        } catch (Exception ex) {
+            await OnError.InvokeAsync($"Failed to remove manager: {ex.Message}");
+        } finally {
+            _busy = false;
+        }
+    }
+}

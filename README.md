@@ -1,8 +1,8 @@
 # Blackwall
 
-Blackwall is a self-hosted Discord anti-spam system. It combines a real-time bot that detects and removes spam messages with a web dashboard for managing guild configurations — all backed by Discord OAuth2 authentication.
+Blackwall is a self-hosted anti-spam and moderation platform for **Discord** and **Twitch**. It combines real-time bots that detect and remove spam messages with a web dashboard for managing server and channel configurations — all backed by Discord and Twitch OAuth2 authentication.
 
-This bot objective is to provide a simple and effective way to manage spam in your server, with a focus on ease of use and customization.
+This bot objective is to provide a simple and effective way to manage spam in your community, with a focus on ease of use and customization.
 Tools provided by the community and improving upon the existing ones.
 
 > **Don't want to self-host?** You can add the bot to your server directly at [blackwall.observer](https://blackwall.observer).
@@ -22,11 +22,12 @@ Tools provided by the community and improving upon the existing ones.
 - **Message audit** — records deleted messages and infraction events with configurable retention for review in the dashboard.
 - **Bot allowlist** — only explicitly trusted bots bypass detection; all other bot-flagged accounts are scanned.
 - **Dry run mode** — test detection rules without taking action against users.
-- **Per-guild configuration** — each server gets its own spam thresholds, module toggles, and actions managed through the dashboard.
-- **Discord OAuth2 login** — users authenticate via Discord; JWT tokens are issued for API/Web access.
+- **Per-guild / per-channel configuration** — each Discord server and Twitch channel gets its own spam thresholds, module toggles, and actions managed through the dashboard.
+- **Discord & Twitch OAuth2 login** — users authenticate via Discord or Twitch; JWT tokens are issued for API/Web access.
 - **Guild permission sync** — a background service periodically synchronises guild manager permissions from Discord.
-- **Web dashboard** — Blazor Server UI for guild owners and managers to configure spam rules visually.
-- **AI Sentinel** — AI-powered content moderation that runs as the last step in the protection pipeline. Supports OpenAI, Anthropic, Google Gemini, and self-hosted Ollama with training mode and per-guild configuration.
+- **Twitch ban sync** — a background service synchronises shared ban lists across Blackwall-managed Twitch channels.
+- **Web dashboard** — Blazor Server UI for guild/channel owners and managers to configure spam rules visually.
+- **Third-party modules** — extend Blackwall's detection capabilities with community-built modules. Modules are compiled .NET assemblies loaded dynamically from Git repositories, supporting Discord, Twitch, or both platforms simultaneously.
 
 ## Account Scoring
 
@@ -66,42 +67,6 @@ For medium and high risk accounts, you can independently enable **auto-timeout**
 If auto-timeout is disabled for a given level, moderators are alerted only and can manually decide whether to intervene. The timeout duration is configurable (default: 10 minutes).
 
 All alerts are sent to the configured **audit log channel** as an embed containing the user, their score, account age, the specific risk factors that contributed, and the action taken.
-
-## AI Sentinel
-
-AI Sentinel is an **optional** AI-powered content moderation module that runs as the **last step** in the protection pipeline. Only messages that pass all other filters (rate limiting, duplicates, Content Guard, link blocking, etc.) are sent to the AI for analysis. It is **off by default** for every guild — each server must explicitly enable it and configure a provider.
-
-> **Optional module.** AI Sentinel is disabled by default. The global toggle `APP__AI_SENTINEL_ENABLED` (defaults to `true`) controls whether the feature is available at all. Even when globally available, each guild must turn it on individually from the dashboard.
-
-### Supported Providers
-
-| Provider | Requirement |
-|----------|-------------|
-| **OpenAI** | API key + model name (e.g. `gpt-4o-mini`) |
-| **Anthropic** | API key + model name (e.g. `claude-3-5-haiku-latest`) |
-| **Google Gemini** | API key + model name (e.g. `gemini-1.5-flash`) |
-| **Ollama** | Server URL + model name (self-hosted, no API key required) |
-
-### How It Works
-
-1. A message arrives and passes all built-in filters without triggering any violation.
-2. The message content (including embeds and attachment filenames) is sent to the configured AI provider with a moderation prompt.
-3. The AI returns a classification: **Clean**, or a malicious category (spam, scam, phishing, toxic, etc.).
-4. If classified as malicious, the configured action is applied (delete only, timeout, kick, or ban).
-
-### Training Mode
-
-When training mode is enabled, **all messages** are analysed and logged but **no actions are taken**. Results can be reviewed and marked as correct or incorrect. Activating AI Sentinel starts in training mode automatically so you can validate the model's behaviour before enforcing it.
-
-### Configuration
-
-| Setting | Description |
-|---------|-------------|
-| **Enable AI Sentinel** | Master toggle for the module. Off by default. |
-| **Dry run** | When enabled, no action is taken. When disabled, respects the global dry-run setting. |
-| **Training mode** | All messages are analysed and logged but no actions are taken. |
-| **Provider** | AI provider: OpenAI, Anthropic, Google Gemini, or Ollama. |
-| **Model** | The model to use for analysis. Auto-loaded when credentials are entered. |
 
 ## NetWatchSnare
 
@@ -146,17 +111,49 @@ A per-guild editable list of banned words. Words are matched case-insensitively 
 
 Content Guard has its own configurable action (delete only, timeout, kick, or ban), timeout duration, message delete days (when banning), and auto-lockdown toggle — independent from other detection filters.
 
+## Third-Party Modules
+
+Blackwall supports third-party modules that extend its detection capabilities. Modules are .NET assemblies that implement the `IBlackwallModule` interface and are loaded dynamically from public Git repositories. A module can target Discord, Twitch, or both platforms.
+
+### How It Works
+
+1. A module author publishes a Git repository with a `blackwall-module.json` manifest and a `src/` project directory.
+2. A server/channel owner installs the module via the web dashboard by providing the Git URL.
+3. Blackwall clones the repo, runs `dotnet build`, and loads the compiled assembly.
+4. On every incoming message, each enabled module's `EvaluateAsync` method is called with a 5-second timeout.
+5. If a module returns a `ModuleVerdict`, the configured action (delete, timeout, ban) is applied.
+
+### Module SDK
+
+The module SDK is available as the `Blackwall.Modules.Abstractions` project, which defines:
+
+- `IBlackwallModule` — the interface modules implement
+- `ModuleMessageContext` — platform-agnostic message context (includes `Platform` field for Discord/Twitch awareness)
+- `ModuleVerdict` — the verdict returned when a violation is detected
+- `ModuleSettings` — typed wrapper for module settings
+- `BlackwallModuleManifest` — manifest structure with settings schema and platform support
+- `ModulePlatform` — enum with `Discord` and `Twitch` values
+
+A shared runtime (`Blackwall.Modules.Runtime`) handles module loading, assembly isolation via `AssemblyLoadContext`, evaluation with timeout, and settings hot-reload.
+
+### Example Module
+
+An example module (`EmojiSpamModule`) is included in `examples/Blackwall.EmojiSpamModule/`. See its [README](examples/Blackwall.EmojiSpamModule/README.md) for a complete guide on creating third-party modules.
+
 ## Architecture
 
-The solution is split into five projects:
+The solution is split into the following projects:
 
 | Project | Description |
 |---------|-------------|
 | `Blackwall.Core` | Shared entities, DTOs, and configuration models |
 | `Blackwall.Infrastructure` | PostgreSQL persistence (EF Core) and Redis caching |
-| `Blackwall.DiscordBot` | Discord gateway client — spam detection, guild events, background sync |
-| `Blackwall.Api` | ASP.NET Core Web API — OAuth flows, JWT auth, guild management endpoints |
+| `Blackwall.Bot.Discord` | Discord gateway client — spam detection, guild events, background sync |
+| `Blackwall.Bot.Twitch` | Twitch IRC client — spam detection, channel moderation, module evaluation |
+| `Blackwall.Api` | ASP.NET Core Web API — OAuth flows, JWT auth, guild/channel management endpoints |
 | `Blackwall.Web` | Blazor Server dashboard — authenticates against the API |
+| `Blackwall.Modules.Abstractions` | Module SDK — interfaces, manifests, and data structures for third-party modules |
+| `Blackwall.Modules.Runtime` | Shared runtime — module loading, evaluation, and build helpers |
 
 ## Prerequisites
 
@@ -164,6 +161,7 @@ The solution is split into five projects:
 - PostgreSQL 17+
 - Redis 7+
 - A Discord application with bot and OAuth2 credentials
+- A Twitch application with OAuth2 credentials (for Twitch support)
 
 ## Getting Started
 
@@ -203,6 +201,29 @@ Edit `.env` and fill in the required values. You can use the **[.env Generator](
 
 > **Tip:** Using the default `10308992462014` keeps permissions fine-grained and matches the full Discord permissions listed for Blackwall. The minimal set is `1374389610518`.
 
+**Twitch**
+
+| Variable | Description |
+|----------|-------------|
+| `TWITCH__CLIENT_ID` | Twitch OAuth2 client ID |
+| `TWITCH__CLIENT_SECRET` | Twitch OAuth2 client secret |
+| `TWITCH__REDIRECT_URI` | OAuth2 callback URL for user login (e.g. `https://public-url.tld/api/auth/twitch/callback`) |
+| `TWITCH__LOGIN_SCOPES` | OAuth2 login scopes (default `openid user:read:email`) |
+| `TWITCH__BOT_SCOPES` | Scopes requested when a channel owner installs the bot |
+| `TWITCH__BOT_REDIRECT_URI` | OAuth2 callback URL for bot authorization flow |
+| `TWITCH__BOT_USERNAME` | Dedicated bot account username for IRC and moderation API |
+| `TWITCH__BOT_ACCESS_TOKEN` | Bot account OAuth access token (without `oauth:` prefix) |
+| `TWITCH__BOT_REFRESH_TOKEN` | Bot account OAuth refresh token for auto-renewal |
+
+> **Tip:** Generate Twitch bot tokens at [twitchtokengenerator.com](https://twitchtokengenerator.com/) using a dedicated bot account with `chat:read` and `chat:edit` scopes. The bot account must be added as a moderator in each channel.
+
+**Twitch Sync**
+
+| Variable | Description |
+|----------|-------------|
+| `TWITCH_SYNC__ENABLED` | Enable the Twitch ban sync background service (default `true`) |
+| `TWITCH_SYNC__INTERVAL_MINUTES` | Sync interval in minutes (default `15`) |
+
 **Google Safe Browsing**
 
 | Variable | Description |
@@ -228,7 +249,6 @@ Edit `.env` and fill in the required values. You can use the **[.env Generator](
 | `APP__DISABLE_NEW_USERS` | When `true`, only the instance owner can register new accounts (existing users can still log in). If `APP__INSTANCE_OWNER` is not set, no new users can register. Defaults to `false`. |
 | `APP__PRIVATE_INSTANCE` | When `true` (and `APP__DISABLE_NEW_USERS` is `false`), only users listed in `AllowedUsers` (in `appsettings.json`) and the instance owner can register. Defaults to `false`. |
 | `APP__INSTANCE_OWNER` | Discord user ID of the instance owner. The owner is always allowed to register when `APP__DISABLE_NEW_USERS` is `true`, and is also allowed when `APP__PRIVATE_INSTANCE` is `true` (even if not listed in `AllowedUsers`). Optional — the bot starts without it, but no one can register if `APP__DISABLE_NEW_USERS` is `true` and this is unset. |
-| `APP__AI_SENTINEL_ENABLED` | When `false`, the AI Sentinel module is globally disabled — the tab is hidden in the dashboard and all AI endpoints return a disabled response. Defaults to `true`. |
 
 **API**
 
@@ -375,13 +395,18 @@ When `ENABLE_DOCS=true` is set in your environment, the API exposes an OpenAPI s
 ```
 Blackwall/
 ├── src/
-│   ├── Blackwall.Api/          # Web API + Discord bot host
-│   ├── Blackwall.DiscordBot/    # Discord bot worker, handlers, background services
-│   ├── Blackwall.Core/         # Entities, DTOs, configuration
-│   ├── Blackwall.Infrastructure/ # EF Core DbContext, Redis cache
-│   └── Blackwall.Web/          # Blazor Server dashboard
-├── infra/                      # Infrastructure scripts
-├── nginx/                      # Nginx reverse proxy config
+│   ├── Blackwall.Api/                  # Web API + Discord/Twitch bot host
+│   ├── Blackwall.Bot.Discord/          # Discord bot worker, handlers, background services
+│   ├── Blackwall.Bot.Twitch/           # Twitch IRC client, moderation, module evaluation
+│   ├── Blackwall.Core/                 # Entities, DTOs, configuration
+│   ├── Blackwall.Infrastructure/       # EF Core DbContext, Redis cache
+│   ├── Blackwall.Modules.Abstractions/ # Module SDK — interfaces, manifests, data structures
+│   ├── Blackwall.Modules.Runtime/      # Shared runtime — module loading, evaluation, build helpers
+│   └── Blackwall.Web/                  # Blazor Server dashboard
+├── examples/
+│   └── Blackwall.EmojiSpamModule/      # Example third-party module (Discord + Twitch)
+├── infra/                              # Infrastructure scripts
+├── nginx/                              # Nginx reverse proxy config
 ├── docker-compose.yml
 ├── Dockerfile.api
 ├── Dockerfile.web

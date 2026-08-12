@@ -24,11 +24,13 @@ public sealed record AddBlacklistDomainRequest(
 
 public sealed record BannedWordResponse(
     long Id,
-    string Word
+    string Word,
+    bool IsRegex
 );
 
 public sealed record AddBannedWordRequest(
-    string Word
+    string Word,
+    bool IsRegex = false
 );
 
 public sealed record AllowedBotResponse(

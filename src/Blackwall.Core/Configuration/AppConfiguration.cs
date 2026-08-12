@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
+// ReSharper disable PropertyCanBeMadeInitOnly.Global
 
 namespace Blackwall.Core.Configuration;
 
@@ -12,14 +13,11 @@ public sealed record AppConfiguration {
     public string EncryptionIv { get; set; } = string.Empty;
 
     [ConfigurationKeyName("DISABLE_NEW_USERS")]
-    public bool DisableNewUsers { get; set; } = false;
+    public bool DisableNewUsers { get; set; }
 
     [ConfigurationKeyName("PRIVATE_INSTANCE")]
-    public bool PrivateInstance { get; set; } = false;
+    public bool PrivateInstance { get; set; }
 
     [ConfigurationKeyName("INSTANCE_OWNER")]
     public string InstanceOwner { get; set; } = string.Empty;
-
-    [ConfigurationKeyName("AI_SENTINEL_ENABLED")]
-    public bool AiSentinelEnabled { get; set; } = true;
 }

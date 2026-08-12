@@ -1,0 +1,303 @@
+@page "/channel/{TwitchUserId:long}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject BlackwallApiService Api
+@inject NavigationManager Nav
+@inject IJSRuntime Js
+@implements IDisposable
+@using Blackwall.Core.DTOs
+@using Blackwall.Web.Components.Shared
+@using Blackwall.Web.Components.Shared.TwitchChannelTabs
+
+<PageTitle>@(_settings?.DisplayName ?? "Config") — Blackwall</PageTitle>
+
+<div style="max-width:980px;margin:0 auto;padding:2.5rem 1.5rem">
+    @if (_loading) {
+        <div class="font-mono bw-loading bw-typewriter">&gt; Loading configuration...</div>
+    } else if (_settings is null) {
+        <div class="font-mono mb-4 bw-err bw-typewriter">&gt; SIGNAL LOST: Channel not found or access denied.</div>
+        <a href="/dashboard" class="btn btn-primary cut-corner font-display bw-btn-sm">RETURN TO GRID</a>
+    } else {
+        <a href="/dashboard?tab=twitch" class="d-inline-flex align-items-center gap-2 mb-4 font-mono text-decoration-none bw-status bw-text-muted">
+            &#8592; BACK TO CHANNEL OVERVIEW
+        </a>
+
+        <div class="d-flex align-items-center gap-3 mb-5">
+            <TwitchAvatar DisplayName="@_settings.DisplayName" ProfileImageUrl="@_settings.ProfileImageUrl" />
+            <div>
+                <div class="font-mono mb-1 bw-role bw-text-primary">
+                    // CHANNEL CONFIG &middot; @_settings.TwitchUserId
+                </div>
+                <h1 class="font-display mb-0" style="font-size:1.8rem;letter-spacing:0.04em">@_settings.DisplayName.ToUpperInvariant()</h1>
+                <div class="font-mono mt-1 bw-meta">
+                    @(_settings.IsEnabled ? "BARRIER ACTIVE" : "BARRIER OFFLINE")
+                </div>
+            </div>
+        </div>
+
+        @if (_saved) {
+            <div class="alert alert-success font-mono mb-4 bw-alert-text">
+                // CONFIGURATION UPLOADED SUCCESSFULLY
+            </div>
+        }
+        @if (_error is not null) {
+            <div class="alert alert-danger font-mono mb-4 bw-alert-text">
+                // ERROR: @_error
+            </div>
+        }
+        @if (_isDirty) {
+            <div class="bw-warning font-mono mb-4">
+                // WARNING: You have unsaved changes. Press COMMIT CHANGES to save your configuration.
+            </div>
+        }
+
+        <EditForm EditContext="_editContext" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+
+            <div class="bw-sidebar-layout">
+                <nav class="bw-sidebar-nav">
+                    <div class="bw-sidebar-header font-mono">MODULES</div>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "general" ? "active" : "")" @onclick='() => _activeTab = "general"'>GENERAL</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "managers" ? "active" : "")" @onclick='() => _activeTab = "managers"'>MANAGERS</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "detection" ? "active" : "")" @onclick='() => _activeTab = "detection"'>DETECTION</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "links" ? "active" : "")" @onclick='() => _activeTab = "links"'>LINKS</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "contentguard" ? "active" : "")" @onclick='() => _activeTab = "contentguard"'>CONTENT GUARD</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "bans" ? "active" : "")" @onclick='() => _activeTab = "bans"'>BAN LIST</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "audit" ? "active" : "")" @onclick='() => _activeTab = "audit"'>AUDIT</button>
+                    @foreach (var mod in _installedModules) {
+                        var tabLabel = (mod.ReadableName ?? mod.ModuleName).ToUpperInvariant();
+                        <button type="button" class="bw-sidebar-btn @(_activeTab == $"mod:{mod.ModuleName}" ? "active" : "")" @onclick='() => _activeTab = $"mod:{mod.ModuleName}"'>@tabLabel</button>
+                    }
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "modules" ? "active" : "")" @onclick='() => _activeTab = "modules"'>MODULES</button>
+                </nav>
+
+                <div class="bw-sidebar-content">
+                    @if (_activeTab == "general") {
+                        <TwitchGeneralTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
+                    } else if (_activeTab == "managers") {
+                        <TwitchManagersTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
+                    } else if (_activeTab == "detection") {
+                        <TwitchDetectionTab Form="Form" />
+                    } else if (_activeTab == "links") {
+                        <TwitchLinksTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
+                    } else if (_activeTab == "contentguard") {
+                        <TwitchContentGuardTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
+                    } else if (_activeTab == "audit") {
+                        <TwitchAuditTab Form="Form" TwitchUserId="TwitchUserId" />
+                    } else if (_activeTab == "bans") {
+                        <TwitchBansTab TwitchUserId="TwitchUserId" InitialShareBanList="@(_settings?.ShareBanList ?? false)" OnError="HandleError" />
+                    } else if (_activeTab == "modules") {
+                        <TwitchModulesTab TwitchUserId="TwitchUserId" OnError="HandleError" OnModulesChanged="ReloadModulesAsync" />
+                    }
+                    @foreach (var mod in _installedModules) {
+                        @if (_activeTab == $"mod:{mod.ModuleName}") {
+                            <TwitchModuleTab @ref="_activeModuleTab" Module="mod" TwitchUserId="TwitchUserId" OnError="HandleError" />
+                        }
+                    }
+
+                    <div class="d-flex align-items-center gap-3 mt-2">
+                        <button type="submit" class="btn btn-primary cut-corner font-display bw-btn-md">
+                            COMMIT CHANGES
+                        </button>
+                        <a href="/dashboard?tab=twitch" class="btn btn-outline-secondary font-display bw-btn-md">
+                            CANCEL
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+
+        @if (_settings.IsOwner) {
+            <hr style="border-color:var(--bw-danger);opacity:0.25;margin:3rem 0 2rem" />
+
+            <div class="cut-corner border mb-4 bw-card-danger">
+                <div class="card-header bw-header-danger">DANGER ZONE</div>
+                <div class="p-4">
+                    <p class="font-mono mb-4 bw-desc">
+                        Removing the bot will immediately deactivate it for this channel and revoke its access tokens. Your configuration will be preserved if you reinstall the bot later.
+                    </p>
+
+                    @if (!_confirmRemove) {
+                        <button type="button" class="btn btn-outline-danger cut-corner font-display bw-btn-md"
+                                @onclick="() => _confirmRemove = true">
+                            REMOVE BOT FROM CHANNEL
+                        </button>
+                    } else {
+                        <div class="font-mono mb-3" style="font-size:0.8rem;color:var(--bw-danger)">
+                            // WARNING: This will deactivate the bot for @_settings.DisplayName. Are you sure?
+                        </div>
+                        <div class="d-flex gap-3">
+                            <button type="button" class="btn btn-danger cut-corner font-display bw-btn-md"
+                                    disabled="@_removing"
+                                    @onclick="RemoveBotAsync">
+                                @(_removing ? "REMOVING..." : "CONFIRM REMOVAL")
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary font-display bw-btn-md"
+                                    @onclick="() => _confirmRemove = false">
+                                ABORT
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public long TwitchUserId { get; set; }
+
+    private TwitchChannelSettingsResponse? _settings;
+    private bool _loading = true;
+    private bool _saved;
+    private string? _error;
+    private string _activeTab = "general";
+    private bool _confirmRemove;
+    private bool _removing;
+
+    private TwitchChannelConfigForm Form { get; set; } = new();
+    private bool _isDirty;
+    private EditContext _editContext = default!;
+    private IReadOnlyList<TwitchChannelModuleInstallationDto> _installedModules = [];
+    private TwitchModuleTab? _activeModuleTab;
+
+    protected override async Task OnInitializedAsync() {
+        _editContext = new EditContext(Form);
+        _editContext.OnFieldChanged += OnFieldChanged;
+
+        try {
+            _settings = await Api.GetTwitchChannelSettingsAsync(TwitchUserId);
+
+            if (_settings is not null) {
+                Form.IsEnabled = _settings.IsEnabled;
+                Form.IsDryRun = _settings.IsDryRun;
+                Form.AutoAddManagers = _settings.AutoAddManagers;
+                Form.CommandTrigger = _settings.CommandTrigger;
+                Form.MaxMessagesPerWindow = _settings.MaxMessagesPerWindow;
+                Form.RateLimitWindowSeconds = _settings.RateLimitWindowSeconds;
+                Form.DuplicateMessageThreshold = _settings.DuplicateMessageThreshold;
+                Form.DuplicateWindowSeconds = _settings.DuplicateWindowSeconds;
+                Form.MentionLimit = _settings.MentionLimit;
+                Form.RateLimitAction = _settings.RateLimitAction;
+                Form.RateLimitTimeoutMinutes = _settings.RateLimitTimeoutMinutes;
+                Form.DuplicateAction = _settings.DuplicateAction;
+                Form.DuplicateTimeoutMinutes = _settings.DuplicateTimeoutMinutes;
+                Form.MentionLimitAction = _settings.MentionLimitAction;
+                Form.MentionLimitTimeoutMinutes = _settings.MentionLimitTimeoutMinutes;
+                Form.BlockSuspiciousLinks = _settings.BlockSuspiciousLinks;
+                Form.LinkWhitelistMode = _settings.LinkWhitelistMode;
+                Form.SafeBrowsingEnabled = _settings.SafeBrowsingEnabled;
+                Form.SafeBrowsingBlockUnsure = _settings.SafeBrowsingBlockUnsure;
+                Form.SuspiciousLinkAction = _settings.SuspiciousLinkAction;
+                Form.SuspiciousLinkTimeoutMinutes = _settings.SuspiciousLinkTimeoutMinutes;
+                Form.IsContentGuardEnabled = _settings.IsContentGuardEnabled;
+                Form.ContentGuardFuzzyMatching = _settings.ContentGuardFuzzyMatching;
+                Form.ContentGuardFuzzyThreshold = _settings.ContentGuardFuzzyThreshold;
+                Form.ContentGuardAction = _settings.ContentGuardAction;
+                Form.ContentGuardTimeoutMinutes = _settings.ContentGuardTimeoutMinutes;
+                Form.IsMessageAuditEnabled = _settings.IsMessageAuditEnabled;
+                Form.MessageAuditRetentionDays = _settings.MessageAuditRetentionDays;
+            }
+
+            try {
+                _installedModules = await Api.GetTwitchModulesAsync(TwitchUserId);
+            } catch {
+                // ignored — modules list will be empty
+            }
+        } catch {
+            _settings = null;
+        } finally {
+            _loading = false;
+        }
+    }
+
+    private async void ReloadModulesAsync() {
+        try {
+            _installedModules = await Api.GetTwitchModulesAsync(TwitchUserId);
+            await InvokeAsync(StateHasChanged);
+        } catch {
+            // ignored — modules list will be empty
+        }
+    }
+
+    private void OnFieldChanged(object? sender, FieldChangedEventArgs e) {
+        _isDirty = true;
+        _saved = false;
+    }
+
+    private void HandleError(string error) {
+        _error = error;
+    }
+
+    private async Task SaveAsync() {
+        _saved = false;
+        _error = null;
+
+        try {
+            await Api.UpdateTwitchChannelSettingsAsync(TwitchUserId, new UpdateTwitchChannelSettingsRequest(
+                Form.IsEnabled,
+                Form.IsDryRun,
+                Form.AutoAddManagers,
+                Form.CommandTrigger,
+                Form.MaxMessagesPerWindow,
+                Form.RateLimitWindowSeconds,
+                Form.DuplicateMessageThreshold,
+                Form.DuplicateWindowSeconds,
+                Form.MentionLimit,
+                Form.RateLimitAction,
+                Form.RateLimitTimeoutMinutes,
+                Form.DuplicateAction,
+                Form.DuplicateTimeoutMinutes,
+                Form.MentionLimitAction,
+                Form.MentionLimitTimeoutMinutes,
+                Form.BlockSuspiciousLinks,
+                Form.LinkWhitelistMode,
+                Form.SafeBrowsingEnabled,
+                Form.SafeBrowsingBlockUnsure,
+                Form.SuspiciousLinkAction,
+                Form.SuspiciousLinkTimeoutMinutes,
+                Form.IsContentGuardEnabled,
+                Form.ContentGuardFuzzyMatching,
+                Form.ContentGuardFuzzyThreshold,
+                Form.ContentGuardAction,
+                Form.ContentGuardTimeoutMinutes,
+                Form.IsMessageAuditEnabled,
+                Form.MessageAuditRetentionDays
+            ));
+            _saved = true;
+            _isDirty = false;
+            _settings = await Api.GetTwitchChannelSettingsAsync(TwitchUserId);
+
+            if (_activeModuleTab is not null) {
+                try {
+                    await _activeModuleTab.SaveSettingsAsync();
+                } catch (Exception ex) {
+                    _error = $"Failed to save module settings: {ex.Message}";
+                }
+            }
+        } catch (Exception ex) {
+            _error = $"Failed to save settings: {ex.Message}";
+        } finally {
+            await Js.InvokeVoidAsync("window.scrollTo", 0, 0);
+        }
+    }
+
+    private async Task RemoveBotAsync() {
+        _removing = true;
+        _error = null;
+
+        try {
+            await Api.RemoveTwitchBotAsync(TwitchUserId);
+            Nav.NavigateTo("/dashboard?tab=twitch", forceLoad: true);
+        } catch (Exception ex) {
+            _error = $"Failed to remove bot: {ex.Message}";
+            _confirmRemove = false;
+        } finally {
+            _removing = false;
+        }
+    }
+
+    public void Dispose() {
+        _editContext.OnFieldChanged -= OnFieldChanged;
+    }
+}

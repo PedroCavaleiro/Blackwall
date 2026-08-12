@@ -34,12 +34,28 @@ public sealed record BlackwallModuleManifestDto(
     string? Description,
     string EntryPoint,
     bool CanPerformActions,
+    IReadOnlyList<ModulePlatform> Platforms,
     ModuleSettingsSchemaDto? SettingsSchema
 );
 
 public sealed record GuildModuleInstallationDto(
     long Id,
     long DiscordGuildId,
+    string ModuleName,
+    string? ReadableName,
+    string ModuleVersion,
+    string ModuleAuthor,
+    string? Description,
+    string GitUrl,
+    bool CanPerformActions,
+    bool IsEnabled,
+    string SettingsJson,
+    BlackwallModuleManifestDto Manifest
+);
+
+public sealed record TwitchChannelModuleInstallationDto(
+    long Id,
+    long TwitchUserId,
     string ModuleName,
     string? ReadableName,
     string ModuleVersion,
