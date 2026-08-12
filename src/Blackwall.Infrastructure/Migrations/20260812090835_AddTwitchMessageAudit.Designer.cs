@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Blackwall.Infrastructure.Migrations
 {
     [DbContext(typeof(BlackwallDbContext))]
-    [Migration("20260812084801_AddTwitchMessageAudit")]
+    [Migration("20260812090835_AddTwitchMessageAudit")]
     partial class AddTwitchMessageAudit
     {
         /// <inheritdoc />
@@ -1117,6 +1117,9 @@ namespace Blackwall.Infrastructure.Migrations
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsMessageAuditEnabled")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("LinkWhitelistMode")
                         .HasColumnType("boolean");
 
@@ -1130,6 +1133,9 @@ namespace Blackwall.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("MentionLimitTimeoutMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MessageAuditRetentionDays")
                         .HasColumnType("integer");
 
                     b.Property<int>("RateLimitAction")

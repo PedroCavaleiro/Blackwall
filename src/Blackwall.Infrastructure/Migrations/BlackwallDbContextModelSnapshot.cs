@@ -1114,6 +1114,9 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsMessageAuditEnabled")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("LinkWhitelistMode")
                         .HasColumnType("boolean");
 
@@ -1127,6 +1130,9 @@ namespace Blackwall.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("MentionLimitTimeoutMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MessageAuditRetentionDays")
                         .HasColumnType("integer");
 
                     b.Property<int>("RateLimitAction")

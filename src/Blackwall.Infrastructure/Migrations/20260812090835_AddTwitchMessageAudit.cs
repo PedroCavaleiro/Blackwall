@@ -12,6 +12,20 @@ namespace Blackwall.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<bool>(
+                name: "IsMessageAuditEnabled",
+                table: "TwitchChannelConfigurations",
+                type: "boolean",
+                nullable: false,
+                defaultValue: false);
+
+            migrationBuilder.AddColumn<int>(
+                name: "MessageAuditRetentionDays",
+                table: "TwitchChannelConfigurations",
+                type: "integer",
+                nullable: false,
+                defaultValue: 0);
+
             migrationBuilder.CreateTable(
                 name: "TwitchMessageAuditEvents",
                 columns: table => new
@@ -87,6 +101,14 @@ namespace Blackwall.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "TwitchMessageAuditEvents");
+
+            migrationBuilder.DropColumn(
+                name: "IsMessageAuditEnabled",
+                table: "TwitchChannelConfigurations");
+
+            migrationBuilder.DropColumn(
+                name: "MessageAuditRetentionDays",
+                table: "TwitchChannelConfigurations");
         }
     }
 }
