@@ -220,6 +220,9 @@ public sealed class MessageHandler(
                 shouldLockdown = true;
         }
 
+        if (violations.Count == 0)
+            return;
+
         var violationSummary = string.Join(", ", violations);
         var (effectiveAction, effectiveTimeoutMinutes, effectiveDeleteDays) = GetMostSevereModule(triggeredModules);
 
