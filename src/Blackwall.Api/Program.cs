@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text;
+using Blackwall.Api.Background;
 using Blackwall.Api.Helpers;
 using Blackwall.Api.Middleware;
 using Blackwall.Api.Services;
@@ -183,6 +184,7 @@ builder.Services.AddKeyedSingleton<LinkProtectionService>("twitch", (sp, _) => {
     var logger = sp.GetRequiredService<ILogger<LinkProtectionService>>();
     return new LinkProtectionService(redis, configProvider, blacklistOptions, options, logger);
 });
+builder.Services.AddHostedService<ModuleBootCompatibilityService>();
 builder.Services.AddHostedService<SafeBrowsingSyncBackgroundService>();
 builder.Services.AddHostedService<MessageAuditPurgeBackgroundService>();
 builder.Services.AddHostedService<BotWorker>();

@@ -43,6 +43,11 @@
                     <div>
                         <span class="font-display">@(module.ReadableName ?? module.ModuleName)</span>
                         <span class="font-mono bw-meta ms-2">@module.ModuleName@@@module.ModuleVersion</span>
+                        @if (!module.IsEnabled && !string.IsNullOrEmpty(module.DisabledReason)) {
+                            <div class="font-mono bw-alert-text text-danger mt-1" style="font-size: 0.85em;">
+                                ⚠ @module.DisabledReason
+                            </div>
+                        }
                     </div>
                     <div class="d-flex align-items-center gap-3">
                         <div class="form-check form-switch">

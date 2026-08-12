@@ -44,6 +44,7 @@ public sealed class ModuleInstallationCache(
                 x.GitUrl,
                 x.CanPerformActions,
                 x.IsEnabled,
+                x.DisabledReason,
                 x.SettingsJson,
                 JsonSerializer.Deserialize<BlackwallModuleManifestDto>(x.ManifestJson, _jsonOptions)!
             ))

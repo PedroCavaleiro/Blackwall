@@ -2067,6 +2067,7 @@ public sealed class TwitchChannelsController(
                 x.GitUrl,
                 x.CanPerformActions,
                 x.IsEnabled,
+                x.DisabledReason,
                 x.SettingsJson,
                 manifest
             );
@@ -2111,6 +2112,7 @@ public sealed class TwitchChannelsController(
                 installation.GitUrl,
                 installation.CanPerformActions,
                 installation.IsEnabled,
+                installation.DisabledReason,
                 installation.SettingsJson,
                 manifest
             ));
@@ -2200,6 +2202,7 @@ public sealed class TwitchChannelsController(
                 installation.GitUrl,
                 installation.CanPerformActions,
                 installation.IsEnabled,
+                installation.DisabledReason,
                 installation.SettingsJson,
                 manifest
             ));
@@ -2238,11 +2241,17 @@ public sealed class TwitchChannelsController(
         try {
             await moduleInstallationService.SetEnabledAsync(twitchUserId, moduleName, request.IsEnabled, cancellationToken);
             return NoContent();
-        } catch (InvalidOperationException) {
+        } catch (InvalidOperationException) when (!request.IsEnabled) {
             return NotFound(new ProblemDetails {
                 Title = "Module not found.",
                 Detail = $"Module '{moduleName}' is not installed for this channel.",
                 Status = StatusCodes.Status404NotFound
+            });
+        } catch (InvalidOperationException ex) {
+            return BadRequest(new ProblemDetails {
+                Title = "Module cannot be enabled.",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest
             });
         }
     }
