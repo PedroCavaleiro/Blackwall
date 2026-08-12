@@ -71,9 +71,7 @@ public static class ModuleBuildHelper {
         string tempDir,
         CancellationToken ct
     ) {
-        var exitCode = await RunGitCloneAsync(gitUrl, tempDir, ct);
-        if (exitCode != 0)
-            throw new InvalidOperationException($"git clone failed with exit code {exitCode}");
+        await RunGitCloneAsync(gitUrl, tempDir, ct);
 
         var manifestPath = Path.Combine(tempDir, "blackwall-module.json");
         if (!File.Exists(manifestPath))
