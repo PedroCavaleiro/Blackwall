@@ -81,3 +81,18 @@ public sealed record UpdateModuleSettingsRequest(
 public sealed record UpdateModuleEnabledRequest(
     bool IsEnabled
 );
+
+public sealed record ModuleRegistryEntryDto(
+    string Name,
+    string? ReadableName,
+    string? Description,
+    string? Author,
+    string GitUrl,
+    string? Category,
+    IReadOnlyList<string> Tags,
+    IReadOnlyList<string> Platforms
+);
+
+public sealed record ModuleRegistryIndexDto(
+    IReadOnlyList<ModuleRegistryEntryDto> Modules
+);
