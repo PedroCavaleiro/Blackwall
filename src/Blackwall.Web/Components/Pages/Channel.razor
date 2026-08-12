@@ -61,6 +61,7 @@
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "detection" ? "active" : "")" @onclick='() => _activeTab = "detection"'>DETECTION</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "links" ? "active" : "")" @onclick='() => _activeTab = "links"'>LINKS</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "contentguard" ? "active" : "")" @onclick='() => _activeTab = "contentguard"'>CONTENT GUARD</button>
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "audit" ? "active" : "")" @onclick='() => _activeTab = "audit"'>AUDIT</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "bans" ? "active" : "")" @onclick='() => _activeTab = "bans"'>BAN LIST</button>
                 </nav>
 
@@ -75,6 +76,8 @@
                         <TwitchLinksTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
                     } else if (_activeTab == "contentguard") {
                         <TwitchContentGuardTab Form="Form" TwitchUserId="TwitchUserId" OnError="HandleError" />
+                    } else if (_activeTab == "audit") {
+                        <TwitchAuditTab Form="Form" TwitchUserId="TwitchUserId" />
                     } else if (_activeTab == "bans") {
                         <TwitchBansTab TwitchUserId="TwitchUserId" InitialShareBanList="@(_settings?.ShareBanList ?? false)" OnError="HandleError" />
                     }
@@ -177,6 +180,8 @@
                 Form.ContentGuardFuzzyThreshold = _settings.ContentGuardFuzzyThreshold;
                 Form.ContentGuardAction = _settings.ContentGuardAction;
                 Form.ContentGuardTimeoutMinutes = _settings.ContentGuardTimeoutMinutes;
+                Form.IsMessageAuditEnabled = _settings.IsMessageAuditEnabled;
+                Form.MessageAuditRetentionDays = _settings.MessageAuditRetentionDays;
             }
         } catch {
             _settings = null;
@@ -225,7 +230,9 @@
                 Form.ContentGuardFuzzyMatching,
                 Form.ContentGuardFuzzyThreshold,
                 Form.ContentGuardAction,
-                Form.ContentGuardTimeoutMinutes
+                Form.ContentGuardTimeoutMinutes,
+                Form.IsMessageAuditEnabled,
+                Form.MessageAuditRetentionDays
             ));
             _saved = true;
             _isDirty = false;

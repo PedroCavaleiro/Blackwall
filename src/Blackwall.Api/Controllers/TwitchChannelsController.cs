@@ -194,7 +194,9 @@ public sealed class TwitchChannelsController(
             config.ContentGuardFuzzyMatching,
             config.ContentGuardFuzzyThreshold,
             config.ContentGuardAction,
-            config.ContentGuardTimeoutMinutes
+            config.ContentGuardTimeoutMinutes,
+            config.IsMessageAuditEnabled,
+            config.MessageAuditRetentionDays
         ));
     }
 
@@ -275,6 +277,8 @@ public sealed class TwitchChannelsController(
         config.ContentGuardFuzzyThreshold = request.ContentGuardFuzzyThreshold;
         config.ContentGuardAction = request.ContentGuardAction;
         config.ContentGuardTimeoutMinutes = request.ContentGuardTimeoutMinutes;
+        config.IsMessageAuditEnabled = request.IsMessageAuditEnabled;
+        config.MessageAuditRetentionDays = request.MessageAuditRetentionDays;
         config.UpdatedAtUtc = DateTime.UtcNow;
         instance.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -315,7 +319,9 @@ public sealed class TwitchChannelsController(
             config.ContentGuardFuzzyMatching,
             config.ContentGuardFuzzyThreshold,
             config.ContentGuardAction,
-            config.ContentGuardTimeoutMinutes
+            config.ContentGuardTimeoutMinutes,
+            config.IsMessageAuditEnabled,
+            config.MessageAuditRetentionDays
         ));
     }
 
@@ -1813,6 +1819,205 @@ public sealed class TwitchChannelsController(
             });
 
         dbContext.TwitchChannelBanSyncRules.Remove(rule);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    //  TWITCH MESSAGE AUDIT
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    [HttpGet("{twitchUserId:long}/audit/events")]
+    [ProducesResponseType(typeof(IReadOnlyList<TwitchMessageAuditEventSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IReadOnlyList<TwitchMessageAuditEventSummaryDto>>> GetTwitchAuditEvents(
+        long twitchUserId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var instance = await dbContext.TwitchChannelInstances
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (instance is null)
+            return NotFound(new ProblemDetails {
+                Title = "Channel not found.",
+                Detail = "No Twitch channel instance exists for this user ID.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        var events = await dbContext.TwitchMessageAuditEvents
+            .Where(e => e.TwitchChannelInstanceId == instance.Id)
+            .OrderByDescending(e => e.CreatedAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(e => new TwitchMessageAuditEventSummaryDto(
+                e.Id,
+                e.TwitchUserId,
+                e.Username,
+                e.Violations,
+                e.Action,
+                e.IsDryRun,
+                e.CreatedAtUtc,
+                e.Records.Count
+            ))
+            .ToListAsync(cancellationToken);
+
+        return Ok(events);
+    }
+
+    [HttpGet("{twitchUserId:long}/audit/events/{eventId:long}")]
+    [ProducesResponseType(typeof(TwitchMessageAuditEventDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TwitchMessageAuditEventDetailDto>> GetTwitchAuditEventDetail(
+        long twitchUserId,
+        long eventId,
+        CancellationToken cancellationToken = default
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var evt = await dbContext.TwitchMessageAuditEvents
+            .Where(e => e.Id == eventId && e.TwitchChannelInstance.TwitchUserId == twitchUserId)
+            .Select(e => new {
+                e.Id,
+                e.TwitchUserId,
+                e.Username,
+                e.Violations,
+                e.Action,
+                e.IsDryRun,
+                e.CreatedAtUtc,
+                Records = e.Records.Select(r => new TwitchMessageAuditMessageDto(
+                    r.Id,
+                    r.DiscordMessageId,
+                    r.TwitchUserId,
+                    r.Username,
+                    r.Content,
+                    r.MessageTimestampUtc
+                )).ToList()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (evt is null)
+            return NotFound(new ProblemDetails {
+                Title = "Audit event not found.",
+                Detail = "No audit event with this ID exists for this channel.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        return Ok(new TwitchMessageAuditEventDetailDto(
+            evt.Id,
+            evt.TwitchUserId,
+            evt.Username,
+            evt.Violations,
+            evt.Action,
+            evt.IsDryRun,
+            evt.CreatedAtUtc,
+            evt.Records
+        ));
+    }
+
+    [HttpDelete("{twitchUserId:long}/audit/events/{eventId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteTwitchAuditEvent(
+        long twitchUserId,
+        long eventId,
+        CancellationToken cancellationToken = default
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var evt = await dbContext.TwitchMessageAuditEvents
+            .FirstOrDefaultAsync(e => e.Id == eventId && e.TwitchChannelInstance.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (evt is null)
+            return NotFound(new ProblemDetails {
+                Title = "Audit event not found.",
+                Detail = "No audit event with this ID exists for this channel.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        dbContext.TwitchMessageAuditEvents.Remove(evt);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    [HttpDelete("{twitchUserId:long}/audit/events/{eventId:long}/records/{recordId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteTwitchAuditRecord(
+        long twitchUserId,
+        long eventId,
+        long recordId,
+        CancellationToken cancellationToken = default
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var record = await dbContext.TwitchMessageAuditRecords
+            .FirstOrDefaultAsync(r => r.Id == recordId && r.EventId == eventId
+                && r.Event.TwitchChannelInstance.TwitchUserId == twitchUserId, cancellationToken);
+
+        if (record is null)
+            return NotFound(new ProblemDetails {
+                Title = "Audit record not found.",
+                Detail = "No audit record with this ID exists for this event.",
+                Status = StatusCodes.Status404NotFound
+            });
+
+        dbContext.TwitchMessageAuditRecords.Remove(record);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return NoContent();

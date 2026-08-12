@@ -30,6 +30,8 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<TwitchRemovedManager> TwitchRemovedManagers => Set<TwitchRemovedManager>();
     public DbSet<TwitchChannelBan> TwitchChannelBans => Set<TwitchChannelBan>();
     public DbSet<TwitchChannelBanSyncRule> TwitchChannelBanSyncRules => Set<TwitchChannelBanSyncRule>();
+    public DbSet<TwitchMessageAuditEvent> TwitchMessageAuditEvents => Set<TwitchMessageAuditEvent>();
+    public DbSet<TwitchMessageAuditRecord> TwitchMessageAuditRecords => Set<TwitchMessageAuditRecord>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -525,6 +527,62 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.HasIndex(e => e.ExpiresAtUtc);
         });
 
+        modelBuilder.Entity<TwitchMessageAuditEvent>(entity => {
+            entity.Property(e => e.TwitchUserId)
+                  .IsRequired();
+
+            entity.Property(e => e.Username)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.Violations)
+                  .IsRequired()
+                  .HasMaxLength(500);
+
+            entity.Property(e => e.Action)
+                  .IsRequired();
+
+            entity.Property(e => e.IsDryRun)
+                  .IsRequired();
+
+            entity.HasOne(e => e.TwitchChannelInstance)
+                  .WithMany(e => e.MessageAuditEvents)
+                  .HasForeignKey(e => e.TwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.Records)
+                  .WithOne(e => e.Event)
+                  .HasForeignKey(e => e.EventId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.TwitchChannelInstanceId, e.CreatedAtUtc });
+        });
+
+        modelBuilder.Entity<TwitchMessageAuditRecord>(entity => {
+            entity.Property(e => e.DiscordMessageId)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(e => e.TwitchUserId)
+                  .IsRequired();
+
+            entity.Property(e => e.Username)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.Content)
+                  .IsRequired();
+
+            entity.Property(e => e.MessageTimestampUtc)
+                  .IsRequired();
+
+            entity.Property(e => e.ExpiresAtUtc)
+                  .IsRequired();
+
+            entity.HasIndex(e => e.EventId);
+            entity.HasIndex(e => e.ExpiresAtUtc);
+        });
+
         modelBuilder.Entity<NetWatchSnareChannel>(entity => {
             entity.Property(e => e.DiscordChannelId)
                   .IsRequired();
@@ -593,6 +651,11 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.HasMany(e => e.BanSyncRules)
                   .WithOne(e => e.TargetTwitchChannelInstance)
                   .HasForeignKey(e => e.TargetTwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.MessageAuditEvents)
+                  .WithOne(e => e.TwitchChannelInstance)
+                  .HasForeignKey(e => e.TwitchChannelInstanceId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 

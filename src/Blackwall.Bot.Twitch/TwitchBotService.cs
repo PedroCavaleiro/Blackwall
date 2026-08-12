@@ -36,6 +36,7 @@ public sealed partial class TwitchBotService(
     [FromKeyedServices("twitch")] LinkProtectionService linkProtectionService,
     ContentGuardService contentGuardService,
     ISafeBrowsingService safeBrowsingService,
+    TwitchMessageAuditService messageAuditService,
     ILogger<TwitchBotService> logger
 )
     : IAsyncDisposable {
@@ -58,7 +59,7 @@ public sealed partial class TwitchBotService(
 
     public event EventHandler<OnMessageReceivedArgs>? OnMessageReceived;
 
-    private record ChannelRecord(long TwitchUserId, string Username, string AccessToken, string CommandTrigger, bool IsEnabled, bool IsDryRun, TwitchDetectionConfig? DetectionConfig, TwitchLinkConfig? LinkConfig, TwitchContentGuardConfig? ContentGuardConfig);
+    private record ChannelRecord(long TwitchUserId, string Username, string AccessToken, string CommandTrigger, bool IsEnabled, bool IsDryRun, TwitchDetectionConfig? DetectionConfig, TwitchLinkConfig? LinkConfig, TwitchContentGuardConfig? ContentGuardConfig, bool IsMessageAuditEnabled, int MessageAuditRetentionDays);
 
     public record TwitchDetectionConfig(
         int MaxMessagesPerWindow,
@@ -181,7 +182,7 @@ public sealed partial class TwitchBotService(
 
         foreach (var ch in channels) {
             var decryptedToken = DecryptToken(ch.BotAccessToken!);
-            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch), GetDetectionConfig(ch), GetLinkConfig(ch), GetContentGuardConfig(ch));
+            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch), GetDetectionConfig(ch), GetLinkConfig(ch), GetContentGuardConfig(ch), GetIsMessageAuditEnabled(ch), GetMessageAuditRetentionDays(ch));
             _channelNameToUserId[ch.Username.ToLowerInvariant()] = ch.TwitchUserId;
         }
 
@@ -211,7 +212,7 @@ public sealed partial class TwitchBotService(
 
         foreach (var ch in toJoin) {
             var decryptedToken = DecryptToken(ch.BotAccessToken!);
-            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch), GetDetectionConfig(ch), GetLinkConfig(ch), GetContentGuardConfig(ch));
+            _channels[ch.TwitchUserId] = new ChannelRecord(ch.TwitchUserId, ch.Username, decryptedToken, GetCommandTrigger(ch), GetIsEnabled(ch), GetIsDryRun(ch), GetDetectionConfig(ch), GetLinkConfig(ch), GetContentGuardConfig(ch), GetIsMessageAuditEnabled(ch), GetMessageAuditRetentionDays(ch));
             _channelNameToUserId[ch.Username.ToLowerInvariant()] = ch.TwitchUserId;
 
             await _client.JoinChannelAsync(ch.Username);
@@ -416,6 +417,16 @@ public sealed partial class TwitchBotService(
                     await ApplyDetectionActionAsync(broadcasterId, twitchUserId, effectiveAction, effectiveTimeout);
                 }
 
+                if (record.IsMessageAuditEnabled) {
+                    _ = Task.Run(() => messageAuditService.RecordEventAsync(
+                        broadcasterId, e,
+                        violations.Select(v => v.Type).ToList(),
+                        effectiveAction, record.IsDryRun,
+                        record.MessageAuditRetentionDays,
+                        CancellationToken.None
+                    ));
+                }
+
                 return;
             }
         }
@@ -465,6 +476,16 @@ public sealed partial class TwitchBotService(
                     await ApplyDetectionActionAsync(broadcasterId, twitchUserId2, linkConfig.SuspiciousLinkAction, linkConfig.SuspiciousLinkTimeoutMinutes);
                 }
 
+                if (record.IsMessageAuditEnabled) {
+                    _ = Task.Run(() => messageAuditService.RecordEventAsync(
+                        broadcasterId, e,
+                        [linkViolation],
+                        linkConfig.SuspiciousLinkAction, record.IsDryRun,
+                        record.MessageAuditRetentionDays,
+                        CancellationToken.None
+                    ));
+                }
+
                 return;
             }
         }
@@ -492,6 +513,16 @@ public sealed partial class TwitchBotService(
                     }
 
                     await ApplyDetectionActionAsync(broadcasterId, twitchUserIdCg, contentGuardConfig.Action, contentGuardConfig.TimeoutMinutes);
+                }
+
+                if (record.IsMessageAuditEnabled) {
+                    _ = Task.Run(() => messageAuditService.RecordEventAsync(
+                        broadcasterId, e,
+                        cgViolations,
+                        contentGuardConfig.Action, record.IsDryRun,
+                        record.MessageAuditRetentionDays,
+                        CancellationToken.None
+                    ));
                 }
 
                 return;
@@ -543,6 +574,12 @@ public sealed partial class TwitchBotService(
 
     private static bool GetIsDryRun(TwitchChannelInstance ch) =>
         ch.Configuration?.IsDryRun ?? false;
+
+    private static bool GetIsMessageAuditEnabled(TwitchChannelInstance ch) =>
+        ch.Configuration?.IsMessageAuditEnabled ?? false;
+
+    private static int GetMessageAuditRetentionDays(TwitchChannelInstance ch) =>
+        ch.Configuration?.MessageAuditRetentionDays ?? 30;
 
     private static TwitchDetectionConfig? GetDetectionConfig(TwitchChannelInstance ch) {
         var config = ch.Configuration;

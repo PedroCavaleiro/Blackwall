@@ -138,6 +138,7 @@ builder.Services.AddSingleton<ModuleRunnerService>();
 builder.Services.AddScoped<ModuleInstallationService>();
 builder.Services.AddScoped<TwitchChannelService>();
 builder.Services.AddSingleton<TwitchBotService>();
+builder.Services.AddScoped<TwitchMessageAuditService>();
 builder.Services.AddKeyedSingleton<IBanPlatformProvider, TwitchBanPlatformProvider>("twitch");
 builder.Services.AddKeyedSingleton<IBanSyncDataAccess, TwitchBanSyncDataAccess>("twitch");
 builder.Services.AddKeyedSingleton<BanSyncService>("twitch", (sp, _) => {

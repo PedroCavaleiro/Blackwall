@@ -810,4 +810,34 @@ public sealed class BlackwallApiService(
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<IReadOnlyList<TwitchMessageAuditEventSummaryDto>> GetTwitchAuditEventsAsync(long twitchUserId, int page = 1, int pageSize = 20, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/audit/events?page={page}&pageSize={pageSize}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchMessageAuditEventSummaryDto>>(ct) ?? [];
+    }
+
+    public async Task<TwitchMessageAuditEventDetailDto?> GetTwitchAuditEventDetailAsync(long twitchUserId, long eventId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/audit/events/{eventId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<TwitchMessageAuditEventDetailDto>(ct);
+    }
+
+    public async Task DeleteTwitchAuditEventAsync(long twitchUserId, long eventId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/audit/events/{eventId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteTwitchAuditRecordAsync(long twitchUserId, long eventId, long recordId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/audit/events/{eventId}/records/{recordId}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

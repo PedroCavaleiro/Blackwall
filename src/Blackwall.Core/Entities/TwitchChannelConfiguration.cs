@@ -39,6 +39,9 @@ public sealed class TwitchChannelConfiguration : EntityBase {
     public InfractionAction ContentGuardAction { get; set; } = InfractionAction.DeleteOnly;
     public int ContentGuardTimeoutMinutes { get; set; } = 10;
 
+    public bool IsMessageAuditEnabled { get; set; }
+    public int MessageAuditRetentionDays { get; set; } = 30;
+
     public DateTime UpdatedAtUtc { get; set; }
 
     public ICollection<TwitchAllowedBot> AllowedBots { get; set; } = [];

@@ -35,7 +35,9 @@ public sealed record TwitchChannelSettingsResponse(
     bool ContentGuardFuzzyMatching,
     int ContentGuardFuzzyThreshold,
     InfractionAction ContentGuardAction,
-    int ContentGuardTimeoutMinutes
+    int ContentGuardTimeoutMinutes,
+    bool IsMessageAuditEnabled,
+    int MessageAuditRetentionDays
 );
 
 public sealed record UpdateTwitchChannelSettingsRequest(
@@ -64,7 +66,9 @@ public sealed record UpdateTwitchChannelSettingsRequest(
     bool ContentGuardFuzzyMatching,
     int ContentGuardFuzzyThreshold,
     InfractionAction ContentGuardAction,
-    int ContentGuardTimeoutMinutes
+    int ContentGuardTimeoutMinutes,
+    bool IsMessageAuditEnabled,
+    int MessageAuditRetentionDays
 );
 
 public sealed record TwitchAllowedBotResponse(

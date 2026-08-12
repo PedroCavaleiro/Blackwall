@@ -22,4 +22,5 @@ public sealed class TwitchChannelInstance : EntityBase {
     public ICollection<TwitchChannelManager> Managers { get; set; } = [];
     public ICollection<TwitchChannelBan> Bans { get; set; } = [];
     public ICollection<TwitchChannelBanSyncRule> BanSyncRules { get; set; } = [];
+    public ICollection<TwitchMessageAuditEvent> MessageAuditEvents { get; set; } = [];
 }

@@ -35,4 +35,7 @@ public sealed class TwitchChannelConfigForm {
     public int ContentGuardFuzzyThreshold { get; set; } = 2;
     public InfractionAction ContentGuardAction { get; set; } = InfractionAction.DeleteOnly;
     public int ContentGuardTimeoutMinutes { get; set; } = 10;
+
+    public bool IsMessageAuditEnabled { get; set; }
+    public int MessageAuditRetentionDays { get; set; } = 30;
 }
