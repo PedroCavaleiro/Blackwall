@@ -13,6 +13,7 @@ public sealed class GuildModuleInstallation : EntityBase {
     public string GitUrl { get; set; } = "";
     public bool CanPerformActions { get; set; }
     public bool IsEnabled { get; set; }
+    public string? DisabledReason { get; set; }
     public string SettingsJson { get; set; } = "{}";
     public string ManifestJson { get; set; } = "{}";
     public DateTime UpdatedAtUtc { get; set; }

@@ -158,6 +158,23 @@ public sealed class TwitchModuleInstallationService(
                 x.ModuleName == moduleName, cancellationToken)
             ?? throw new InvalidOperationException($"Module '{moduleName}' is not installed for this channel.");
 
+        if (isEnabled) {
+            var dllPath = Path.Combine(ModuleBuildHelper.ModulesBasePath, installation.ModuleName, installation.ModuleVersion, installation.EntryPoint);
+            if (!File.Exists(dllPath) || !ModuleCompatibilityService.IsAssemblyCompatible(dllPath)) {
+                var referencedVersion = File.Exists(dllPath)
+                    ? ModuleCompatibilityService.GetAbstractionsReferenceVersion(dllPath)
+                    : null;
+                throw new InvalidOperationException(
+                    $"Module '{moduleName}' cannot be enabled because it is incompatible with the current Blackwall runtime "
+                    + $"(references Abstractions v{referencedVersion?.ToString() ?? "not found"}, "
+                    + $"runtime has v{ModuleCompatibilityService.CurrentAbstractionsVersion}). "
+                    + "Update the module to a compatible version first.");
+            }
+            installation.DisabledReason = null;
+        } else {
+            installation.DisabledReason = "Disabled by user.";
+        }
+
         installation.IsEnabled = isEnabled;
         installation.UpdatedAtUtc = DateTime.UtcNow;
 

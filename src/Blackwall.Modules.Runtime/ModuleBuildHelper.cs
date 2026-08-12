@@ -71,9 +71,7 @@ public static class ModuleBuildHelper {
         string tempDir,
         CancellationToken ct
     ) {
-        var exitCode = await RunGitCloneAsync(gitUrl, tempDir, ct);
-        if (exitCode != 0)
-            throw new InvalidOperationException($"git clone failed with exit code {exitCode}");
+        await RunGitCloneAsync(gitUrl, tempDir, ct);
 
         var manifestPath = Path.Combine(tempDir, "blackwall-module.json");
         if (!File.Exists(manifestPath))
@@ -110,6 +108,18 @@ public static class ModuleBuildHelper {
         var sourceDllPath = Path.Combine(buildOutputDir, manifest.EntryPoint);
         if (!File.Exists(sourceDllPath))
             throw new InvalidOperationException($"Entry point DLL '{manifest.EntryPoint}' was not produced by the build.");
+
+        var referencedVersion = ModuleCompatibilityService.GetAbstractionsReferenceVersion(sourceDllPath);
+        if (referencedVersion is null)
+            throw new InvalidOperationException(
+                $"Module '{manifest.Name}' does not reference Blackwall.Modules.Abstractions. "
+                + "Ensure the module project references the Blackwall.Modules.Abstractions package.");
+
+        if (!ModuleCompatibilityService.IsAssemblyCompatible(sourceDllPath))
+            throw new InvalidOperationException(
+                $"Module '{manifest.Name}' was compiled against Blackwall.Modules.Abstractions v{referencedVersion} "
+                + $"but the runtime has v{ModuleCompatibilityService.CurrentAbstractionsVersion}. "
+                + "Major and minor versions must match.");
 
         var moduleDir = Path.Combine(ModulesBasePath, manifest.Name, manifest.Version);
         Directory.CreateDirectory(moduleDir);
@@ -152,7 +162,14 @@ public static class ModuleBuildHelper {
         };
 
         using var process = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start git process.");
+        var stderrTask = process.StandardError.ReadToEndAsync(ct);
         await process.WaitForExitAsync(ct);
+        var stderr = await stderrTask;
+
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException(
+                $"git clone failed with exit code {process.ExitCode}.\n{stderr.Trim()}");
+
         return process.ExitCode;
     }
 

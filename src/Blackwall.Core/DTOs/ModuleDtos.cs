@@ -49,6 +49,7 @@ public sealed record GuildModuleInstallationDto(
     string GitUrl,
     bool CanPerformActions,
     bool IsEnabled,
+    string? DisabledReason,
     string SettingsJson,
     BlackwallModuleManifestDto Manifest
 );
@@ -64,6 +65,7 @@ public sealed record TwitchChannelModuleInstallationDto(
     string GitUrl,
     bool CanPerformActions,
     bool IsEnabled,
+    string? DisabledReason,
     string SettingsJson,
     BlackwallModuleManifestDto Manifest
 );

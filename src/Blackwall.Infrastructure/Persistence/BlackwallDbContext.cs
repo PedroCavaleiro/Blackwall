@@ -811,6 +811,9 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .IsRequired()
                   .HasDefaultValue(false);
 
+            entity.Property(e => e.DisabledReason)
+                  .HasMaxLength(1000);
+
             entity.Property(e => e.SettingsJson)
                   .IsRequired();
 
@@ -854,6 +857,9 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
             entity.Property(e => e.IsEnabled)
                   .IsRequired()
                   .HasDefaultValue(false);
+
+            entity.Property(e => e.DisabledReason)
+                  .HasMaxLength(1000);
 
             entity.Property(e => e.SettingsJson)
                   .IsRequired();

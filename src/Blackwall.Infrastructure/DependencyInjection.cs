@@ -1,4 +1,5 @@
 using Blackwall.Infrastructure.Cache.Discord;
+using Blackwall.Infrastructure.Cache.Twitch;
 using Blackwall.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -34,6 +35,7 @@ public static class DependencyInjection {
         services.AddScoped<SpamConfigurationCache>();
         services.AddScoped<NetWatchSnareChannelCache>();
         services.AddScoped<ModuleInstallationCache>();
+        services.AddScoped<TwitchModuleInstallationCache>();
     }
 
 }
