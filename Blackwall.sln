@@ -26,6 +26,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Bots", "Bots", "{D093FC31-8
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Modules.Banlist", "src\Blackwall.Modules.Banlist\Blackwall.Modules.Banlist.csproj", "{A913FE6E-3E2B-4F7C-95BF-BEDA601A240F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackwall.Modules.Runtime", "src\Blackwall.Modules.Runtime\Blackwall.Modules.Runtime.csproj", "{7B90B339-1AD0-4BDE-B4CF-09CB01F313F6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -168,6 +170,18 @@ Global
 		{A913FE6E-3E2B-4F7C-95BF-BEDA601A240F}.Release|x64.Build.0 = Release|Any CPU
 		{A913FE6E-3E2B-4F7C-95BF-BEDA601A240F}.Release|x86.ActiveCfg = Release|Any CPU
 		{A913FE6E-3E2B-4F7C-95BF-BEDA601A240F}.Release|x86.Build.0 = Release|Any CPU
+		{7B90B339-1AD0-4BDE-B4CF-09CB01F313F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B90B339-1AD0-4BDE-B4CF-09CB01F313F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B90B339-1AD0-4BDE-B4CF-09CB01F313F6}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7B90B339-1AD0-4BDE-B4CF-09CB01F313F6}.Debug|x64.Build.0 = Debug|Any CPU
+		{7B90B339-1AD0-4BDE-B4CF-09CB01F313F6}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7B90B339-1AD0-4BDE-B4CF-09CB01F313F6}.Debug|x86.Build.0 = Debug|Any CPU
+		{7B90B339-1AD0-4BDE-B4CF-09CB01F313F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7B90B339-1AD0-4BDE-B4CF-09CB01F313F6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7B90B339-1AD0-4BDE-B4CF-09CB01F313F6}.Release|x64.ActiveCfg = Release|Any CPU
+		{7B90B339-1AD0-4BDE-B4CF-09CB01F313F6}.Release|x64.Build.0 = Release|Any CPU
+		{7B90B339-1AD0-4BDE-B4CF-09CB01F313F6}.Release|x86.ActiveCfg = Release|Any CPU
+		{7B90B339-1AD0-4BDE-B4CF-09CB01F313F6}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -180,5 +194,6 @@ Global
 		{B2C3D4E5-F6A7-8901-2345-67890ABCDEF1} = {10863526-CB4F-4070-837F-20130A8AA0E4}
 		{C3D4E5F6-A7B8-9012-3456-7890ABCDEF23} = {10863526-CB4F-4070-837F-20130A8AA0E4}
 		{A913FE6E-3E2B-4F7C-95BF-BEDA601A240F} = {10863526-CB4F-4070-837F-20130A8AA0E4}
+		{7B90B339-1AD0-4BDE-B4CF-09CB01F313F6} = {10863526-CB4F-4070-837F-20130A8AA0E4}
 	EndGlobalSection
 EndGlobal

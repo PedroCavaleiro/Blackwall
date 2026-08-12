@@ -20,9 +20,10 @@ public sealed record ModuleEmbed(
 );
 
 public sealed record ModuleMessageContext(
-    long DiscordGuildId,
-    long DiscordUserId,
-    long DiscordChannelId,
+    ModulePlatform Platform,
+    long CommunityId,
+    long UserId,
+    long ChannelId,
     string ChannelName,
     string Username,
     bool IsBot,

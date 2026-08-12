@@ -9,6 +9,10 @@ using Blackwall.Core.Services;
 using Blackwall.Infrastructure.Persistence;
 using Blackwall.Modules.LinkProtection;
 using Blackwall.Bot.Twitch;
+using Blackwall.Bot.Twitch.Services;
+using Blackwall.Modules.Abstractions;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -27,11 +31,16 @@ public sealed class TwitchChannelsController(
     TwitchBotService twitchBotService,
     TwitchBanSyncService twitchBanSyncService,
     [FromKeyedServices("twitch")] LinkProtectionService linkProtectionService,
+    TwitchModuleInstallationService moduleInstallationService,
     BlackwallDbContext dbContext,
     IOptions<TwitchOptions> twitchOptions,
     IOptions<AppConfiguration> appConfiguration,
     ILogger<TwitchChannelsController> logger
 ) : ControllerBase {
+
+    private static readonly JsonSerializerOptions ModuleJsonOptions = new(JsonSerializerDefaults.Web) {
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+    };
 
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<ManageableTwitchChannelResponse>), StatusCodes.Status200OK)]
@@ -2021,6 +2030,256 @@ public sealed class TwitchChannelsController(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return NoContent();
+    }
+
+    [HttpGet("{twitchUserId:long}/modules")]
+    [ProducesResponseType(typeof(IReadOnlyList<TwitchChannelModuleInstallationDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<IReadOnlyList<TwitchChannelModuleInstallationDto>>> ListModules(
+        long twitchUserId,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        var installations = await moduleInstallationService.ListInstalledAsync(twitchUserId, cancellationToken);
+
+        var dtos = installations.Select(x => {
+            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(x.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", null, "", "", null, "", false, [], null);
+            return new TwitchChannelModuleInstallationDto(
+                x.Id,
+                twitchUserId,
+                x.ModuleName,
+                manifest.ReadableName,
+                x.ModuleVersion,
+                x.ModuleAuthor,
+                manifest.Description,
+                x.GitUrl,
+                x.CanPerformActions,
+                x.IsEnabled,
+                x.SettingsJson,
+                manifest
+            );
+        }).ToList();
+
+        return Ok(dtos);
+    }
+
+    [HttpPost("{twitchUserId:long}/modules/install")]
+    [ProducesResponseType(typeof(TwitchChannelModuleInstallationDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<TwitchChannelModuleInstallationDto>> InstallModule(
+        long twitchUserId,
+        [FromBody] InstallModuleRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        try {
+            var installation = await moduleInstallationService.InstallAsync(twitchUserId, request.GitUrl, cancellationToken);
+            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(installation.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", null, "", "", null, "", false, [], null);
+            return Ok(new TwitchChannelModuleInstallationDto(
+                installation.Id,
+                twitchUserId,
+                installation.ModuleName,
+                manifest.ReadableName,
+                installation.ModuleVersion,
+                installation.ModuleAuthor,
+                manifest.Description,
+                installation.GitUrl,
+                installation.CanPerformActions,
+                installation.IsEnabled,
+                installation.SettingsJson,
+                manifest
+            ));
+        } catch (ArgumentException ex) {
+            return BadRequest(new ProblemDetails {
+                Title = "Invalid module URL.",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest
+            });
+        } catch (InvalidOperationException ex) {
+            return BadRequest(new ProblemDetails {
+                Title = "Module installation failed.",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+    }
+
+    [HttpDelete("{twitchUserId:long}/modules/{moduleName}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UninstallModule(
+        long twitchUserId,
+        string moduleName,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        try {
+            await moduleInstallationService.UninstallAsync(twitchUserId, moduleName, cancellationToken);
+            return NoContent();
+        } catch (InvalidOperationException) {
+            return NotFound(new ProblemDetails {
+                Title = "Module not found.",
+                Detail = $"Module '{moduleName}' is not installed for this channel.",
+                Status = StatusCodes.Status404NotFound
+            });
+        }
+    }
+
+    [HttpPost("{twitchUserId:long}/modules/{moduleName}/update")]
+    [ProducesResponseType(typeof(TwitchChannelModuleInstallationDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<TwitchChannelModuleInstallationDto>> UpdateModule(
+        long twitchUserId,
+        string moduleName,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        try {
+            var installation = await moduleInstallationService.UpdateAsync(twitchUserId, moduleName, cancellationToken);
+            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(installation.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", null, "", "", null, "", false, [], null);
+            return Ok(new TwitchChannelModuleInstallationDto(
+                installation.Id,
+                twitchUserId,
+                installation.ModuleName,
+                manifest.ReadableName,
+                installation.ModuleVersion,
+                installation.ModuleAuthor,
+                manifest.Description,
+                installation.GitUrl,
+                installation.CanPerformActions,
+                installation.IsEnabled,
+                installation.SettingsJson,
+                manifest
+            ));
+        } catch (InvalidOperationException ex) {
+            return BadRequest(new ProblemDetails {
+                Title = "Module update failed.",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+    }
+
+    [HttpPut("{twitchUserId:long}/modules/{moduleName}/enabled")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetModuleEnabled(
+        long twitchUserId,
+        string moduleName,
+        [FromBody] UpdateModuleEnabledRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        try {
+            await moduleInstallationService.SetEnabledAsync(twitchUserId, moduleName, request.IsEnabled, cancellationToken);
+            return NoContent();
+        } catch (InvalidOperationException) {
+            return NotFound(new ProblemDetails {
+                Title = "Module not found.",
+                Detail = $"Module '{moduleName}' is not installed for this channel.",
+                Status = StatusCodes.Status404NotFound
+            });
+        }
+    }
+
+    [HttpPut("{twitchUserId:long}/modules/{moduleName}/settings")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateModuleSettings(
+        long twitchUserId,
+        string moduleName,
+        [FromBody] UpdateModuleSettingsRequest request,
+        CancellationToken cancellationToken
+    ) {
+        var appUserId = GetCurrentUserId();
+        if (appUserId is null)
+            return Unauthorized(new ProblemDetails {
+                Title = "Invalid user identity.",
+                Detail = "The authenticated token did not contain a valid user id.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+
+        var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
+        if (!canOpen)
+            return Forbid();
+
+        try {
+            await moduleInstallationService.UpdateSettingsAsync(twitchUserId, moduleName, request.SettingsJson, cancellationToken);
+            return NoContent();
+        } catch (InvalidOperationException) {
+            return NotFound(new ProblemDetails {
+                Title = "Module not found.",
+                Detail = $"Module '{moduleName}' is not installed for this channel.",
+                Status = StatusCodes.Status404NotFound
+            });
+        }
     }
 
     private long? GetCurrentUserId() {

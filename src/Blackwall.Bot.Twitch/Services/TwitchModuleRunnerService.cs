@@ -1,19 +1,18 @@
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;
-using Blackwall.Modules.DetectionMatrix;
-using Blackwall.Infrastructure.Cache.Discord;
+using Blackwall.Infrastructure.Cache.Twitch;
 using Blackwall.Modules.Abstractions;
 using Blackwall.Modules.Runtime;
-using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using TwitchLib.Client.Events;
 // ReSharper disable NotAccessedPositionalProperty.Global
 // ReSharper disable NullableWarningSuppressionIsUsed
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
-namespace Blackwall.Bot.Discord.Services;
+namespace Blackwall.Bot.Twitch.Services;
 
-public sealed record ModuleEvaluationResult(
+public sealed record TwitchModuleEvaluationResult(
     string ViolationType,
     string ModuleName,
     string? ReadableName,
@@ -24,30 +23,29 @@ public sealed record ModuleEvaluationResult(
     string? Reason
 );
 
-public sealed class ModuleRunnerService(
+public sealed class TwitchModuleRunnerService(
     IServiceScopeFactory scopeFactory,
     ModuleRuntimeService runtime,
-    ILogger<ModuleRunnerService> logger
+    ILogger<TwitchModuleRunnerService> logger
 ) {
-    public async Task<IReadOnlyList<ModuleEvaluationResult>> EvaluateAsync(
-        long discordGuildId,
-        SocketUserMessage message,
-        SocketGuildChannel guildChannel,
+    public async Task<IReadOnlyList<TwitchModuleEvaluationResult>> EvaluateAsync(
+        long twitchUserId,
+        OnMessageReceivedArgs e,
         bool isDryRun,
         CancellationToken cancellationToken
     ) {
-        IReadOnlyList<GuildModuleInstallationDto> installations;
+        IReadOnlyList<TwitchChannelModuleInstallationDto> installations;
 
         using (var scope = scopeFactory.CreateScope()) {
-            var cache = scope.ServiceProvider.GetRequiredService<ModuleInstallationCache>();
-            installations = await cache.GetByDiscordGuildIdAsync(discordGuildId, cancellationToken);
+            var cache = scope.ServiceProvider.GetRequiredService<TwitchModuleInstallationCache>();
+            installations = await cache.GetByTwitchUserIdAsync(twitchUserId, cancellationToken);
         }
 
         if (installations.Count == 0)
             return [];
 
-        var context = BuildMessageContext(message, guildChannel, discordGuildId);
-        var results = new List<ModuleEvaluationResult>();
+        var context = BuildMessageContext(twitchUserId, e);
+        var results = new List<TwitchModuleEvaluationResult>();
 
         foreach (var installation in installations) {
             try {
@@ -66,7 +64,7 @@ public sealed class ModuleRunnerService(
                 var verdict = await runtime.EvaluateAsync(moduleInstance, context, cancellationToken);
 
                 if (verdict is not null) {
-                    results.Add(new ModuleEvaluationResult(
+                    results.Add(new TwitchModuleEvaluationResult(
                         verdict.ViolationType,
                         installation.ModuleName,
                         installation.ReadableName,
@@ -79,12 +77,12 @@ public sealed class ModuleRunnerService(
                 }
             } catch (OperationCanceledException) {
                 logger.LogWarning(
-                    "Module {ModuleName} timed out evaluating message {MessageId} in guild {GuildId}",
-                    installation.ModuleName, message.Id, discordGuildId);
+                    "Module {ModuleName} timed out evaluating message {MessageId} in channel {TwitchUserId}",
+                    installation.ModuleName, e.ChatMessage.Id, twitchUserId);
             } catch (Exception ex) {
                 logger.LogError(ex,
-                    "Module {ModuleName} threw an exception evaluating message {MessageId} in guild {GuildId}",
-                    installation.ModuleName, message.Id, discordGuildId);
+                    "Module {ModuleName} threw an exception evaluating message {MessageId} in channel {TwitchUserId}",
+                    installation.ModuleName, e.ChatMessage.Id, twitchUserId);
             }
         }
 
@@ -105,46 +103,23 @@ public sealed class ModuleRunnerService(
     public void UnloadAllModules() => runtime.UnloadAllModules();
 
     private static ModuleMessageContext BuildMessageContext(
-        SocketUserMessage message,
-        SocketGuildChannel guildChannel,
-        long discordGuildId
+        long twitchUserId,
+        OnMessageReceivedArgs e
     ) {
-        var attachments = message.Attachments
-            .Select(a => new ModuleAttachment(
-                (long)a.Id,
-                a.Filename,
-                a.Size,
-                a.Url,
-                a.Width,
-                a.Height
-            ))
-            .ToList();
-
-        var embeds = message.Embeds
-            .Select(e => new ModuleEmbed(
-                e.Title,
-                e.Description,
-                e.Url,
-                e.Type.ToString(),
-                e.Image?.Url,
-                e.Thumbnail?.Url
-            ))
-            .ToList();
-
-        var fullContent = DetectionService.ExtractFullContent(message);
+        var cm = e.ChatMessage;
 
         return new ModuleMessageContext(
-            ModulePlatform.Discord,
-            discordGuildId,
-            (long)message.Author.Id,
-            (long)message.Channel.Id,
-            guildChannel.Name,
-            message.Author.Username,
-            message.Author.IsBot,
-            fullContent,
-            attachments,
-            embeds,
-            message.Timestamp.UtcDateTime
+            ModulePlatform.Twitch,
+            twitchUserId,
+            long.Parse(cm.UserId),
+            twitchUserId,
+            cm.Channel,
+            cm.Username,
+            cm.IsBroadcaster,
+            cm.Message,
+            [],
+            [],
+            DateTime.UtcNow
         );
     }
 }

@@ -1,5 +1,5 @@
 using Blackwall.Core.Entities;
-using Blackwall.Infrastructure.Cache.Discord;
+using Blackwall.Infrastructure.Cache.Twitch;
 using Blackwall.Infrastructure.Persistence;
 using Blackwall.Modules.Abstractions;
 using Blackwall.Modules.Runtime;
@@ -7,46 +7,46 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
-namespace Blackwall.Bot.Discord.Services;
+namespace Blackwall.Bot.Twitch.Services;
 
-public sealed class ModuleInstallationService(
+public sealed class TwitchModuleInstallationService(
     BlackwallDbContext dbContext,
-    ModuleInstallationCache cache,
-    ModuleRunnerService moduleRunnerService,
-    ILogger<ModuleInstallationService> logger
+    TwitchModuleInstallationCache cache,
+    TwitchModuleRunnerService moduleRunnerService,
+    ILogger<TwitchModuleInstallationService> logger
 ) {
     private static readonly JsonSerializerOptions JsonOptions = ModuleBuildHelper.JsonOptions;
 
-    public async Task<GuildModuleInstallation> InstallAsync(
-        long discordGuildId,
+    public async Task<TwitchChannelModuleInstallation> InstallAsync(
+        long twitchUserId,
         string gitUrl,
         CancellationToken cancellationToken = default
     ) {
         if (!Uri.TryCreate(gitUrl, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
             throw new ArgumentException("Git URL must be a valid HTTPS URL.");
 
-        var guildInstance = await dbContext.GuildInstances
-            .FirstOrDefaultAsync(x => x.DiscordGuildId == discordGuildId && x.IsActive, cancellationToken)
-            ?? throw new InvalidOperationException("Guild not found or not active.");
+        var channelInstance = await dbContext.TwitchChannelInstances
+            .FirstOrDefaultAsync(x => x.TwitchUserId == twitchUserId && x.IsActive, cancellationToken)
+            ?? throw new InvalidOperationException("Twitch channel not found or not active.");
 
         var tempDir = ModuleBuildHelper.CreateTempDir();
 
         try {
             var (manifestJson, manifest) = await ModuleBuildHelper.CloneAndReadManifestAsync(gitUrl, tempDir, cancellationToken);
-            ModuleBuildHelper.ValidateManifest(manifest, ModulePlatform.Discord);
+            ModuleBuildHelper.ValidateManifest(manifest, ModulePlatform.Twitch);
 
-            var existing = await dbContext.GuildModuleInstallations
-                .FirstOrDefaultAsync(x => x.GuildInstanceId == guildInstance.Id && x.ModuleName == manifest.Name, cancellationToken);
+            var existing = await dbContext.TwitchChannelModuleInstallations
+                .FirstOrDefaultAsync(x => x.TwitchChannelInstanceId == channelInstance.Id && x.ModuleName == manifest.Name, cancellationToken);
 
             if (existing is not null)
-                throw new InvalidOperationException($"Module '{manifest.Name}' is already installed for this guild.");
+                throw new InvalidOperationException($"Module '{manifest.Name}' is already installed for this channel.");
 
             await ModuleBuildHelper.BuildAndCopyModuleAsync(manifest, tempDir, cancellationToken);
 
             var defaultSettings = ModuleBuildHelper.BuildDefaultSettings(manifest);
 
-            var installation = new GuildModuleInstallation {
-                GuildInstanceId = guildInstance.Id,
+            var installation = new TwitchChannelModuleInstallation {
+                TwitchChannelInstanceId = channelInstance.Id,
                 ModuleName = manifest.Name,
                 ModuleVersion = manifest.Version,
                 ModuleAuthor = manifest.Author,
@@ -59,14 +59,14 @@ public sealed class ModuleInstallationService(
                 UpdatedAtUtc = DateTime.UtcNow
             };
 
-            dbContext.GuildModuleInstallations.Add(installation);
+            dbContext.TwitchChannelModuleInstallations.Add(installation);
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            await cache.InvalidateAsync(discordGuildId);
+            await cache.InvalidateAsync(twitchUserId);
 
             logger.LogInformation(
-                "Module {ModuleName} v{Version} installed for guild {GuildId}",
-                manifest.Name, manifest.Version, discordGuildId);
+                "Module {ModuleName} v{Version} installed for Twitch channel {TwitchUserId}",
+                manifest.Name, manifest.Version, twitchUserId);
 
             return installation;
         } finally {
@@ -75,38 +75,38 @@ public sealed class ModuleInstallationService(
     }
 
     public async Task UninstallAsync(
-        long discordGuildId,
+        long twitchUserId,
         string moduleName,
         CancellationToken cancellationToken = default
     ) {
-        var installation = await dbContext.GuildModuleInstallations
+        var installation = await dbContext.TwitchChannelModuleInstallations
             .FirstOrDefaultAsync(x =>
-                x.GuildInstance.DiscordGuildId == discordGuildId &&
-                x.GuildInstance.IsActive &&
+                x.TwitchChannelInstance.TwitchUserId == twitchUserId &&
+                x.TwitchChannelInstance.IsActive &&
                 x.ModuleName == moduleName, cancellationToken)
-            ?? throw new InvalidOperationException($"Module '{moduleName}' is not installed for this guild.");
+            ?? throw new InvalidOperationException($"Module '{moduleName}' is not installed for this channel.");
 
-        dbContext.GuildModuleInstallations.Remove(installation);
+        dbContext.TwitchChannelModuleInstallations.Remove(installation);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await cache.InvalidateAsync(discordGuildId);
+        await cache.InvalidateAsync(twitchUserId);
 
         logger.LogInformation(
-            "Module {ModuleName} uninstalled from guild {GuildId}",
-            moduleName, discordGuildId);
+            "Module {ModuleName} uninstalled from Twitch channel {TwitchUserId}",
+            moduleName, twitchUserId);
     }
 
-    public async Task<GuildModuleInstallation> UpdateAsync(
-        long discordGuildId,
+    public async Task<TwitchChannelModuleInstallation> UpdateAsync(
+        long twitchUserId,
         string moduleName,
         CancellationToken cancellationToken = default
     ) {
-        var installation = await dbContext.GuildModuleInstallations
+        var installation = await dbContext.TwitchChannelModuleInstallations
             .FirstOrDefaultAsync(x =>
-                x.GuildInstance.DiscordGuildId == discordGuildId &&
-                x.GuildInstance.IsActive &&
+                x.TwitchChannelInstance.TwitchUserId == twitchUserId &&
+                x.TwitchChannelInstance.IsActive &&
                 x.ModuleName == moduleName, cancellationToken)
-            ?? throw new InvalidOperationException($"Module '{moduleName}' is not installed for this guild.");
+            ?? throw new InvalidOperationException($"Module '{moduleName}' is not installed for this channel.");
 
         if (string.IsNullOrWhiteSpace(installation.GitUrl))
             throw new InvalidOperationException("Module does not have a stored Git URL — cannot update.");
@@ -116,7 +116,7 @@ public sealed class ModuleInstallationService(
 
         try {
             var (manifestJson, manifest) = await ModuleBuildHelper.CloneAndReadManifestAsync(gitUrl, tempDir, cancellationToken);
-            ModuleBuildHelper.ValidateManifest(manifest, ModulePlatform.Discord);
+            ModuleBuildHelper.ValidateManifest(manifest, ModulePlatform.Twitch);
 
             if (manifest.Name != moduleName)
                 throw new InvalidOperationException($"Module name mismatch: expected '{moduleName}', got '{manifest.Name}'.");
@@ -131,13 +131,13 @@ public sealed class ModuleInstallationService(
             installation.UpdatedAtUtc = DateTime.UtcNow;
 
             await dbContext.SaveChangesAsync(cancellationToken);
-            await cache.InvalidateAsync(discordGuildId);
+            await cache.InvalidateAsync(twitchUserId);
 
             moduleRunnerService.UnloadModule(moduleName, manifest.Version);
 
             logger.LogInformation(
-                "Module {ModuleName} updated to v{Version} for guild {GuildId}",
-                manifest.Name, manifest.Version, discordGuildId);
+                "Module {ModuleName} updated to v{Version} for Twitch channel {TwitchUserId}",
+                manifest.Name, manifest.Version, twitchUserId);
 
             return installation;
         } finally {
@@ -146,54 +146,54 @@ public sealed class ModuleInstallationService(
     }
 
     public async Task SetEnabledAsync(
-        long discordGuildId,
+        long twitchUserId,
         string moduleName,
         bool isEnabled,
         CancellationToken cancellationToken = default
     ) {
-        var installation = await dbContext.GuildModuleInstallations
+        var installation = await dbContext.TwitchChannelModuleInstallations
             .FirstOrDefaultAsync(x =>
-                x.GuildInstance.DiscordGuildId == discordGuildId &&
-                x.GuildInstance.IsActive &&
+                x.TwitchChannelInstance.TwitchUserId == twitchUserId &&
+                x.TwitchChannelInstance.IsActive &&
                 x.ModuleName == moduleName, cancellationToken)
-            ?? throw new InvalidOperationException($"Module '{moduleName}' is not installed for this guild.");
+            ?? throw new InvalidOperationException($"Module '{moduleName}' is not installed for this channel.");
 
         installation.IsEnabled = isEnabled;
         installation.UpdatedAtUtc = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        await cache.InvalidateAsync(discordGuildId);
+        await cache.InvalidateAsync(twitchUserId);
     }
 
     public async Task UpdateSettingsAsync(
-        long discordGuildId,
+        long twitchUserId,
         string moduleName,
         string settingsJson,
         CancellationToken cancellationToken = default
     ) {
-        var installation = await dbContext.GuildModuleInstallations
+        var installation = await dbContext.TwitchChannelModuleInstallations
             .FirstOrDefaultAsync(x =>
-                x.GuildInstance.DiscordGuildId == discordGuildId &&
-                x.GuildInstance.IsActive &&
+                x.TwitchChannelInstance.TwitchUserId == twitchUserId &&
+                x.TwitchChannelInstance.IsActive &&
                 x.ModuleName == moduleName, cancellationToken)
-            ?? throw new InvalidOperationException($"Module '{moduleName}' is not installed for this guild.");
+            ?? throw new InvalidOperationException($"Module '{moduleName}' is not installed for this channel.");
 
         installation.SettingsJson = settingsJson;
         installation.UpdatedAtUtc = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        await cache.InvalidateAsync(discordGuildId);
+        await cache.InvalidateAsync(twitchUserId);
 
         await moduleRunnerService.ReloadModuleSettingsAsync(
             moduleName, installation.ModuleVersion, settingsJson, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<GuildModuleInstallation>> ListInstalledAsync(
-        long discordGuildId,
+    public async Task<IReadOnlyList<TwitchChannelModuleInstallation>> ListInstalledAsync(
+        long twitchUserId,
         CancellationToken cancellationToken = default
     ) {
-        return await dbContext.GuildModuleInstallations
-            .Where(x => x.GuildInstance.DiscordGuildId == discordGuildId && x.GuildInstance.IsActive)
+        return await dbContext.TwitchChannelModuleInstallations
+            .Where(x => x.TwitchChannelInstance.TwitchUserId == twitchUserId && x.TwitchChannelInstance.IsActive)
             .ToListAsync(cancellationToken);
     }
 }

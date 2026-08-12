@@ -840,4 +840,58 @@ public sealed class BlackwallApiService(
         var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<IReadOnlyList<TwitchChannelModuleInstallationDto>> GetTwitchModulesAsync(long twitchUserId, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/twitchchannels/{twitchUserId}/modules");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<TwitchChannelModuleInstallationDto>>(ct) ?? [];
+    }
+
+    public async Task<TwitchChannelModuleInstallationDto?> InstallTwitchModuleAsync(long twitchUserId, string gitUrl, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/modules/install");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new InstallModuleRequest(gitUrl));
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct);
+            throw new Exception(problem?.Detail ?? problem?.Title ?? $"HTTP {response.StatusCode}");
+        }
+        return await response.Content.ReadFromJsonAsync<TwitchChannelModuleInstallationDto>(ct);
+    }
+
+    public async Task UninstallTwitchModuleAsync(long twitchUserId, string moduleName, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/twitchchannels/{twitchUserId}/modules/{Uri.EscapeDataString(moduleName)}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<TwitchChannelModuleInstallationDto?> UpdateTwitchModuleAsync(long twitchUserId, string moduleName, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/twitchchannels/{twitchUserId}/modules/{Uri.EscapeDataString(moduleName)}/update");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(ct);
+            throw new Exception(problem?.Detail ?? problem?.Title ?? $"HTTP {response.StatusCode}");
+        }
+        return await response.Content.ReadFromJsonAsync<TwitchChannelModuleInstallationDto>(ct);
+    }
+
+    public async Task SetTwitchModuleEnabledAsync(long twitchUserId, string moduleName, bool isEnabled, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/twitchchannels/{twitchUserId}/modules/{Uri.EscapeDataString(moduleName)}/enabled");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new UpdateModuleEnabledRequest(isEnabled));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task UpdateTwitchModuleSettingsAsync(long twitchUserId, string moduleName, string settingsJson, CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/twitchchannels/{twitchUserId}/modules/{Uri.EscapeDataString(moduleName)}/settings");
+        ApplyAuth(request);
+        request.Content = JsonContent.Create(new UpdateModuleSettingsRequest(settingsJson));
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

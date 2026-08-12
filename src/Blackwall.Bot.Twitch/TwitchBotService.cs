@@ -4,6 +4,8 @@ using System.Text.Json;
 using Blackwall.Core.Configuration;
 using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
+using Blackwall.Bot.Twitch.Services;
+using Blackwall.Modules.Abstractions;
 using Blackwall.Modules.ContentGuard;
 using Blackwall.Modules.DetectionMatrix;
 using Blackwall.Infrastructure.Persistence;
@@ -37,6 +39,7 @@ public sealed partial class TwitchBotService(
     ContentGuardService contentGuardService,
     ISafeBrowsingService safeBrowsingService,
     TwitchMessageAuditService messageAuditService,
+    TwitchModuleRunnerService moduleRunnerService,
     ILogger<TwitchBotService> logger
 )
     : IAsyncDisposable {
@@ -527,6 +530,52 @@ public sealed partial class TwitchBotService(
 
                 return;
             }
+        }
+
+        try {
+            var moduleResults = await moduleRunnerService.EvaluateAsync(
+                broadcasterId, e, record.IsDryRun, CancellationToken.None);
+
+            if (moduleResults.Count > 0) {
+                var worst = moduleResults.Aggregate((a, b) =>
+                    a.Action > b.Action ? a : b);
+
+                logger.LogInformation(
+                    "Module violation in channel {BroadcasterId} from user {UserId}: {Modules} (DryRun={DryRun}, Action={Action})",
+                    broadcasterId, e.ChatMessage.UserId,
+                    string.Join(", ", moduleResults.Select(r => r.ModuleName)),
+                    record.IsDryRun, worst.Action);
+
+                if (!record.IsDryRun) {
+                    try {
+                        await DeleteMessageAsync(broadcasterId, e.ChatMessage.Id);
+                    } catch (Exception ex) {
+                        logger.LogWarning(ex,
+                            "Failed to delete module violation message {MessageId} in channel {BroadcasterId}",
+                            e.ChatMessage.Id, broadcasterId);
+                    }
+
+                    await ApplyDetectionActionAsync(
+                        broadcasterId, long.Parse(e.ChatMessage.UserId),
+                        worst.Action, worst.TimeoutMinutes);
+                }
+
+                if (record.IsMessageAuditEnabled) {
+                    _ = Task.Run(() => messageAuditService.RecordEventAsync(
+                        broadcasterId, e,
+                        moduleResults.Select(r => r.ViolationType).ToList(),
+                        worst.Action, record.IsDryRun,
+                        record.MessageAuditRetentionDays,
+                        CancellationToken.None
+                    ));
+                }
+
+                return;
+            }
+        } catch (Exception ex) {
+            logger.LogError(ex,
+                "Error evaluating modules for message {MessageId} in channel {BroadcasterId}",
+                e.ChatMessage.Id, broadcasterId);
         }
 
         var trigger = record.CommandTrigger;

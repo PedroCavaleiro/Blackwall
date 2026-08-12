@@ -2571,7 +2571,7 @@ public sealed class GuildsController(
         var installations = await moduleInstallationService.ListInstalledAsync(discordGuildId, cancellationToken);
 
         var dtos = installations.Select(x => {
-            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(x.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", null, "", "", null, "", false, null);
+            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(x.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", null, "", "", null, "", false, [], null);
             return new GuildModuleInstallationDto(
                 x.Id,
                 discordGuildId,
@@ -2615,7 +2615,7 @@ public sealed class GuildsController(
 
         try {
             var installation = await moduleInstallationService.InstallAsync(discordGuildId, request.GitUrl, cancellationToken);
-            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(installation.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", null, "", "", null, "", false, null);
+            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(installation.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", null, "", "", null, "", false, [], null);
             return Ok(new GuildModuleInstallationDto(
                 installation.Id,
                 discordGuildId,
@@ -2704,7 +2704,7 @@ public sealed class GuildsController(
 
         try {
             var installation = await moduleInstallationService.UpdateAsync(discordGuildId, moduleName, cancellationToken);
-            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(installation.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", null, "", "", null, "", false, null);
+            var manifest = JsonSerializer.Deserialize<BlackwallModuleManifestDto>(installation.ManifestJson, ModuleJsonOptions) ?? new BlackwallModuleManifestDto("", null, "", "", null, "", false, [], null);
             return Ok(new GuildModuleInstallationDto(
                 installation.Id,
                 discordGuildId,

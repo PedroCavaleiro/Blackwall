@@ -20,6 +20,7 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
     public DbSet<MessageAuditRecord> MessageAuditRecords => Set<MessageAuditRecord>();
     public DbSet<NetWatchSnareChannel> NetWatchSnareChannels => Set<NetWatchSnareChannel>();
     public DbSet<GuildModuleInstallation> GuildModuleInstallations => Set<GuildModuleInstallation>();
+    public DbSet<TwitchChannelModuleInstallation> TwitchChannelModuleInstallations => Set<TwitchChannelModuleInstallation>();
     public DbSet<TwitchChannelInstance> TwitchChannelInstances => Set<TwitchChannelInstance>();
     public DbSet<TwitchChannelManager> TwitchChannelManagers => Set<TwitchChannelManager>();
     public DbSet<TwitchChannelConfiguration> TwitchChannelConfigurations => Set<TwitchChannelConfiguration>();
@@ -824,6 +825,50 @@ public sealed class BlackwallDbContext(DbContextOptions<BlackwallDbContext> opti
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(e => new { e.GuildInstanceId, e.ModuleName })
+                  .IsUnique();
+        });
+
+        modelBuilder.Entity<TwitchChannelModuleInstallation>(entity => {
+            entity.Property(e => e.ModuleName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.ModuleVersion)
+                  .IsRequired()
+                  .HasMaxLength(50);
+
+            entity.Property(e => e.ModuleAuthor)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.EntryPoint)
+                  .IsRequired()
+                  .HasMaxLength(500);
+
+            entity.Property(e => e.GitUrl)
+                  .HasMaxLength(1000);
+
+            entity.Property(e => e.CanPerformActions)
+                  .IsRequired();
+
+            entity.Property(e => e.IsEnabled)
+                  .IsRequired()
+                  .HasDefaultValue(false);
+
+            entity.Property(e => e.SettingsJson)
+                  .IsRequired();
+
+            entity.Property(e => e.ManifestJson)
+                  .IsRequired();
+
+            entity.Property(e => e.UpdatedAtUtc);
+
+            entity.HasOne(e => e.TwitchChannelInstance)
+                  .WithMany()
+                  .HasForeignKey(e => e.TwitchChannelInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.TwitchChannelInstanceId, e.ModuleName })
                   .IsUnique();
         });
 

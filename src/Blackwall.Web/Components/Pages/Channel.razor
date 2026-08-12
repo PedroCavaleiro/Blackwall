@@ -7,6 +7,7 @@
 @implements IDisposable
 @using Blackwall.Core.DTOs
 @using Blackwall.Web.Components.Shared
+@using Blackwall.Web.Components.Shared.TwitchChannelTabs
 
 <PageTitle>@(_settings?.DisplayName ?? "Config") — Blackwall</PageTitle>
 
@@ -63,6 +64,11 @@
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "contentguard" ? "active" : "")" @onclick='() => _activeTab = "contentguard"'>CONTENT GUARD</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "bans" ? "active" : "")" @onclick='() => _activeTab = "bans"'>BAN LIST</button>
                     <button type="button" class="bw-sidebar-btn @(_activeTab == "audit" ? "active" : "")" @onclick='() => _activeTab = "audit"'>AUDIT</button>
+                    @foreach (var mod in _installedModules) {
+                        var tabLabel = (mod.ReadableName ?? mod.ModuleName).ToUpperInvariant();
+                        <button type="button" class="bw-sidebar-btn @(_activeTab == $"mod:{mod.ModuleName}" ? "active" : "")" @onclick='() => _activeTab = $"mod:{mod.ModuleName}"'>@tabLabel</button>
+                    }
+                    <button type="button" class="bw-sidebar-btn @(_activeTab == "modules" ? "active" : "")" @onclick='() => _activeTab = "modules"'>MODULES</button>
                 </nav>
 
                 <div class="bw-sidebar-content">
@@ -80,6 +86,13 @@
                         <TwitchAuditTab Form="Form" TwitchUserId="TwitchUserId" />
                     } else if (_activeTab == "bans") {
                         <TwitchBansTab TwitchUserId="TwitchUserId" InitialShareBanList="@(_settings?.ShareBanList ?? false)" OnError="HandleError" />
+                    } else if (_activeTab == "modules") {
+                        <TwitchModulesTab TwitchUserId="TwitchUserId" OnError="HandleError" OnModulesChanged="ReloadModulesAsync" />
+                    }
+                    @foreach (var mod in _installedModules) {
+                        @if (_activeTab == $"mod:{mod.ModuleName}") {
+                            <TwitchModuleTab @ref="_activeModuleTab" Module="mod" TwitchUserId="TwitchUserId" OnError="HandleError" />
+                        }
                     }
 
                     <div class="d-flex align-items-center gap-3 mt-2">
@@ -145,6 +158,8 @@
     private TwitchChannelConfigForm Form { get; set; } = new();
     private bool _isDirty;
     private EditContext _editContext = default!;
+    private IReadOnlyList<TwitchChannelModuleInstallationDto> _installedModules = [];
+    private TwitchModuleTab? _activeModuleTab;
 
     protected override async Task OnInitializedAsync() {
         _editContext = new EditContext(Form);
@@ -183,10 +198,25 @@
                 Form.IsMessageAuditEnabled = _settings.IsMessageAuditEnabled;
                 Form.MessageAuditRetentionDays = _settings.MessageAuditRetentionDays;
             }
+
+            try {
+                _installedModules = await Api.GetTwitchModulesAsync(TwitchUserId);
+            } catch {
+                // ignored — modules list will be empty
+            }
         } catch {
             _settings = null;
         } finally {
             _loading = false;
+        }
+    }
+
+    private async void ReloadModulesAsync() {
+        try {
+            _installedModules = await Api.GetTwitchModulesAsync(TwitchUserId);
+            await InvokeAsync(StateHasChanged);
+        } catch {
+            // ignored — modules list will be empty
         }
     }
 
@@ -237,6 +267,14 @@
             _saved = true;
             _isDirty = false;
             _settings = await Api.GetTwitchChannelSettingsAsync(TwitchUserId);
+
+            if (_activeModuleTab is not null) {
+                try {
+                    await _activeModuleTab.SaveSettingsAsync();
+                } catch (Exception ex) {
+                    _error = $"Failed to save module settings: {ex.Message}";
+                }
+            }
         } catch (Exception ex) {
             _error = $"Failed to save settings: {ex.Message}";
         } finally {
