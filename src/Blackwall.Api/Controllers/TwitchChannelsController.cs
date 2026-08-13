@@ -32,9 +32,11 @@ public sealed class TwitchChannelsController(
     TwitchBanSyncService twitchBanSyncService,
     [FromKeyedServices("twitch")] LinkProtectionService linkProtectionService,
     TwitchModuleInstallationService moduleInstallationService,
+    ModuleRegistryService moduleRegistryService,
     BlackwallDbContext dbContext,
     IOptions<TwitchOptions> twitchOptions,
     IOptions<AppConfiguration> appConfiguration,
+    IOptions<ModulesConfiguration> modulesConfiguration,
     ILogger<TwitchChannelsController> logger
 ) : ControllerBase {
 
@@ -2097,6 +2099,23 @@ public sealed class TwitchChannelsController(
         var canOpen = await twitchChannelService.CanOpenChannelAsync(appUserId.Value, twitchUserId, cancellationToken);
         if (!canOpen)
             return Forbid();
+
+        if (!modulesConfiguration.Value.AllowThirdParty)
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails {
+                Title = "Third-party modules are disabled.",
+                Detail = "Module installation has been disabled by the instance administrator.",
+                Status = StatusCodes.Status403Forbidden
+            });
+
+        if (modulesConfiguration.Value.CatalogOnly) {
+            var registry = await moduleRegistryService.GetRegistryAsync(cancellationToken);
+            if (!registry.Any(e => string.Equals(e.GitUrl, request.GitUrl, StringComparison.OrdinalIgnoreCase)))
+                return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails {
+                    Title = "Module not in catalog.",
+                    Detail = "Installation is restricted to modules from the curated catalog.",
+                    Status = StatusCodes.Status403Forbidden
+                });
+        }
 
         try {
             var installation = await moduleInstallationService.InstallAsync(twitchUserId, request.GitUrl, cancellationToken);

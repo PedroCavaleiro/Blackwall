@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Blackwall.Api.Services;
 using Blackwall.Api.Services.Discord;
 using Blackwall.Bot.Discord.Services;
 using Blackwall.Core.Configuration;
@@ -35,7 +36,9 @@ public sealed class GuildsController(
     DiscordBanSyncService banSyncService,
     AllowedBotService allowedBotService,
     ModuleInstallationService moduleInstallationService,
-    IOptions<AppConfiguration> appConfiguration
+    ModuleRegistryService moduleRegistryService,
+    IOptions<AppConfiguration> appConfiguration,
+    IOptions<ModulesConfiguration> modulesConfiguration
 ) : ControllerBase {
 
     private static readonly JsonSerializerOptions ModuleJsonOptions = new(JsonSerializerDefaults.Web) {
@@ -2613,6 +2616,23 @@ public sealed class GuildsController(
         var canOpen = await guildClaimService.CanOpenGuildAsync(appUserId.Value, discordGuildId, cancellationToken);
         if (!canOpen)
             return Forbid();
+
+        if (!modulesConfiguration.Value.AllowThirdParty)
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails {
+                Title = "Third-party modules are disabled.",
+                Detail = "Module installation has been disabled by the instance administrator.",
+                Status = StatusCodes.Status403Forbidden
+            });
+
+        if (modulesConfiguration.Value.CatalogOnly) {
+            var registry = await moduleRegistryService.GetRegistryAsync(cancellationToken);
+            if (!registry.Any(e => string.Equals(e.GitUrl, request.GitUrl, StringComparison.OrdinalIgnoreCase)))
+                return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails {
+                    Title = "Module not in catalog.",
+                    Detail = "Installation is restricted to modules from the curated catalog.",
+                    Status = StatusCodes.Status403Forbidden
+                });
+        }
 
         try {
             var installation = await moduleInstallationService.InstallAsync(discordGuildId, request.GitUrl, cancellationToken);

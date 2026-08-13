@@ -11,4 +11,10 @@ public sealed record ModulesConfiguration {
 
     [ConfigurationKeyName("REGISTRY_CACHE_MINUTES")]
     public int RegistryCacheMinutes { get; set; } = 15;
+
+    [ConfigurationKeyName("ALLOW_THIRD_PARTY")]
+    public bool AllowThirdParty { get; set; }
+
+    [ConfigurationKeyName("CATALOG_ONLY")]
+    public bool CatalogOnly { get; set; }
 }
