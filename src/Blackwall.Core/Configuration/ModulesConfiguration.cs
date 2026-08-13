@@ -13,8 +13,8 @@ public sealed record ModulesConfiguration {
     public int RegistryCacheMinutes { get; set; } = 15;
 
     [ConfigurationKeyName("ALLOW_THIRD_PARTY")]
-    public bool AllowThirdParty { get; set; }
+    public bool AllowThirdParty { get; set; } = true;
 
     [ConfigurationKeyName("CATALOG_ONLY")]
-    public bool CatalogOnly { get; set; }
+    public bool CatalogOnly { get; set; } = true;
 }

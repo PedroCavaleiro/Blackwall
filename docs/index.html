@@ -389,6 +389,17 @@ cd Blackwall</code></pre>
           </tbody>
         </table>
 
+        <h3>Module Registry</h3>
+        <table>
+          <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>MODULES__REGISTRY_URL</code></td><td>No</td><td><code>https://raw.githubusercontent.com/PedroCavaleiro/Blackwall.Modules/main/index.json</code></td><td>URL of the curated module catalog index JSON</td></tr>
+            <tr><td><code>MODULES__REGISTRY_CACHE_MINUTES</code></td><td>No</td><td><code>15</code></td><td>Cache duration for the registry index in minutes</td></tr>
+            <tr><td><code>MODULES__ALLOW_THIRD_PARTY</code></td><td>No</td><td><code>true</code></td><td>Master switch for third-party module installation. When <code>false</code>, all module installation is disabled &mdash; both catalog and Git URL</td></tr>
+            <tr><td><code>MODULES__CATALOG_ONLY</code></td><td>No</td><td><code>true</code></td><td>When <code>ALLOW_THIRD_PARTY</code> is <code>true</code>, restricts installations to modules from the curated catalog only. Hides the manual Git URL input and rejects Git URLs not in the registry</td></tr>
+          </tbody>
+        </table>
+
         <h3>Miscellaneous</h3>
         <table>
           <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
@@ -892,6 +903,13 @@ dotnet publish src/Blackwall.Web -c Release -o /opt/blackwall/web</code></pre>
           <strong>How it works</strong>
           When a message arrives, the bot fetches all enabled module installations for the guild or Twitch channel from cache, loads each module's assembly (if not already cached), calls <code>EvaluateAsync</code> with a 5-second timeout, and collects verdicts. Each verdict is mapped to an infraction action and applied alongside the built-in filters. Modules stack with each other and with all built-in detection.
         </div>
+
+        <h3>Installation Controls</h3>
+        <p>Instance administrators can control third-party module installation via two environment variables:</p>
+        <ul>
+          <li><strong><code>MODULES__ALLOW_THIRD_PARTY</code></strong> &mdash; master switch. When <code>false</code>, all module installation is disabled (both catalog and Git URL). The web dashboard shows a &ldquo;disabled by administrator&rdquo; message instead of the install UI.</li>
+          <li><strong><code>MODULES__CATALOG_ONLY</code></strong> &mdash; when <code>ALLOW_THIRD_PARTY</code> is <code>true</code>, setting this to <code>true</code> restricts installations to modules listed in the curated catalog only. The manual Git URL input is hidden from the dashboard, and the API rejects Git URLs not present in the registry.</li>
+        </ul>
 
         <h3>Module Lifecycle</h3>
         <div class="step">

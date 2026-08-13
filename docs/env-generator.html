@@ -714,6 +714,48 @@ const sections = [
     ]
   },
   {
+    title: "Module Registry",
+    icon: "&#129514;",
+    fields: [
+      {
+        key: "MODULES__REGISTRY_URL",
+        label: "MODULES__REGISTRY_URL",
+        required: false,
+        type: "text",
+        default: "https://raw.githubusercontent.com/PedroCavaleiro/Blackwall.Modules/main/index.json",
+        desc: "URL of the curated module catalog index JSON.",
+        help: "Points to the JSON index file listing available third-party modules. Only change if you're hosting a custom registry."
+      },
+      {
+        key: "MODULES__REGISTRY_CACHE_MINUTES",
+        label: "MODULES__REGISTRY_CACHE_MINUTES",
+        required: false,
+        type: "number",
+        default: "15",
+        desc: "Cache duration for the registry index in minutes.",
+        help: "Default <code>15</code>. Lower values mean more frequent fetches of the registry URL."
+      },
+      {
+        key: "MODULES__ALLOW_THIRD_PARTY",
+        label: "MODULES__ALLOW_THIRD_PARTY",
+        required: false,
+        type: "bool",
+        default: true,
+        desc: "Master switch for third-party module installation.",
+        help: "When <code>false</code>, all module installation is disabled &mdash; both catalog and Git URL. The web dashboard shows a &ldquo;disabled by administrator&rdquo; message. When <code>true</code>, module installation is allowed (subject to <code>MODULES__CATALOG_ONLY</code>)."
+      },
+      {
+        key: "MODULES__CATALOG_ONLY",
+        label: "MODULES__CATALOG_ONLY",
+        required: false,
+        type: "bool",
+        default: true,
+        desc: "Restrict installations to the curated catalog only.",
+        help: "When <code>MODULES__ALLOW_THIRD_PARTY</code> is <code>true</code>, setting this to <code>true</code> hides the manual Git URL input and rejects Git URLs not present in the registry. Has no effect when <code>ALLOW_THIRD_PARTY</code> is <code>false</code>."
+      }
+    ]
+  },
+  {
     title: "Twitch Sync",
     icon: "&#128260;",
     fields: [
