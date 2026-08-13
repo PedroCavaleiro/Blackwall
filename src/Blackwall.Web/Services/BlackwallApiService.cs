@@ -488,6 +488,27 @@ public sealed class BlackwallApiService(
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task<IReadOnlyList<ModuleRegistryEntryDto>> GetModuleRegistryAsync(string? search = null, string? platform = null, CancellationToken ct = default) {
+        var query = System.Web.HttpUtility.ParseQueryString(string.Empty);
+        if (!string.IsNullOrWhiteSpace(search))
+            query["search"] = search;
+        if (!string.IsNullOrWhiteSpace(platform))
+            query["platform"] = platform;
+        var qs = query.Count > 0 ? $"?{query}" : "";
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/modules/registry{qs}");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<ModuleRegistryEntryDto>>(ct) ?? [];
+    }
+
+    public async Task RefreshModuleRegistryAsync(CancellationToken ct = default) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/modules/registry/refresh");
+        ApplyAuth(request);
+        var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<LinkedAccountsResponse?> GetLinkedAccountsAsync(CancellationToken ct = default) {
         using var request = new HttpRequestMessage(HttpMethod.Get, "api/users/accounts");
         ApplyAuth(request);

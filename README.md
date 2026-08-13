@@ -118,10 +118,17 @@ Blackwall supports third-party modules that extend its detection capabilities. M
 ### How It Works
 
 1. A module author publishes a Git repository with a `blackwall-module.json` manifest and a `src/` project directory.
-2. A server/channel owner installs the module via the web dashboard by providing the Git URL.
+2. A server/channel owner installs the module via the web dashboard — either from the curated catalog or by providing a Git URL directly.
 3. Blackwall clones the repo, runs `dotnet build`, and loads the compiled assembly.
 4. On every incoming message, each enabled module's `EvaluateAsync` method is called with a 5-second timeout.
 5. If a module returns a `ModuleVerdict`, the configured action (delete, timeout, ban) is applied.
+
+### Installation Controls
+
+Instance administrators can control third-party module installation via two environment variables:
+
+- **`MODULES__ALLOW_THIRD_PARTY`** — master switch. When `false`, all module installation is disabled (both catalog and Git URL). The web dashboard shows a "disabled by administrator" message instead of the install UI.
+- **`MODULES__CATALOG_ONLY`** — when `ALLOW_THIRD_PARTY` is `true`, setting this to `true` restricts installations to modules listed in the curated catalog only. The manual Git URL input is hidden from the dashboard, and the API rejects Git URLs not present in the registry.
 
 ### Module SDK
 
@@ -272,6 +279,15 @@ Edit `.env` and fill in the required values. You can use the **[.env Generator](
 |----------|-------------|
 | `GUILDSYNC__ENABLED` | Enable the guild permission sync background service (default `true`) |
 | `GUILDSYNC__INTERVALMINUTES` | Sync interval in minutes (default `15`) |
+
+**Module Registry**
+
+| Variable | Description |
+|----------|-------------|
+| `MODULES__REGISTRY_URL` | URL of the curated module catalog index JSON (default `https://raw.githubusercontent.com/PedroCavaleiro/Blackwall.Modules/main/index.json`) |
+| `MODULES__REGISTRY_CACHE_MINUTES` | Cache duration for the registry index in minutes (default `15`) |
+| `MODULES__ALLOW_THIRD_PARTY` | Master switch for third-party module installation. When `false`, all module installation is disabled — both catalog and Git URL (default `true`) |
+| `MODULES__CATALOG_ONLY` | When `ALLOW_THIRD_PARTY` is `true`, restricts installations to modules from the curated catalog only. Hides the manual Git URL input and rejects Git URLs not in the registry (default `true`) |
 
 ### 3. Configure `appsettings.json`
 

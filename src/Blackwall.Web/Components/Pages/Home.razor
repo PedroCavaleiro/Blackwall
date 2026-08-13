@@ -3,7 +3,7 @@
 @inject NavigationManager Nav
 @inject IOptions<AppConfiguration> AppCfg
 
-<PageTitle>Blackwall — Discord Anti-Spam</PageTitle>
+<PageTitle>Blackwall — Discord & Twitch Anti-Spam</PageTitle>
 
 <div class="d-flex flex-column" style="min-height:calc(100vh - 64px)">
     <main class="flex-grow-1">
@@ -15,7 +15,7 @@
             <div class="d-inline-flex align-items-center gap-2 px-3 py-1 mb-4 font-mono"
                  style="border:1px solid rgba(34,211,238,0.4);color:var(--bw-primary);font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;position:relative">
                 <span class="rounded-circle bw-pulse" style="width:6px;height:6px;background:var(--bw-primary);flex-shrink:0;display:inline-block"></span>
-                System online &middot; protecting Discord servers
+                System online &middot; protecting Discord & Twitch communities
             </div>
 
             <h1 class="font-display mb-3" style="font-size:clamp(2.2rem,5.5vw,4.2rem);line-height:1.1;position:relative">
@@ -24,8 +24,9 @@
             </h1>
 
             <p class="mx-auto mb-5 font-mono" style="max-width:580px;color:var(--bw-muted);font-size:0.92rem;line-height:1.7;position:relative">
-                Blackwall is an autonomous countermeasure for Discord — spam scoring,
-                raid detection, and automated enforcement when something nasty tries to breach your server.
+                Blackwall is an autonomous countermeasure for Discord and Twitch — spam scoring,
+                raid detection, content guard, and automated enforcement when something nasty tries
+                to breach your server or channel.
             </p>
 
             @if (_error == "new_users_disabled") {
@@ -98,7 +99,7 @@
                 <a href="https://github.com/PedroCavaleiro/Blackwall" target="_blank" class="font-mono text-decoration-none bw-meta">GitHub</a>
                 <a href="/terms-of-service" class="font-mono text-decoration-none bw-meta">Terms</a>
                 <a href="/privacy-policy" class="font-mono text-decoration-none bw-meta">Privacy</a>
-                <span class="font-mono bw-meta">NOT AFFILIATED WITH DISCORD INC.</span>
+                <span class="font-mono bw-meta">NOT AFFILIATED WITH DISCORD INC. OR TWITCH INTERACTIVE.</span>
             </div>
         </div>
     </footer>
@@ -117,17 +118,24 @@
     private void CloseLoginModal() => _loginModalOpen = false;
 
     private static readonly (string Icon, string Title, string Desc, bool IsOptional)[] Features = [
-        ("fa-solid fa-bolt", "Spam Detection", "Rolling-window rate limiting, invite-link blocking, and suspicious-URL detection with redirect following. Tunable per-server thresholds.", false),
-        ("fa-solid fa-triangle-exclamation", "Raid Detection", "Monitors join velocity in real time. Triggers automatic lockdown when configurable join-rate thresholds are breached.", false),
-        ("fa-solid fa-globe", "Safe Browsing", "Real-time URL checks against Google Safe Browsing V5 using hash-prefix lookups with Rice-Golomb delta decoding and Redis caching.", false),
-        ("fa-solid fa-ban", "Domain Blacklist", "Downloads and caches AdGuard-format domain filter lists in Redis. Messages containing blacklisted domains are blocked instantly.", false),
-        ("fa-solid fa-user-shield", "Account Scoring", "Scores new members on account age, avatar presence, and username patterns (gibberish, numeric-only, consecutive consonants). Flags suspicious accounts.", false),
-        ("fa-solid fa-robot", "Bot Allowlist", "Only explicitly trusted bots bypass spam detection. Automated attacks disguised as bot accounts are caught and processed through the full filter pipeline.", false),
-        ("fa-solid fa-lock", "Lockdown Protocol", "Denies SEND_MESSAGES, SEND_MESSAGES_IN_THREADS, and CREATE_PUBLIC_THREADS for @everyone across all text channels when a raid is detected.", false),
-        ("fa-solid fa-clipboard-list", "Ban Synchronization", "Periodically syncs Discord guild ban lists into the database so enforcement state stays consistent across restarts.", false),
-        ("fa-solid fa-gears", "Permission Sync", "Tracks guild-level bot permissions and role changes to ensure Blackwall always has the access it needs to enforce.", false),
+        ("fa-solid fa-bolt", "Spam Detection", "Sliding-window rate limiting, duplicate detection with cross-channel support, mention flooding, invite link blocking, and suspicious link filtering. Tunable per-server and per-channel thresholds.", false),
         ("fa-solid fa-shield-halved", "Content Guard", "Banned word filtering with Levenshtein fuzzy matching and leetspeak normalisation, Zalgo text blocking, copypasta hash detection, and invisible character scrubbing.", false),
+        ("fa-solid fa-globe", "Safe Browsing", "Real-time URL checks against Google Safe Browsing V5 using hash-prefix lookups with Rice-Golomb delta decoding and Redis caching.", false),
+        ("fa-solid fa-ban", "Domain Blacklist", "Downloads and caches AdGuard-format domain filter lists in Redis. Custom domains, whitelist mode, and blacklisted domains are blocked instantly.", false),
+        ("fa-solid fa-triangle-exclamation", "Raid Detection", "Monitors join velocity in real time. Triggers automatic lockdown and invite pause when configurable join-rate thresholds are breached.", false),
+        ("fa-solid fa-user-shield", "Account Scoring", "Scores new members on account age, avatar presence, and username patterns (gibberish, numeric-only, consecutive consonants). Flags suspicious accounts with optional auto-timeout.", false),
         ("fa-solid fa-bullseye", "NetWatchSnare", "Trap channels that automatically punish users who post in them. Configurable per-trap actions — useful for announcement channels and decoy bot-catchers.", false),
+        ("fa-solid fa-lock", "Lockdown Protocol", "Denies SEND_MESSAGES, SEND_MESSAGES_IN_THREADS, and CREATE_PUBLIC_THREADS for @everyone across all text channels — manually or automatically on infraction.", false),
+        ("fa-solid fa-clipboard-list", "Ban Management", "Share, sync, and import bans across Blackwall-managed servers with auto-sync support. Periodically syncs Discord guild ban lists into the database for consistency across restarts.", false),
+        ("fa-solid fa-robot", "Bot Allowlist", "Only explicitly trusted bots bypass spam detection. Automated attacks disguised as bot accounts are caught and processed through the full filter pipeline.", false),
+        ("fa-solid fa-gears", "Permission Sync", "Tracks guild-level bot permissions and role changes to ensure Blackwall always has the access it needs to enforce.", false),
+        ("fa-solid fa-message", "Message Audit", "Records deleted messages and infraction events with configurable retention for review in the dashboard.", false),
+        ("fa-solid fa-flask", "Dry Run Mode", "Test detection rules without taking action against users. Detections are logged only — perfect for tuning thresholds safely.", false),
+        ("fa-solid fa-sliders", "Per-Guild Config", "Each Discord server and Twitch channel gets its own spam thresholds, module toggles, and actions managed through the web dashboard.", false),
+        ("fa-solid fa-key", "OAuth2 Login", "Users authenticate via Discord or Twitch OAuth2. Accounts can be linked, unlinked, and merged. JWT tokens are issued for API and Web access.", false),
+        ("fa-solid fa-arrows-rotate", "Twitch Ban Sync", "A background service synchronises shared ban lists across Blackwall-managed Twitch channels.", false),
+        ("fa-solid fa-display", "Web Dashboard", "Blazor Server UI for guild and channel owners to configure spam rules, manage modules, and review audit logs visually.", false),
+        ("fa-solid fa-puzzle-piece", "Third-Party Modules", "Extend detection capabilities with community-built .NET modules loaded dynamically from Git repositories. Supports Discord, Twitch, or both platforms.", false),
     ];
 
     protected override async Task OnInitializedAsync() {

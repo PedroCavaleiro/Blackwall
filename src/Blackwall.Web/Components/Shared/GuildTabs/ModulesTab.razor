@@ -1,26 +1,56 @@
 @inject BlackwallApiService Api
+@inject IOptions<ModulesConfiguration> ModulesCfg
+@using Blackwall.Core.Configuration
 @using Blackwall.Core.DTOs
 
-<div class="cut-corner border mb-4 bw-card">
-    <div class="card-header">INSTALL MODULE</div>
-    <div class="p-4">
-        <p class="font-mono mb-3 bw-desc">
-            Install a module from a public HTTPS Git repository. The repository must contain a <code>blackwall-module.json</code> manifest at the root and a <code>src/</code> directory with the module project.
-        </p>
-        <div class="d-flex gap-2">
-            <input type="text" class="form-control bw-input font-mono" placeholder="https://github.com/user/blackwall-module.git"
-                   value="@_gitUrl" @oninput="OnGitUrlInput" disabled="@_installing" />
+@if (ModulesCfg.Value.AllowThirdParty) {
+    <div class="cut-corner border mb-4 bw-card">
+        <div class="card-header">MODULE CATALOG</div>
+        <div class="p-4">
+            <p class="font-mono mb-3 bw-desc">
+                Browse the curated module catalog to discover and install community modules with one click.
+            </p>
             <button type="button" class="btn btn-primary cut-corner font-display bw-btn-sm"
-                    disabled="@(_installing || string.IsNullOrWhiteSpace(_gitUrl))"
-                    @onclick="InstallAsync">
-                @(_installing ? "INSTALLING..." : "INSTALL")
+                    @onclick="OpenStoreModal">
+                EXPLORE
             </button>
         </div>
-        @if (_installError is not null) {
-            <div class="alert alert-danger font-mono mt-3 bw-alert-text">@_installError</div>
-        }
     </div>
-</div>
+
+    @if (_storeModalOpen) {
+        <ModuleStoreModal DiscordGuildId="DiscordGuildId" OnClose="CloseStoreModal" OnModulesChanged="OnStoreModulesChanged" />
+    }
+
+    @if (!ModulesCfg.Value.CatalogOnly) {
+        <div class="cut-corner border mb-4 bw-card">
+            <div class="card-header">INSTALL MODULE</div>
+            <div class="p-4">
+                <p class="font-mono mb-3 bw-desc">
+                    Install a module from a public HTTPS Git repository. The repository must contain a <code>blackwall-module.json</code> manifest at the root and a <code>src/</code> directory with the module project.
+                </p>
+                <div class="d-flex gap-2">
+                    <input type="text" class="form-control bw-input font-mono" placeholder="https://github.com/user/blackwall-module.git"
+                           value="@_gitUrl" @oninput="OnGitUrlInput" disabled="@_installing" />
+                    <button type="button" class="btn btn-primary cut-corner font-display bw-btn-sm"
+                            disabled="@(_installing || string.IsNullOrWhiteSpace(_gitUrl))"
+                            @onclick="InstallAsync">
+                        @(_installing ? "INSTALLING..." : "INSTALL")
+                    </button>
+                </div>
+                @if (_installError is not null) {
+                    <div class="alert alert-danger font-mono mt-3 bw-alert-text">@_installError</div>
+                }
+            </div>
+        </div>
+    }
+} else {
+    <div class="cut-corner border mb-4 bw-card">
+        <div class="card-header">MODULES</div>
+        <div class="p-4">
+            <p class="font-mono bw-desc">Third-party module installation is disabled by the instance administrator.</p>
+        </div>
+    </div>
+}
 
 @if (_loading) {
     <div class="font-mono bw-loading bw-typewriter">&gt; Loading modules...</div>
@@ -85,6 +115,8 @@
     private long? _uninstallingId;
     private long? _updatingId;
 
+    private bool _storeModalOpen;
+
     protected override async Task OnInitializedAsync() {
         try {
             _modules = await Api.GetModulesAsync(DiscordGuildId);
@@ -93,6 +125,19 @@
         } finally {
             _loading = false;
         }
+    }
+
+    private void OpenStoreModal() {
+        _storeModalOpen = true;
+    }
+
+    private void CloseStoreModal() {
+        _storeModalOpen = false;
+    }
+
+    private async Task OnStoreModulesChanged() {
+        _modules = await Api.GetModulesAsync(DiscordGuildId);
+        OnModulesChanged?.Invoke();
     }
 
     private void OnGitUrlInput(ChangeEventArgs e) {

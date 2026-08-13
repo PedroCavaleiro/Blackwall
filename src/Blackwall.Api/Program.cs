@@ -72,6 +72,9 @@ builder.Services.Configure<AppConfiguration>(
 builder.Services.Configure<GuildSyncOptions>(
     builder.Configuration.GetSection(GuildSyncOptions.SectionName));
 
+builder.Services.Configure<ModulesConfiguration>(
+    builder.Configuration.GetSection(ModulesConfiguration.SectionName));
+
 builder.Services.Configure<BlacklistOptions>(
     builder.Configuration.GetSection(BlacklistOptions.SectionName));
 
@@ -139,6 +142,8 @@ builder.Services.AddScoped<SafeBrowsingSyncService>();
 builder.Services.AddScoped<MessageAuditService>();
 builder.Services.AddSingleton<ModuleRunnerService>();
 builder.Services.AddScoped<ModuleInstallationService>();
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<ModuleRegistryService>();
 builder.Services.AddSingleton<ModuleRuntimeService>();
 builder.Services.AddSingleton<TwitchModuleRunnerService>();
 builder.Services.AddScoped<TwitchModuleInstallationService>();
