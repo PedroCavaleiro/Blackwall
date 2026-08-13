@@ -1,8 +1,17 @@
 <component name="ProjectDictionaryState">
   <dictionary name="project">
     <words>
+      <w>Cavaleiro</w>
+      <w>FEFF</w>
+      <w>NETWATCH</w>
+      <w>SADD</w>
+      <w>SREM</w>
       <w>aeiou</w>
+      <w>contentguard</w>
       <w>discordapp</w>
+      <w>dtos</w>
+      <w>globalcache</w>
+      <w>ratelimit</w>
     </words>
   </dictionary>
 </component>

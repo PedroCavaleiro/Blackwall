@@ -1,8 +1,6 @@
 using Blackwall.Core.Configuration;
 using Blackwall.Core.DTOs;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Net.Http.Json;
 
 namespace Blackwall.Api.Services;
 

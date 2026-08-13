@@ -151,7 +151,7 @@ public static class ModuleBuildHelper {
         return tempDir;
     }
 
-    private static async Task<int> RunGitCloneAsync(string url, string targetDir, CancellationToken ct) {
+    private static async Task RunGitCloneAsync(string url, string targetDir, CancellationToken ct) {
         var psi = new ProcessStartInfo {
             FileName = "git",
             Arguments = $"clone --depth 1 \"{url}\" \"{targetDir}\"",
@@ -169,8 +169,6 @@ public static class ModuleBuildHelper {
         if (process.ExitCode != 0)
             throw new InvalidOperationException(
                 $"git clone failed with exit code {process.ExitCode}.\n{stderr.Trim()}");
-
-        return process.ExitCode;
     }
 
     private static async Task<(int ExitCode, string Output)> RunDotnetBuildAsync(string srcDir, CancellationToken ct) {

@@ -2,6 +2,7 @@ using Blackwall.Api.Services;
 using Blackwall.Core.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+// ReSharper disable RouteTemplates.ActionRoutePrefixCanBeExtractedToControllerRoute
 
 namespace Blackwall.Api.Controllers;
 
@@ -38,19 +39,20 @@ public sealed class ModulesController(
                 .Where(e => e.Platforms.Count == 0 || e.Platforms.Contains(platform, StringComparer.OrdinalIgnoreCase))
                 .ToList();
 
-        if (!string.IsNullOrWhiteSpace(search)) {
-            var term = search.Trim();
-            entries = entries
+        if (string.IsNullOrWhiteSpace(search)) return Ok(entries);
+
+        var term = search.Trim();
+        entries = [
+            .. entries
                 .Where(e =>
-                    (e.Name?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (e.ReadableName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (e.Description?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (e.Author?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (e.Category?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    e.Tags.Any(t => t.Contains(term, StringComparison.OrdinalIgnoreCase))
+                           e.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                           (e.ReadableName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                           (e.Description?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                           (e.Author?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                           (e.Category?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                           e.Tags.Any(t => t.Contains(term, StringComparison.OrdinalIgnoreCase))
                 )
-                .ToList();
-        }
+        ];
 
         return Ok(entries);
     }

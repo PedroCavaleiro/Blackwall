@@ -5,7 +5,6 @@ using Blackwall.Core.Configuration;
 using Blackwall.Core.Entities;
 using Blackwall.Core.Services;
 using Blackwall.Bot.Twitch.Services;
-using Blackwall.Modules.Abstractions;
 using Blackwall.Modules.ContentGuard;
 using Blackwall.Modules.DetectionMatrix;
 using Blackwall.Infrastructure.Persistence;
@@ -632,28 +631,20 @@ public sealed partial class TwitchBotService(
 
     private static TwitchDetectionConfig? GetDetectionConfig(TwitchChannelInstance ch) {
         var config = ch.Configuration;
-        if (config is null)
-            return null;
 
-        if (config.MaxMessagesPerWindow <= 0
-            && config.RateLimitWindowSeconds <= 0
-            && config.DuplicateMessageThreshold <= 0
-            && config.MentionLimit <= 0)
-            return null;
-
-        return new TwitchDetectionConfig(
-            config.MaxMessagesPerWindow,
-            config.RateLimitWindowSeconds,
-            config.DuplicateMessageThreshold,
-            config.DuplicateWindowSeconds,
-            config.MentionLimit,
-            config.RateLimitAction,
-            config.RateLimitTimeoutMinutes,
-            config.DuplicateAction,
-            config.DuplicateTimeoutMinutes,
-            config.MentionLimitAction,
-            config.MentionLimitTimeoutMinutes
-        );
+        return config switch {
+            null or {
+                MaxMessagesPerWindow: <= 0,
+                RateLimitWindowSeconds: <= 0,
+                DuplicateMessageThreshold: <= 0,
+                MentionLimit: <= 0
+            } => null,
+            _ => new TwitchDetectionConfig(config.MaxMessagesPerWindow, config.RateLimitWindowSeconds,
+                                           config.DuplicateMessageThreshold, config.DuplicateWindowSeconds,
+                                           config.MentionLimit, config.RateLimitAction, config.RateLimitTimeoutMinutes,
+                                           config.DuplicateAction, config.DuplicateTimeoutMinutes,
+                                           config.MentionLimitAction, config.MentionLimitTimeoutMinutes)
+        };
     }
 
     private static TwitchLinkConfig? GetLinkConfig(TwitchChannelInstance ch) {

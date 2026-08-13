@@ -1,11 +1,7 @@
-using Blackwall.Core.Entities;
 using Blackwall.Infrastructure.Persistence;
 using Blackwall.Modules.Abstractions;
 using Blackwall.Modules.Runtime;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace Blackwall.Api.Background;
 
@@ -49,7 +45,6 @@ public sealed class ModuleBootCompatibilityService(
                 installation.ModuleVersion,
                 installation.EntryPoint,
                 installation.GitUrl,
-                installation.ManifestJson,
                 ModulePlatform.Discord,
                 ct
             );
@@ -111,7 +106,6 @@ public sealed class ModuleBootCompatibilityService(
                 installation.ModuleVersion,
                 installation.EntryPoint,
                 installation.GitUrl,
-                installation.ManifestJson,
                 ModulePlatform.Twitch,
                 ct
             );
@@ -154,7 +148,6 @@ public sealed class ModuleBootCompatibilityService(
         string moduleVersion,
         string entryPoint,
         string gitUrl,
-        string manifestJson,
         ModulePlatform platform,
         CancellationToken ct
     ) {
