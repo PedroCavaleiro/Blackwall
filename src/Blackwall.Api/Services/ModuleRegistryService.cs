@@ -7,7 +7,7 @@ using System.Net.Http.Json;
 namespace Blackwall.Api.Services;
 
 public sealed class ModuleRegistryService(
-    HttpClient httpClient,
+    IHttpClientFactory httpClientFactory,
     IOptions<ModulesConfiguration> options,
     ILogger<ModuleRegistryService> logger
 ) {
@@ -28,6 +28,7 @@ public sealed class ModuleRegistryService(
             var url = options.Value.RegistryUrl;
             logger.LogDebug("Fetching module registry from {Url}", url);
 
+            var httpClient = httpClientFactory.CreateClient();
             var index = await httpClient.GetFromJsonAsync<ModuleRegistryIndexDto>(url, cancellationToken);
             _cachedEntries = index?.Modules ?? [];
             _cacheExpiryUtc = DateTime.UtcNow + _cacheTtl;
@@ -36,7 +37,9 @@ public sealed class ModuleRegistryService(
             return _cachedEntries;
         } catch (Exception ex) {
             logger.LogWarning(ex, "Failed to fetch module registry from {Url}", options.Value.RegistryUrl);
-            return _cachedEntries ?? [];
+            if (_cachedEntries is not null)
+                return _cachedEntries;
+            throw;
         } finally {
             _lock.Release();
         }

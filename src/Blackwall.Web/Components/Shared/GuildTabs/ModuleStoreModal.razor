@@ -1,0 +1,129 @@
+@inject BlackwallApiService Api
+@using Blackwall.Core.DTOs
+
+<div class="bw-modal-overlay" @onclick="OnClose">
+    <div class="bw-modal cut-corner" @onclick:stopPropagation="true" style="max-width:80vw">
+        <div class="bw-modal-header">
+            <span class="font-mono bw-text-primary">// MODULE CATALOG</span>
+            <button type="button" class="bw-modal-close" @onclick="OnClose">&times;</button>
+        </div>
+        <div class="bw-modal-body" style="overflow-y:auto;padding:1.5rem">
+            <div class="d-flex gap-2 mb-3">
+                <input type="text" class="form-control bw-input font-mono" placeholder="Search modules..."
+                       value="@_storeSearch" @oninput="OnStoreSearchInput" disabled="@_storeLoading" />
+                <button type="button" class="btn btn-outline-secondary cut-corner font-display bw-btn-sm"
+                        disabled="@_storeLoading" @onclick="LoadStoreAsync">
+                    @(_storeLoading ? "..." : "SEARCH")
+                </button>
+                <button type="button" class="btn btn-outline-secondary cut-corner font-display bw-btn-sm"
+                        disabled="@_storeLoading" @onclick="RefreshStoreAsync">
+                    REFRESH
+                </button>
+            </div>
+            @if (_storeLoading) {
+                <div class="font-mono bw-loading bw-typewriter">&gt; Loading store...</div>
+            } else if (!_storeModules.Any()) {
+                <p class="font-mono bw-desc">No modules found. Try a different search term or refresh the registry.</p>
+            } else {
+                <p class="font-mono mb-3 bw-desc">@_storeModules.Count module(s) found.</p>
+                <div class="row g-3">
+                    @foreach (var mod in _storeModules) {
+                        <div class="col-md-6 col-lg-4">
+                            <div class="cut-corner border bw-card h-100 d-flex flex-column">
+                                <div class="p-3 flex-grow-1">
+                                    <div class="font-display">@(mod.ReadableName ?? mod.Name)</div>
+                                    <div class="font-mono bw-meta mb-2">@mod.Name</div>
+                                    @if (mod.Description is not null) {
+                                        <div class="font-mono bw-desc mb-2" style="font-size:0.8em">@mod.Description</div>
+                                    }
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @if (mod.Author is not null) {
+                                            <span class="font-mono bw-meta" style="font-size:0.7rem">by @mod.Author</span>
+                                        }
+                                        @if (mod.Category is not null) {
+                                            <span class="font-mono bw-meta" style="font-size:0.7rem">[ @mod.Category ]</span>
+                                        }
+                                        @foreach (var tag in mod.Tags) {
+                                            <span class="font-mono bw-meta" style="font-size:0.7rem">#@tag</span>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="p-3 pt-0">
+                                    <button type="button" class="btn btn-primary cut-corner font-display bw-btn-xs w-100"
+                                            disabled="@_installingStoreModule"
+                                            @onclick="@(async () => await InstallFromStoreAsync(mod.GitUrl))">
+                                        @(_installingStoreModule ? "INSTALLING..." : "INSTALL")
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            @if (_storeError is not null) {
+                <div class="alert alert-danger font-mono mt-3 bw-alert-text">@_storeError</div>
+            }
+            @if (_installSuccess is not null) {
+                <div class="alert alert-success font-mono mt-3 bw-alert-text">@_installSuccess</div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public long DiscordGuildId { get; set; }
+    [Parameter] public required EventCallback OnClose { get; set; }
+    [Parameter] public Func<Task>? OnModulesChanged { get; set; }
+
+    private IReadOnlyList<ModuleRegistryEntryDto> _storeModules = [];
+    private bool _storeLoading = true;
+    private string _storeSearch { get; set; } = "";
+    private bool _installingStoreModule;
+    private string? _storeError;
+    private string? _installSuccess;
+
+    protected override async Task OnInitializedAsync() {
+        await LoadStoreAsync();
+    }
+
+    private async Task LoadStoreAsync() {
+        _storeLoading = true;
+        _storeError = null;
+        try {
+            _storeModules = await Api.GetModuleRegistryAsync(
+                string.IsNullOrWhiteSpace(_storeSearch) ? null : _storeSearch,
+                "discord");
+        } catch (Exception ex) {
+            _storeError = ex.Message;
+        } finally {
+            _storeLoading = false;
+        }
+    }
+
+    private async Task RefreshStoreAsync() {
+        try {
+            await Api.RefreshModuleRegistryAsync();
+        } catch { }
+        await LoadStoreAsync();
+    }
+
+    private void OnStoreSearchInput(ChangeEventArgs e) {
+        _storeSearch = e.Value?.ToString() ?? "";
+    }
+
+    private async Task InstallFromStoreAsync(string gitUrl) {
+        _installingStoreModule = true;
+        _storeError = null;
+        _installSuccess = null;
+        try {
+            await Api.InstallModuleAsync(DiscordGuildId, gitUrl);
+            _installSuccess = $"Module installed successfully.";
+            if (OnModulesChanged is not null)
+                await OnModulesChanged();
+        } catch (Exception ex) {
+            _storeError = ex.Message;
+        } finally {
+            _installingStoreModule = false;
+        }
+    }
+}

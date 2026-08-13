@@ -142,7 +142,7 @@ builder.Services.AddScoped<SafeBrowsingSyncService>();
 builder.Services.AddScoped<MessageAuditService>();
 builder.Services.AddSingleton<ModuleRunnerService>();
 builder.Services.AddScoped<ModuleInstallationService>();
-builder.Services.AddHttpClient<ModuleRegistryService>();
+builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ModuleRegistryService>();
 builder.Services.AddSingleton<ModuleRuntimeService>();
 builder.Services.AddSingleton<TwitchModuleRunnerService>();

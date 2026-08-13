@@ -2,59 +2,21 @@
 @using Blackwall.Core.DTOs
 
 <div class="cut-corner border mb-4 bw-card">
-    <div class="card-header">MODULE STORE</div>
+    <div class="card-header">MODULE CATALOG</div>
     <div class="p-4">
-        <div class="d-flex gap-2 mb-3">
-            <input type="text" class="form-control bw-input font-mono" placeholder="Search modules..."
-                   value="@_storeSearch" @oninput="OnStoreSearchInput" disabled="@_storeLoading" />
-            <button type="button" class="btn btn-outline-secondary cut-corner font-display bw-btn-sm"
-                    disabled="@_storeLoading" @onclick="LoadStoreAsync">
-                @(_storeLoading ? "..." : "SEARCH")
-            </button>
-            <button type="button" class="btn btn-outline-secondary cut-corner font-display bw-btn-sm"
-                    disabled="@_storeLoading" @onclick="RefreshStoreAsync">
-                REFRESH
-            </button>
-        </div>
-        @if (_storeLoading) {
-            <div class="font-mono bw-loading bw-typewriter">&gt; Loading store...</div>
-        } else if (!_storeModules.Any()) {
-            <p class="font-mono bw-desc">No modules found in the registry.</p>
-        } else {
-            <p class="font-mono mb-3 bw-desc">@_storeModules.Count module(s) available.</p>
-            @foreach (var mod in _storeModules) {
-                <div class="d-flex justify-content-between align-items-start py-3 border-bottom">
-                    <div class="flex-grow-1 me-3">
-                        <div class="font-display">@(mod.ReadableName ?? mod.Name)</div>
-                        <div class="font-mono bw-meta mb-1">@mod.Name</div>
-                        @if (mod.Description is not null) {
-                            <div class="font-mono bw-desc" style="font-size:0.85em">@mod.Description</div>
-                        }
-                        <div class="d-flex flex-wrap gap-1 mt-2">
-                            @if (mod.Author is not null) {
-                                <span class="font-mono bw-meta" style="font-size:0.75rem">by @mod.Author</span>
-                            }
-                            @if (mod.Category is not null) {
-                                <span class="font-mono bw-meta" style="font-size:0.75rem">[ @mod.Category ]</span>
-                            }
-                            @foreach (var tag in mod.Tags) {
-                                <span class="font-mono bw-meta" style="font-size:0.75rem">#@tag</span>
-                            }
-                        </div>
-                    </div>
-                    <button type="button" class="btn btn-primary cut-corner font-display bw-btn-xs flex-shrink-0"
-                            disabled="@_installingStoreModule"
-                            @onclick="@(async () => await InstallFromStoreAsync(mod.GitUrl))">
-                        INSTALL
-                    </button>
-                </div>
-            }
-        }
-        @if (_storeError is not null) {
-            <div class="alert alert-danger font-mono mt-3 bw-alert-text">@_storeError</div>
-        }
+        <p class="font-mono mb-3 bw-desc">
+            Browse the curated module catalog to discover and install community modules with one click.
+        </p>
+        <button type="button" class="btn btn-primary cut-corner font-display bw-btn-sm"
+                @onclick="OpenStoreModal">
+            EXPLORE
+        </button>
     </div>
 </div>
+
+@if (_storeModalOpen) {
+    <TwitchModuleStoreModal TwitchUserId="TwitchUserId" OnClose="CloseStoreModal" OnModulesChanged="OnStoreModulesChanged" />
+}
 
 <div class="cut-corner border mb-4 bw-card">
     <div class="card-header">INSTALL MODULE</div>
@@ -140,11 +102,7 @@
     private long? _uninstallingId;
     private long? _updatingId;
 
-    private IReadOnlyList<ModuleRegistryEntryDto> _storeModules = [];
-    private bool _storeLoading = true;
-    private string _storeSearch { get; set; } = "";
-    private bool _installingStoreModule;
-    private string? _storeError;
+    private bool _storeModalOpen;
 
     protected override async Task OnInitializedAsync() {
         try {
@@ -154,47 +112,19 @@
         } finally {
             _loading = false;
         }
-
-        _ = LoadStoreAsync();
     }
 
-    private async Task LoadStoreAsync() {
-        _storeLoading = true;
-        _storeError = null;
-        try {
-            _storeModules = await Api.GetModuleRegistryAsync(
-                string.IsNullOrWhiteSpace(_storeSearch) ? null : _storeSearch,
-                "twitch");
-        } catch (Exception ex) {
-            _storeError = ex.Message;
-        } finally {
-            _storeLoading = false;
-        }
+    private void OpenStoreModal() {
+        _storeModalOpen = true;
     }
 
-    private async Task RefreshStoreAsync() {
-        try {
-            await Api.RefreshModuleRegistryAsync();
-        } catch { }
-        await LoadStoreAsync();
+    private void CloseStoreModal() {
+        _storeModalOpen = false;
     }
 
-    private void OnStoreSearchInput(ChangeEventArgs e) {
-        _storeSearch = e.Value?.ToString() ?? "";
-    }
-
-    private async Task InstallFromStoreAsync(string gitUrl) {
-        _installingStoreModule = true;
-        _storeError = null;
-        try {
-            await Api.InstallTwitchModuleAsync(TwitchUserId, gitUrl);
-            _modules = await Api.GetTwitchModulesAsync(TwitchUserId);
-            OnModulesChanged?.Invoke();
-        } catch (Exception ex) {
-            _storeError = ex.Message;
-        } finally {
-            _installingStoreModule = false;
-        }
+    private async Task OnStoreModulesChanged() {
+        _modules = await Api.GetTwitchModulesAsync(TwitchUserId);
+        OnModulesChanged?.Invoke();
     }
 
     private void OnGitUrlInput(ChangeEventArgs e) {
