@@ -4,8 +4,8 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <AssemblyVersion>2.0.0</AssemblyVersion>
-        <FileVersion>2.0.0</FileVersion>
+        <AssemblyVersion>2.3.0</AssemblyVersion>
+        <FileVersion>2.3.0</FileVersion>
     </PropertyGroup>
 
     <ItemGroup>
@@ -17,6 +17,7 @@
       <ProjectReference Include="..\Blackwall.Modules.DetectionMatrix\Blackwall.Modules.DetectionMatrix.csproj" />
       <ProjectReference Include="..\Blackwall.Modules.ContentGuard\Blackwall.Modules.ContentGuard.csproj" />
       <ProjectReference Include="..\Blackwall.Modules.Banlist\Blackwall.Modules.Banlist.csproj" />
+      <ProjectReference Include="..\Blackwall.Modules.DiscordAccountScoring\Blackwall.Modules.DiscordAccountScoring.csproj" />
     </ItemGroup>
 
     <ItemGroup>

@@ -10,6 +10,7 @@ using Blackwall.Bot.Discord.Background;
 using Blackwall.Bot.Discord.Handlers;
 using Blackwall.Bot.Discord.Services;
 using Blackwall.Modules.DetectionMatrix;
+using Blackwall.Modules.DiscordAccountScoring;
 using Blackwall.Modules.ContentGuard;
 using Blackwall.Bot.Twitch;
 using Blackwall.Bot.Twitch.Services;

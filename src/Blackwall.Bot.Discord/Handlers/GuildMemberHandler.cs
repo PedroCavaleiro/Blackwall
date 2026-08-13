@@ -1,5 +1,6 @@
 using Blackwall.Bot.Discord.Services;
 using Blackwall.Core.Entities;
+using Blackwall.Modules.DiscordAccountScoring;
 using Blackwall.Infrastructure.Cache.Discord;
 using Discord;
 using Discord.WebSocket;

@@ -1,4 +1,4 @@
-using Blackwall.Bot.Discord.Services;
+using Blackwall.Modules.DiscordAccountScoring;
 using Blackwall.Modules.LinkProtection.Services;
 using Blackwall.Core.DTOs;
 using Blackwall.Core.Entities;

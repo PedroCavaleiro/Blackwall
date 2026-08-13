@@ -99,16 +99,17 @@ public sealed class MessageHandler(
                 "NetWatchSnare trap triggered in guild {GuildId} channel {ChannelId} by user {UserId}",
                 discordGuildId, message.Channel.Id, discordUserId);
 
-            try {
-                await message.DeleteAsync();
-            } catch (Exception ex) {
-                logger.LogWarning(ex,
-                    "Failed to delete netWatchSnare-triggered message {MessageId} in guild {GuildId}",
-                    message.Id, discordGuildId);
-            }
+            if (!config.IsDryRun) {
+                try {
+                    await message.DeleteAsync();
+                } catch (Exception ex) {
+                    logger.LogWarning(ex,
+                        "Failed to delete netWatchSnare-triggered message {MessageId} in guild {GuildId}",
+                        message.Id, discordGuildId);
+                }
 
-            if (!config.IsDryRun)
                 await netWatchSnareService.ApplyNetWatchSnareActionAsync(message, guildChannel.Guild, netWatchSnare);
+            }
 
             if (config.LogChannelId.HasValue)
                 await netWatchSnareService.SendNetWatchSnareLogAsync(message, guildChannel.Guild, netWatchSnare, config.LogChannelId);

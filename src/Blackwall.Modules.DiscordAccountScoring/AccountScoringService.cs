@@ -2,16 +2,16 @@ using System.Text.RegularExpressions;
 using Blackwall.Core.Entities;
 using Discord;
 
-namespace Blackwall.Bot.Discord.Services;
+namespace Blackwall.Modules.DiscordAccountScoring;
 
 public sealed partial class AccountScoringService {
     private const int MinAccountAgeDays = 1;
     private const int RecentAccountAgeDays = 7;
     private const int SomewhatRecentAccountAgeDays = 30;
 
-    private static readonly Regex GibberishPattern = GibberishPatternRegex();
     private static readonly Regex NumericOnlyPattern = NumericOnlyPatternRegex();
     private static readonly Regex ConsecutiveConsonantsPattern = ConsecutiveConsonantsPatternRegex();
+    private static readonly HashSet<char> Vowels = ['a', 'e', 'i', 'o', 'u'];
 
     /// <summary>
     /// Scores a guild user based on account metadata: account age, avatar presence,
@@ -48,9 +48,9 @@ public sealed partial class AccountScoringService {
         if (NumericOnlyPattern.IsMatch(username)) {
             score += 2;
             factors.Add("Username is purely numeric");
-        } else if (GibberishPattern.IsMatch(username)) {
+        } else if (IsGibberish(username)) {
             score += 2;
-            factors.Add("Username appears to be alphanumeric gibberish");
+            factors.Add("Username appears to be gibberish (very low vowel ratio)");
         } else if (ConsecutiveConsonantsPattern.IsMatch(username)) {
             score += 1;
             factors.Add("Username has excessive consecutive consonants");
@@ -65,13 +65,27 @@ public sealed partial class AccountScoringService {
         return new AccountScoreResult(score, threatLevel, factors);
     }
 
-    [GeneratedRegex(@"^[a-z0-9]{6,}$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
-    private static partial Regex GibberishPatternRegex();
+    /// <summary>
+    /// Returns true if the username is 6+ characters, alphanumeric, and has a vowel
+    /// ratio below 15% — a strong indicator of randomly generated gibberish.
+    /// Normal usernames like "david1" or "pedro99" have sufficient vowels and pass.
+    /// </summary>
+    private static bool IsGibberish(string username) {
+        if (username.Length < 6)
+            return false;
+
+        var letters = username.Where(char.IsLetterOrDigit).ToArray();
+        if (letters.Length < 6)
+            return false;
+
+        var vowelCount = letters.Count(c => Vowels.Contains(char.ToLowerInvariant(c)));
+        return (double)vowelCount / letters.Length < 0.15;
+    }
 
     [GeneratedRegex(@"^\d+$", RegexOptions.Compiled, "en-US")]
     private static partial Regex NumericOnlyPatternRegex();
 
-    [GeneratedRegex(@"[^aeiou0-9]{5,}", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
+    [GeneratedRegex(@"[^aeiou0-9]{7,}", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
     private static partial Regex ConsecutiveConsonantsPatternRegex();
 }
 
