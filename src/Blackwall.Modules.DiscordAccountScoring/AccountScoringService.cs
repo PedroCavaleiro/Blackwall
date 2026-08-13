@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 using Blackwall.Core.Entities;
 using Discord;
 
-namespace Blackwall.Bot.Discord.Services;
+namespace Blackwall.Modules.DiscordAccountScoring;
 
 public sealed partial class AccountScoringService {
     private const int MinAccountAgeDays = 1;
