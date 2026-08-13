@@ -1,8 +1,4 @@
-using Blackwall.Core.Entities;
 using Blackwall.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace Blackwall.Modules.Banlist;
 

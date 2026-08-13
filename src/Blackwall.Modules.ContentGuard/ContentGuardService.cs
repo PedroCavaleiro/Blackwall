@@ -219,7 +219,7 @@ public sealed partial class ContentGuardService(
     }
 
     /// <summary>
-    /// Replaces common leetspeak substitutions to normalise text before comparison.
+    /// Replaces common leetspeak substitutions to normalize text before comparison.
     /// </summary>
     private static string NormaliseLeetspeak(string input) {
         var sb = new StringBuilder(input.Length);

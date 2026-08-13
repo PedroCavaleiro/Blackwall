@@ -1,5 +1,4 @@
 using Blackwall.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -127,7 +126,7 @@ public sealed class BanSyncService(
             return new BanImportResult(0, 0, 0, [$"Source {platformProvider.PlatformName} {sourcePlatformId} not found."]);
         }
 
-        var (sourceInstanceId, shareBanList, sourceBans) = sourceData.Value;
+        var (_, shareBanList, sourceBans) = sourceData.Value;
         if (!shareBanList) {
             return new BanImportResult(0, 0, 0, [$"Source {platformProvider.PlatformName} {sourcePlatformId} does not have ban list sharing enabled."]);
         }

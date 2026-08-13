@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+// ReSharper disable UnusedMember.Local
 
 namespace Blackwall.Api.Controllers;
 
@@ -51,11 +52,10 @@ public sealed class GuildsController(
         return (key, iv);
     }
 
-    private static string? Encrypt(string? plainText, byte[] key, byte[] iv) {
-        if (string.IsNullOrWhiteSpace(plainText))
-            return plainText;
-        return AesCrypto.EncryptString(plainText, key, iv);
-    }
+    private static string? Encrypt(string? plainText, byte[] key, byte[] iv) =>
+        string.IsNullOrWhiteSpace(plainText)
+            ? plainText
+            : AesCrypto.EncryptString(plainText, key, iv);
 
     private static string? Decrypt(string? cipherText, byte[] key, byte[] iv) {
         if (string.IsNullOrWhiteSpace(cipherText))

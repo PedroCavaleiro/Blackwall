@@ -10,7 +10,6 @@ using Blackwall.Infrastructure.Persistence;
 using Blackwall.Modules.LinkProtection;
 using Blackwall.Bot.Twitch;
 using Blackwall.Bot.Twitch.Services;
-using Blackwall.Modules.Abstractions;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authorization;
